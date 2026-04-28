@@ -16,7 +16,10 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', adminAuth, routes);
-app.use('/admin', express.static(path.join(__dirname, '..', 'public')));
+app.get('/admin', adminAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+});
+app.use('/admin', adminAuth, express.static(path.join(__dirname, '..', 'public')));
 app.get('/', (req, res) => res.redirect('/admin'));
 
 if (require.main === module) {

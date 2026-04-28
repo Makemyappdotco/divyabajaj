@@ -4,17 +4,36 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Divya Bajaj</title>
-  <meta http-equiv="refresh" content="0; url=/landing.html">
   <style>
     body{margin:0;background:#08070a;color:#f4efe7;font-family:Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center;padding:24px}
+    .loader{max-width:520px}
+    h1{font-size:24px;margin-bottom:10px}
+    p{color:#b9afa2;line-height:1.6}
     a{color:#c9a96e}
   </style>
 </head>
 <body>
-  <div>
+  <div class="loader">
     <h1>Loading Divya Bajaj...</h1>
-    <p><a href="/landing.html">Click here if the page does not open automatically.</a></p>
+    <p>Please wait while the experience opens.</p>
+    <p><a href="/landing.html">Open direct landing page</a></p>
   </div>
-  <script>window.location.replace('/landing.html');</script>
+  <script>
+    async function loadLanding(){
+      try{
+        var response=await fetch('/landing.html',{cache:'no-store'});
+        var html=await response.text();
+        var script='<script src="/flow-fix.js?v=2"><\\/script>';
+        if(html.indexOf('</body>')>-1){html=html.replace('</body>',script+'</body>');}
+        else{html+=script;}
+        document.open();
+        document.write(html);
+        document.close();
+      }catch(error){
+        document.body.innerHTML='<div class="loader"><h1>Landing page could not load</h1><p>'+error.message+'</p><p><a href="/landing.html">Try direct page</a></p></div>';
+      }
+    }
+    loadLanding();
+  </script>
 </body>
 </html>

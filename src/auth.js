@@ -8,8 +8,10 @@ function requestLogin(res) {
 
 function adminAuth(req, res, next) {
   const publicPostPaths = ['/leads', '/reports/free', '/payments/webhook', '/calculate'];
+  const isPublicPost = req.method === 'POST' && publicPostPaths.some(p => req.path === p || req.path.startsWith(`${p}/`));
+  const isPublicPdf = req.method === 'GET' && /^\/reports\/[^/]+\/pdf$/.test(req.path);
 
-  if (req.method === 'POST' && publicPostPaths.some(p => req.path === p || req.path.startsWith(`${p}/`))) {
+  if (isPublicPost || isPublicPdf) {
     return next();
   }
 

@@ -1,0 +1,15 @@
+{
+  "name": "divya-bajaj-backend",
+  "version": "1.0.0",
+  "description": "Backend system for Divya Bajaj platform",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "build": "echo \"No build step required\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}

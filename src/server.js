@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api', adminAuth, routes);
 app.get('/admin', adminAuth, (req, res) => {
-  res.sendFile(path.join(publicDir, 'index.html'));
+  res.sendFile(path.join(publicDir, 'admin.html'));
 });
 app.use('/admin', adminAuth, express.static(publicDir));
 app.use(express.static(publicDir));

@@ -1,86 +1,136 @@
-# Divya Bajaj - Backend System
+# Divya Bajaj Backend System
 
-Complete backend for the Divya Bajaj Astro-Numerologist platform.
+Backend for the Divya Bajaj astrology and numerology funnel.
 
-## Architecture
+## What this system does
 
-```
-Landing Page Form
+```text
+Landing page form
       |
       v
-   /api/reports/free  --> Numerology Calculator --> Claude AI Agent --> Report
-      |                                                                    |
-      v                                                                    v
-   Lead Created                                                   On-Screen Display
-      |                                                                    |
-      v                                                                    v
-   WhatsApp Delivery --> Follow-up Bot (2hr delay) --> Upsell --> Payment
+/api/reports/free
+      |
+      v
+Lead created -> Numerology calculation -> OpenAI report generation -> Report saved
+      |
+      v
+WhatsApp delivery in mock mode now, provider API can be added later
+      |
+      v
+Upsell follow-up for paid report and consultation
 ```
 
-## API Endpoints
+## Current status
 
-### Public (no auth needed)
-- `POST /api/leads` - Capture lead from landing page
-- `POST /api/reports/free` - Generate free report (full pipeline)
-- `POST /api/payments/webhook` - Razorpay webhook
-- `POST /api/calculate` - Standalone numerology calculator
+This version is prepared for Vercel testing and uses OpenAI instead of Claude.
 
-### Protected (admin auth)
-- `GET /api/leads` - List leads (filter by status, tier, search)
-- `GET /api/leads/:id` - Lead detail with reports, payments, bookings
-- `PATCH /api/leads/:id` - Update lead
-- `POST /api/reports/paid` - Create paid report + Razorpay order
-- `POST /api/payments/verify` - Verify Razorpay payment
-- `GET /api/payments` - List payments
-- `POST /api/bookings` - Create booking
-- `GET /api/bookings` - List bookings
-- `GET /api/bookings/slots/:date` - Available slots for a date
-- `GET /api/stats` - Dashboard analytics
-- `GET /api/events` - Activity log
-- `GET /api/export/:table?format=csv` - Export CSV
+Working now:
+- Express API
+- Admin dashboard
+- Basic auth for admin and protected APIs
+- Numerology calculation without external API
+- Free report pipeline
+- OpenAI report generation when `OPENAI_API_KEY` is added
+- Razorpay mock mode when keys are missing
+- WhatsApp mock mode when provider keys are missing
+- JSON file database for testing
 
-## Setup
+Important: On Vercel, JSON storage is temporary. This is okay for testing. For production, move the database to Supabase, PostgreSQL, MongoDB, or another persistent database.
 
-1. `cp .env.example .env` and fill in your keys
-2. `npm install`
-3. `npm start`
+## Required Vercel environment variables
+
+Minimum for testing:
+
+```env
+NODE_ENV=production
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change-this-now
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Optional for later:
+
+```env
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+WHATSAPP_API_KEY=
+WHATSAPP_API_URL=
+SITE_URL=
+```
+
+## API endpoints
+
+### Public endpoints
+
+- `POST /api/leads`
+- `POST /api/reports/free`
+- `POST /api/payments/webhook`
+- `POST /api/calculate`
+- `GET /health`
+
+### Protected admin endpoints
+
+These require Basic Auth using `ADMIN_USERNAME` and `ADMIN_PASSWORD`.
+
+- `GET /api/leads`
+- `GET /api/leads/:id`
+- `PATCH /api/leads/:id`
+- `POST /api/reports/paid`
+- `POST /api/payments/verify`
+- `GET /api/payments`
+- `POST /api/bookings`
+- `GET /api/bookings`
+- `GET /api/bookings/slots/:date`
+- `GET /api/stats`
+- `GET /api/events`
+- `GET /api/export/:table?format=csv`
+
+## Admin dashboard
+
+Open:
+
+```text
+/admin
+```
+
+Browser will ask for username and password.
+
+## Local setup
+
+```bash
+npm install
+npm start
+```
 
 Server runs on port 3000.
-- API: http://localhost:3000/api
-- Admin Dashboard: http://localhost:3000/admin
 
-## Services
+```text
+API: http://localhost:3000/api
+Admin: http://localhost:3000/admin
+Health: http://localhost:3000/health
+```
 
-### Numerology Calculator (`services/numerology.js`)
-Pure math calculations - no API needed:
-- Ruling Number (from DOB day)
-- Destiny Number (from full DOB)
-- Name Number (Chaldean method)
-- Lo Shu Grid (digit frequency)
-- Personal Year
-- Plane Analysis (Mental/Emotional/Practical)
+## Vercel setup
 
-### AI Report Agent (`services/numerology.js`)
-Uses Claude API to generate human-readable reports from calculated numbers.
-Two modes: Free (500 words) and Paid (2000-3000 words).
+Settings:
 
-### Razorpay (`services/razorpay.js`)
-Order creation, signature verification, refunds.
-Works in mock mode if keys not configured.
+```text
+Application Preset: Other
+Root Directory: ./
+Build Command: npm run build
+Install Command: npm install
+Output Directory: leave blank
+```
 
-### WhatsApp (`services/whatsapp.js`)
-Report delivery, payment confirmations, booking confirmations, follow-up upsells.
-Compatible with Interakt/AiSensy/Wati APIs.
+Then add environment variables and deploy.
 
-## Data Storage
-JSON files in `/data` directory. Production recommendation: migrate to PostgreSQL or MongoDB.
+## Production recommendation
 
-## Deployment
+Before client launch:
 
-### Vercel test deployment
-This repo includes `api/index.js` and `vercel.json`, so it can be imported into Vercel for testing.
-
-Important: the current JSON database writes to `/tmp` on Vercel. This is fine for demo/testing, but data is not permanent. For production, migrate the database layer to Supabase, PostgreSQL, MongoDB, or another persistent database.
-
-### Recommended production hosting
-Railway, Render, or DigitalOcean App Platform are better for this exact Express + JSON storage version because they can keep a persistent disk.
+1. Move JSON storage to Supabase or PostgreSQL.
+2. Add real WhatsApp provider integration.
+3. Add Razorpay live keys.
+4. Add FreeAstrologyAPI as optional astrology calculation layer.
+5. Add report review/edit flow for Divya before paid report delivery.

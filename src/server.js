@@ -20,7 +20,9 @@ app.get('/admin', adminAuth, (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 app.use('/admin', adminAuth, express.static(path.join(__dirname, '..', 'public')));
-app.get('/', (req, res) => res.redirect('/admin'));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'landing.html'));
+});
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`Divya Bajaj Backend System running on ${PORT}`));

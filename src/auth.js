@@ -1,6 +1,11 @@
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'divya';
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'changethispassword123';
 
+function requestLogin(res) {
+  res.setHeader('WWW-Authenticate', 'Basic realm="Divya Bajaj Admin"');
+  return res.status(401).send('Authentication required');
+}
+
 function adminAuth(req, res, next) {
   const publicPostPaths = ['/leads', '/reports/free', '/payments/webhook', '/calculate'];
 
@@ -10,15 +15,17 @@ function adminAuth(req, res, next) {
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return requestLogin(res);
   }
 
   const credentials = Buffer.from(authHeader.split(' ')[1], 'base64').toString();
-  const [user, pass] = credentials.split(':');
+  const separatorIndex = credentials.indexOf(':');
+  const user = credentials.slice(0, separatorIndex);
+  const pass = credentials.slice(separatorIndex + 1);
 
   if (user === ADMIN_USER && pass === ADMIN_PASS) return next();
 
-  return res.status(403).json({ error: 'Invalid credentials' });
+  return requestLogin(res);
 }
 
 function generateToken() {

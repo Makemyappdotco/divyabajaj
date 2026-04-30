@@ -73,8 +73,7 @@ function calcAllNumbers(name, dob) {
 
 function fallbackReport(type, name, dob, question) {
   const numbers = calcAllNumbers(name, dob);
-  const concernLine = question ? `Your main question is: ${question}` : 'Your report gives a first layer of personal clarity.';
-  const reportText = `Namaste ${name},\n\nYour core numerology snapshot shows Ruling Number ${numbers.ruling_number}, Destiny Number ${numbers.destiny_number}, Name Number ${numbers.name_number}, and Personal Year ${numbers.personal_year}.\n\n${concernLine}\n\nThis combination suggests that your current phase needs more clarity, patience, and practical decision-making. The free report is a starting point only. For deeper timing, repeated patterns, missing number impact, and remedies, a detailed report or consultation is recommended.`;
+  const reportText = `Namaste ${name},\n\nQuick Summary\nYour basic numerology report shows Ruling Number ${numbers.ruling_number}, Destiny Number ${numbers.destiny_number}, Name Number ${numbers.name_number}, and Personal Year ${numbers.personal_year}.\n\nNumerology Report\nRuling Number ${numbers.ruling_number} shows how you usually respond to life. Destiny Number ${numbers.destiny_number} shows the larger direction of your life. Name Number ${numbers.name_number} shows the energy of your public identity.\n\nYour main focus is: ${question || 'General life clarity'}.\n\nThis basic report suggests that your current phase needs clarity, patience, and practical decision-making. For deeper astrology, timing, remedies, and detailed guidance, you can request an advanced report or consultation.`;
   return { generated: false, numbers, report_text: reportText, insights: { concerns: [question || 'General life clarity'] }, message: 'OpenAI API key not configured, returned fallback report.' };
 }
 
@@ -102,16 +101,18 @@ async function callOpenAI(prompt) {
   return parts.join('\n');
 }
 
-async function generateReport(type, name, dob, question = '') {
+async function generateReport(type, name, dob, question = '', astrologyData = null) {
   const numbers = calcAllNumbers(name, dob);
-  const wordCount = type === 'free_awareness' ? '450 to 600 words' : '1800 to 2500 words';
-  const prompt = `You are writing a personalised astrology and numerology style report for Divya Bajaj, Astro-Numerologist.\n\nWrite in simple Indian English. Keep the tone calm, premium, clear, personal, and human. Do not sound like AI. Do not make scary, guaranteed, medical, legal, death-related, or absolute claims. Use may, indicates, suggests, this period asks for caution.\n\nReport type: ${type}\nLength: ${wordCount}\n\nClient details:\nName: ${name}\nDOB: ${dob}\nQuestion: ${question || 'General life clarity'}\n\nCalculated numerology data:\n${JSON.stringify(numbers, null, 2)}\n\nStructure:\n1. Personal opening\n2. Core number pattern\n3. Lo Shu grid insight\n4. Current life phase\n5. Guidance for the main concern\n6. Simple remedy\n7. Next step CTA\n\nFor free report, end by naturally inviting the user to upgrade to a deeper report. For paid report, make it more detailed and action-oriented.`;
+  const wordCount = type === 'free_awareness' ? '1200 to 1500 words' : '2000 to 3000 words';
+  const astroStatus = astrologyData && astrologyData.success ? 'Astrology data is available.' : 'Astrology data is not fully available.';
+  const prompt = `Write a free awareness report for Divya Bajaj, Astro-Numerologist.\n\nReader: normal Indian user, not an astrology expert.\nLanguage: very simple Indian English. Clear, relatable, practical.\nAvoid: heavy words, fear, fixed predictions, confusing spiritual language, textbook tone.\nUse soft words: may, can, suggests, shows a tendency.\nExplain every number or astrology point in daily life language.\n\nLength: ${wordCount}\n\nClient Name: ${name}\nDOB: ${dob}\nUser Focus: ${question || 'General life clarity'}\n\nNumerology Data:\n${JSON.stringify(numbers, null, 2)}\n\n${astroStatus}\nAstrology Data:\n${JSON.stringify(astrologyData, null, 2)}\n\nWrite with these exact headings:\n1. Personal Opening\n2. Quick Summary\n3. Numerology Report\n4. Astrology Report\n5. Combined Insight\n6. Current Phase Guidance\n7. Simple Remedies\n8. What This Free Report Covers\n9. Next Step\n\nRules:\n- In Quick Summary, give 6 to 8 simple bullet points.\n- In Numerology Report, explain Ruling Number, Destiny Number, Name Number, Personal Year, Lo Shu Grid, missing numbers, repeated numbers, and mental, emotional, practical planes.\n- In Astrology Report, use only astrology API data if success is true. If not, clearly say detailed astrology chart data could not be fetched, so this section is kept basic.\n- Give 4 to 6 simple remedies. No expensive or fear-based remedies.\n- End with a soft upgrade CTA for advanced report or one-to-one consultation.`;
   try {
     const text = await callOpenAI(prompt);
     if (!text) return fallbackReport(type, name, dob, question);
     const concerns = [];
     if (question) concerns.push(question);
     if (numbers.lo_shu_grid.missing.length) concerns.push(`Missing numbers: ${numbers.lo_shu_grid.missing.join(', ')}`);
+    if (astrologyData && astrologyData.success) concerns.push('Astrology chart data available');
     return { generated: true, numbers, report_text: text, insights: { concerns } };
   } catch (error) {
     console.error('[OpenAI report error]', error.message);

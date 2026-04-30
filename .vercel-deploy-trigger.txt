@@ -1,0 +1,2 @@
+Trigger Vercel deployment after astrology timezone parsing fix.
+Commit included: 03203c166219687087bf5b3ebafe67d61477f47c

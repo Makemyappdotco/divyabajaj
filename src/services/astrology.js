@@ -10,6 +10,15 @@ function parseTob(tob) {
   return { hours: hours || 0, minutes: minutes || 0, seconds: 0 };
 }
 
+function toNumber(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '' || value === 'null') continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
 async function callApi(endpoint, payload) {
   const key = process.env.FREE_ASTROLOGY_API_KEY;
   if (!key) return { success: false, skipped: true, error: 'FREE_ASTROLOGY_API_KEY missing' };
@@ -45,13 +54,21 @@ async function getGeoDetails(place) {
   const geo = pickGeo(result.data);
   if (!geo) return { success: false, error: 'Location not found', raw: result.data };
 
+  const latitude = toNumber(geo.latitude, geo.lat);
+  const longitude = toNumber(geo.longitude, geo.lon, geo.lng);
+  const timezone = toNumber(geo.timezone_offset, geo.timezone, geo.tzone, geo.offset, 5.5);
+
+  if (latitude === null || longitude === null || timezone === null) {
+    return { success: false, error: 'Geo result missing latitude, longitude, or timezone', geo, raw: result.data };
+  }
+
   return {
     success: true,
     geo: {
       ...geo,
-      latitude: Number(geo.latitude || geo.lat),
-      longitude: Number(geo.longitude || geo.lon || geo.lng),
-      timezone: Number(geo.timezone || geo.timezone_offset || geo.tzone || geo.offset)
+      latitude,
+      longitude,
+      timezone
     },
     raw: result.data
   };

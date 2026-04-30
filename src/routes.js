@@ -2,6 +2,7 @@ const express = require('express');
 const db = require('./database');
 const numerology = require('./services/numerology');
 const { generateReportPdf } = require('./services/pdf');
+const { getVedicPlanets } = require('./services/astrology');
 
 const router = express.Router();
 
@@ -14,47 +15,30 @@ function requireFreeReportFields(body) {
 router.post('/leads', (req, res) => {
   try {
     const { name, phone, dob, tob, pob, email, question, source, utm_source, utm_medium, utm_campaign } = req.body;
-
-    if (!name || !phone || !dob) {
-      return res.status(400).json({ error: 'Name, phone, and date of birth are required' });
-    }
-
+    if (!name || !phone || !dob) return res.status(400).json({ error: 'Name, phone, and date of birth are required' });
     const existing = db.getLeads({ search: phone });
-    if (existing.length > 0) {
-      return res.json({ success: true, lead: existing[0], existing: true });
-    }
-
+    if (existing.length > 0) return res.json({ success: true, lead: existing[0], existing: true });
     const lead = db.createLead({ name, phone, dob, tob, pob, email, question, source, utm_source, utm_medium, utm_campaign });
     res.status(201).json({ success: true, lead, existing: false });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 router.post('/calculate', (req, res) => {
   try {
     const { name, dob } = req.body;
-    if (!name || !dob) {
-      return res.status(400).json({ error: 'Name and DOB are required' });
-    }
+    if (!name || !dob) return res.status(400).json({ error: 'Name and DOB are required' });
     res.json({ success: true, numbers: numerology.calcAllNumbers(name, dob) });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
 router.post('/reports/free', async (req, res) => {
   try {
     const { name, phone, dob, tob, pob, email, question, source } = req.body;
     const missing = requireFreeReportFields(req.body);
-
-    if (missing.length) {
-      return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
-    }
+    if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
     let lead;
     const existing = db.getLeads({ search: phone });
-
     if (existing.length > 0) {
       lead = db.updateLead(existing[0].id, { name, phone, dob, tob, pob, email, question, source: source || existing[0].source || 'free_report_form' });
     } else {
@@ -68,12 +52,14 @@ router.post('/reports/free', async (req, res) => {
       input_data: { name, phone, dob, tob, pob, email, question }
     });
 
-    const concern = question || `Generate a detailed free awareness report using DOB ${dob}, birth time ${tob}, and birthplace ${pob}.`;
-    const result = await numerology.generateReport('free_awareness', name, dob, concern);
+    const astrologyData = await getVedicPlanets({ dob, tob, pob });
+    const concern = question || `General life clarity using DOB ${dob}, birth time ${tob}, and birthplace ${pob}.`;
+    const result = await numerology.generateReport('free_awareness', name, dob, concern, astrologyData);
 
     const updatedReport = db.updateReport(report.id, {
       status: 'completed',
       horosoft_data: result.numbers,
+      astrology_data: astrologyData,
       ai_report: result.report_text,
       ai_insights: result.insights,
       generated_by: result.generated ? 'openai' : 'fallback',
@@ -88,6 +74,7 @@ router.post('/reports/free', async (req, res) => {
       report_id: report.id,
       generated_by: result.generated ? 'openai' : 'fallback',
       numbers: result.numbers,
+      astrology_data: astrologyData,
       report_text: result.report_text,
       pdf_url: `/api/reports/${report.id}/pdf`,
       report: updatedReport
@@ -102,23 +89,13 @@ router.get('/reports/:id/pdf', async (req, res) => {
   try {
     const report = db.getReports({}).find(item => item.id === req.params.id);
     if (!report) return res.status(404).json({ error: 'Report not found' });
-
     const lead = db.getLead(report.lead_id) || {};
-    const pdfBuffer = await generateReportPdf({
-      lead,
-      report,
-      numbers: report.horosoft_data || {},
-      reportText: report.ai_report || 'Report content is not available.'
-    });
-
+    const pdfBuffer = await generateReportPdf({ lead, report, numbers: report.horosoft_data || {}, astrologyData: report.astrology_data || null, reportText: report.ai_report || 'Report content is not available.' });
     const safeName = String(lead.name || 'Divya-Bajaj-Report').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}-free-report.pdf"`);
     res.send(pdfBuffer);
-  } catch (error) {
-    console.error('[PDF error]', error);
-    res.status(500).json({ error: error.message });
-  }
+  } catch (error) { console.error('[PDF error]', error); res.status(500).json({ error: error.message }); }
 });
 
 router.get('/leads', (req, res) => {
@@ -148,28 +125,20 @@ router.get('/reports/:id', (req, res) => {
   res.json({ success: true, report });
 });
 
-router.get('/stats', (req, res) => {
-  res.json({ success: true, stats: db.getStats() });
-});
-
-router.get('/events', (req, res) => {
-  res.json({ success: true, events: db.getEvents(Number(req.query.limit) || 100) });
-});
+router.get('/stats', (req, res) => res.json({ success: true, stats: db.getStats() }));
+router.get('/events', (req, res) => res.json({ success: true, events: db.getEvents(Number(req.query.limit) || 100) }));
 
 router.get('/export/leads', (req, res) => {
   const leads = db.getLeads();
   if (!leads.length) return res.send('');
   const headers = Object.keys(leads[0]);
-  const csv = [
-    headers.join(','),
-    ...leads.map(row => headers.map(header => {
-      let value = row[header];
-      if (typeof value === 'object') value = JSON.stringify(value);
-      value = String(value || '');
-      if (value.includes(',')) value = `"${value.replace(/"/g, '""')}"`;
-      return value;
-    }).join(','))
-  ].join('\n');
+  const csv = [headers.join(','), ...leads.map(row => headers.map(header => {
+    let value = row[header];
+    if (typeof value === 'object') value = JSON.stringify(value);
+    value = String(value || '');
+    if (value.includes(',')) value = `"${value.replace(/"/g, '""')}"`;
+    return value;
+  }).join(','))].join('\n');
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=leads.csv');
   res.send(csv);

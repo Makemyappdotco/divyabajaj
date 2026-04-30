@@ -249,7 +249,7 @@ body.light .toggle-icon.moon{opacity:0}body.light .toggle-icon.sun{opacity:1}
 .svc-items span::before{content:'';position:absolute;left:0;top:6px;width:4px;height:4px;border-radius:50%;background:var(--gold);opacity:.3}
 
 /* Pricing */
-.pricing-head{text-align:center;max-width:520px;margin:0 auto clamp(32px,5vw,48px)}
+.pricing-head{text-align:center;max-width:520px;margin:0 auto clamp(32px,5vw,48px);padding-top:24px}
 .price-row{display:grid;grid-template-columns:1fr;gap:16px;max-width:860px;margin:0 auto}
 @media(min-width:640px){.price-row{grid-template-columns:1fr 1fr 1fr}}
 .pcard{padding:clamp(28px,4vw,40px);border:1px solid rgba(201,169,110,.06);transition:all .5s;position:relative;overflow:hidden}
@@ -683,7 +683,7 @@ background:linear-gradient(135deg,rgba(201,169,110,.08) 0%,transparent 50%)}
 .pcard.popular{border-color:rgba(201,169,110,.2);background:linear-gradient(170deg,rgba(201,169,110,.08) 0%,rgba(201,169,110,.01) 100%)}
 .pcard.popular::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold)}
 .pcard.popular:hover{box-shadow:0 24px 60px rgba(201,169,110,.15);transform:translateY(-8px) scale(1.03)}
-.pcard-ribbon{position:absolute;top:18px;right:-32px;background:var(--gold);color:var(--bg);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 40px;transform:rotate(45deg);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.pcard-ribbon{position:absolute;top:20px;right:-30px;background:var(--gold);color:var(--bg);font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:6px 36px;transform:rotate(45deg);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.15);text-align:center;line-height:1;display:flex;align-items:center;justify-content:center;width:130px}
 .pcard-phase{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .pcard-phase .phase-num{width:20px;height:20px;border-radius:50%;border:1px solid rgba(201,169,110,.2);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--gold);font-family:var(--serif)}
 .pcard h3{font-family:var(--serif);font-size:clamp(16px,2vw,19px);font-weight:500;color:var(--ivory);margin-bottom:6px;line-height:1.25}
@@ -1263,6 +1263,38 @@ background:radial-gradient(circle at 35% 35%,rgba(176,141,74,.12),rgba(176,141,7
 box-shadow:0 0 20px rgba(176,141,74,.04)}
 body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 
+
+/* ===== FREE REPORT RESULT BOX ===== */
+#generatedReportBox{margin-top:16px;padding:20px;border:1.5px solid rgba(201,169,110,.2);background:rgba(201,169,110,.04);max-height:400px;overflow-y:auto}
+#generatedReportBox h4{font-family:var(--serif);font-size:17px;color:var(--ivory);margin-bottom:4px}
+#generatedReportBox .result-sub{font-size:12px;color:var(--text-m);margin-bottom:14px}
+#generatedReportBox .report-content{font-size:13px;color:var(--text-m);line-height:1.75;white-space:pre-wrap;font-weight:300}
+.pdf-download-btn{display:block;width:100%;padding:14px;margin-top:14px;background:#25D366;color:white;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;text-align:center;border:none;cursor:pointer;font-family:var(--sans);transition:all .3s}
+.pdf-download-btn:hover{background:#20BD5A;transform:translateY(-2px)}
+body.light #generatedReportBox{border-color:rgba(176,141,74,.18);background:rgba(176,141,74,.03)}
+.popup-form select{width:100%;padding:13px 14px;background:rgba(201,169,110,.04);border:1.5px solid rgba(201,169,110,.18);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:300;outline:none;transition:border-color .3s;appearance:none}
+.popup-form select:focus{border-color:var(--gold)}
+body.light .popup-form select{background:rgba(176,141,74,.03);border-color:rgba(176,141,74,.12)}
+
+
+/* ===== INPUT LABEL FIX + SERVICE NUMBER FIX ===== */
+
+/* Date and Time inputs - add visible labels */
+.popup-form .field-group{position:relative;width:100%}
+.popup-form .field-label{display:block;font-size:11px;font-weight:500;color:var(--gold);letter-spacing:.5px;margin-bottom:4px}
+.popup-form input[type="date"],
+.popup-form input[type="time"]{color:var(--text)!important;-webkit-appearance:none}
+.popup-form input[type="date"]::-webkit-calendar-picker-indicator,
+.popup-form input[type="time"]::-webkit-calendar-picker-indicator{filter:invert(.7) sepia(.3) hue-rotate(10deg);opacity:.6}
+body.light .popup-form input[type="date"]::-webkit-calendar-picker-indicator,
+body.light .popup-form input[type="time"]::-webkit-calendar-picker-indicator{filter:none;opacity:.5}
+
+/* Service card numbers - BOLD and visible */
+.svc-num{color:rgba(201,169,110,.50)!important;font-size:44px!important}
+.svc:hover .svc-num{color:rgba(201,169,110,.65)!important}
+body.light .svc-num{color:rgba(176,141,74,.50)!important}
+body.light .svc:hover .svc-num{color:rgba(176,141,74,.60)!important}
+
 </style>
 <div class="scroll-progress" id="scrollProg"></div>
 
@@ -1293,7 +1325,7 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 </a>
 <div class="nav-links"><a href="#about">About</a><a href="#services">Services</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></div>
 <div class="nav-right">
-<a href="#free-report" class="nav-free">Free Report</a>
+<a href="javascript:void(0)" onclick="openFreeReportPopup()" class="nav-free">Free Report</a>
 <a href="#booking" class="nav-book">Book Now</a>
 <div class="theme-toggle" id="themeToggle" title="Switch theme"><span class="toggle-icon moon">&#9789;</span><span class="toggle-icon sun">&#9728;</span></div>
 </div>
@@ -1330,7 +1362,7 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 <div class="hero-free-box">
 <div class="hero-free-label">&#10022; Free Report</div>
 <div class="hero-free-title">See what your numbers reveal about you</div>
-<button class="hero-free-btn pulse-cta" onclick="document.getElementById('free-report').scrollIntoView({behavior:'smooth'})">Get My Free Report &#8594;</button>
+<button class="hero-free-btn pulse-cta" type="button" onclick="openFreeReportPopup()">Get My Free Report &rarr;</button>
 </div>
 
 </div>
@@ -1507,7 +1539,7 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 <div class="pcard-save" style="background:rgba(126,214,148,.08);color:#7ED694">Zero cost, zero catch</div>
 <div class="pcard-desc">Your personalised numerology snapshot: ruling number, destiny path, career alignment, and one powerful remedy. Handcrafted by Divya. Delivered on WhatsApp within 24 hours.</div>
 <div class="pcard-tags"><span class="pcard-tag">Ruling Number</span><span class="pcard-tag">Destiny Number</span><span class="pcard-tag">Career Check</span><span class="pcard-tag">1 Remedy</span></div>
-<a href="#free-report" class="pcard-btn">Get Free Report</a>
+<a href="javascript:void(0)" onclick="openFreeReportPopup()" class="pcard-btn">Get Free Report</a>
 </div>
 
 <div class="pcard popular reveal reveal-d1 tilt-card">
@@ -1628,7 +1660,7 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 </div>
 <div class="footer-tag">"Stop guessing. Start knowing."</div>
 <div class="footer-btns">
-<a href="#free-report" class="footer-btn fp">Free Report</a>
+<a href="javascript:void(0)" onclick="openFreeReportPopup()" class="footer-btn fp">Free Report</a>
 <a href="https://wa.me/91XXXXXXXXXX" target="_blank" class="footer-btn fs">WhatsApp</a>
 <a href="#booking" class="footer-btn fs">Book Consultation</a>
 </div>
@@ -1638,7 +1670,7 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 </footer>
 
 <div class="sticky" id="sticky">
-<a href="#free-report" class="st-free">Free Report</a>
+<a href="javascript:void(0)" onclick="openFreeReportPopup()" class="st-free">Free Report</a>
 <a href="https://wa.me/91XXXXXXXXXX" target="_blank" class="st-book">WhatsApp</a>
 </div>
 <!-- Live Activity Notifications -->
@@ -1663,30 +1695,30 @@ body.light .f-planet::after{border-color:rgba(176,141,74,.06)}
 <div class="popup-portrait" id="popupPortrait"></div>
 <div class="popup-visual-text">
 <div class="popup-badge"><span class="badge-dot"></span>Divya Bajaj is Online</div>
-<h3>Your free report is ready to be made</h3>
+<h3>Generate your free awareness report instantly</h3>
 </div>
 </div>
 
 <div class="popup-body">
-<h2 class="popup-headline">Wait, before you go.<br><em>This takes 30 seconds.</em></h2>
-<p class="popup-sub">Get your personalised numerology snapshot for free. Ruling number, destiny path, career alignment, and one powerful remedy. Handcrafted by Divya.</p>
+<h2 class="popup-headline">Your personalised report.<br><em>Ready in seconds.</em></h2>
+<p class="popup-sub">Fill your birth details below. Your free astro-numerology awareness report will be generated instantly.</p>
 
 <div class="popup-gets">
-<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Your Ruling Number decoded</div>
-<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Destiny Number and life path</div>
-<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Career alignment check</div>
-<div class="popup-get"><span class="popup-get-icon">&#10003;</span>1 personalised remedy</div>
-<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Generated instantly after submission</div>
+<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Basic numerology snapshot</div>
+<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Birth detail based awareness</div>
+<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Instant PDF download</div>
+<div class="popup-get"><span class="popup-get-icon">&#10003;</span>Upgrade option for deeper report</div>
 </div>
 
-<div class="popup-form">
-<input type="text" placeholder="Your Full Name" id="popName">
-<div class="popup-form-row">
-<input type="date" placeholder="Date of Birth" id="popDob">
-<input type="tel" placeholder="WhatsApp Number" id="popPhone">
+<div class="popup-form" id="popupFormFields">
+<input type="text" placeholder="Full Name" id="popName" name="name" required>
+<div class="popup-form-row"><div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="popDob" name="dob" required></div><div class="field-group"><label class="field-label">Time of Birth</label><input type="time" id="popTob" name="tob" required></div></div>
+<input type="text" placeholder="Place of Birth" id="popPob" name="pob" required>
+<input type="tel" placeholder="WhatsApp Number" id="popPhone" name="phone" required>
+<button class="popup-submit" type="button" id="popupSubmitBtn" onclick="submitPopup()">Generate My Free Report</button>
 </div>
-<button class="popup-submit" type="button" onclick="submitPopup()">Get My Free Report &rarr;</button>
-</div>
+
+<div id="generatedReportBox" style="display:none"></div>
 
 <div class="popup-proof">
 <span class="pp-dot"></span>
@@ -1958,144 +1990,72 @@ setTimeout(showNotification,Math.random()*4000);
 })();
 
 
-// ===== FREE REPORT POPUP =====
-(function(){
-var popup=document.getElementById('freePopup');
-var closeBtn=document.getElementById('popupClose');
-var dismissBtn=document.getElementById('popupDismiss');
-var portrait=document.getElementById('popupPortrait');
-var proofCount=document.getElementById('popProofCount');
-var shown=false;
-var dismissed=sessionStorage.getItem('popup_dismissed')==='true';
-
-// Clone portrait from hero
-var heroImg=document.querySelector('.hero-portrait img');
-if(heroImg&&portrait){
-var img=document.createElement('img');
-img.src=heroImg.src;
-img.alt='Divya Bajaj';
-portrait.appendChild(img);
-}
-
-// Random proof count between 34-68
-if(proofCount)proofCount.textContent=Math.floor(Math.random()*35)+34;
-
-function showPopup(){
-if(shown||dismissed||!popup)return;
-shown=true;
-popup.classList.add('active');
+// ===== FREE REPORT POPUP (PRODUCTION) =====
+function openFreeReportPopup(){
+var p=document.getElementById('freePopup');
+if(!p)return;
+p.classList.add('active');
 document.body.style.overflow='hidden';
+var form=document.getElementById('popupFormFields');
+if(form)form.style.display='flex';
+var rb=document.getElementById('generatedReportBox');
+if(rb){rb.style.display='none';rb.innerHTML='';}
+var btn=document.getElementById('popupSubmitBtn');
+if(btn){btn.textContent='Generate My Free Report';btn.disabled=false;btn.style.opacity='1';btn.style.background='';}
 }
-
-function hidePopup(){
-if(!popup)return;
-popup.classList.remove('active');
+function closeFreeReportPopup(){
+var p=document.getElementById('freePopup');
+if(!p)return;
+p.classList.remove('active');
 document.body.style.overflow='';
-sessionStorage.setItem('popup_dismissed','true');
-dismissed=true;
 }
-
-// Close handlers
-if(closeBtn)closeBtn.addEventListener('click',hidePopup);
-if(dismissBtn)dismissBtn.addEventListener('click',hidePopup);
-popup.addEventListener('click',function(e){if(e.target===popup)hidePopup()});
-
-// TRIGGER 1: Scroll depth - 35% of page
-function checkScroll(){
-var scrollPct=(window.scrollY/(document.documentElement.scrollHeight-window.innerHeight))*100;
-if(scrollPct>35){showPopup();window.removeEventListener('scroll',checkScroll)}
-}
-window.addEventListener('scroll',checkScroll,{passive:true});
-
-// TRIGGER 2: Time on page - 30 seconds
-setTimeout(function(){showPopup()},30000);
-
-// TRIGGER 3: Exit intent (desktop only) - mouse leaves viewport top
-if(window.innerWidth>768){
-var exitTriggered=false;
-document.addEventListener('mouseout',function(e){
-if(e.clientY<5&&!exitTriggered&&!shown&&!dismissed){
-exitTriggered=true;
-showPopup();
-}
-});
-}
-
-// TRIGGER 4: Back button intent (mobile) - scroll up fast
-var lastScrollY=window.scrollY;
-var scrollUpCount=0;
-window.addEventListener('scroll',function(){
-if(window.scrollY<lastScrollY-100){
-scrollUpCount++;
-if(scrollUpCount>3&&!shown&&!dismissed){showPopup()}
-}else{scrollUpCount=0}
-lastScrollY=window.scrollY;
-},{passive:true});
-
-// Submit handler
-window.submitPopup=async function(){
-var nameEl=document.getElementById('popName');
-var dobEl=document.getElementById('popDob');
-var phoneEl=document.getElementById('popPhone');
-var name=nameEl?nameEl.value.trim():'';
-var dob=dobEl?dobEl.value:'';
-var phone=phoneEl?phoneEl.value.trim():'';
-if(!name||!dob||!phone){
-var empty=!name?nameEl:(!dob?dobEl:phoneEl);
-if(empty){
-empty.style.borderColor='rgba(255,100,100,.5)';
-setTimeout(function(){empty.style.borderColor=''},2000);
-}
-alert('Please fill your name, date of birth, and WhatsApp number.');
-return;
-}
-var btn=document.querySelector('.popup-submit');
-if(btn){
-btn.textContent='Generating Report...';
-btn.disabled=true;
-btn.style.background='var(--gold)';
-}
-try{
-var response=await fetch('/api/reports/free',{
-method:'POST',
-headers:{'Content-Type':'application/json'},
-body:JSON.stringify({name:name,phone:phone,dob:dob,question:'General life clarity',source:'landing_page_popup'})
-});
-var data=await response.json();
-if(!response.ok){throw new Error(data.error||'Report generation failed');}
-if(btn){
-btn.textContent='Report Generated';
-btn.disabled=true;
-btn.style.background='#25D366';
-}
-var oldBox=document.getElementById('generatedReportBox');
-if(oldBox){oldBox.remove();}
-var box=document.createElement('div');
-box.id='generatedReportBox';
-box.style.marginTop='16px';
-box.style.padding='16px';
-box.style.border='1px solid rgba(201,169,110,.25)';
-box.style.background='rgba(201,169,110,.07)';
-box.style.color='var(--text)';
-box.style.fontSize='13px';
-box.style.lineHeight='1.65';
-box.style.maxHeight='320px';
-box.style.overflow='auto';
-box.style.whiteSpace='pre-wrap';
-box.textContent=data.report_text||'Your report has been generated successfully.';
-var form=document.querySelector('.popup-form');
-if(form){form.appendChild(box);}
-}catch(error){
-if(btn){
-btn.textContent='Try Again';
-btn.disabled=false;
-btn.style.background='var(--gold)';
-}
-alert(error.message);
-}
-};
-
+(function(){
+var p=document.getElementById('freePopup');
+var cb=document.getElementById('popupClose');
+var db2=document.getElementById('popupDismiss');
+if(cb)cb.addEventListener('click',closeFreeReportPopup);
+if(db2)db2.addEventListener('click',function(){closeFreeReportPopup();sessionStorage.setItem('popup_dismissed','true')});
+if(p)p.addEventListener('click',function(e){if(e.target===p)closeFreeReportPopup()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeFreeReportPopup()});
+var hi=document.querySelector('.hero-portrait img');
+var pp=document.getElementById('popupPortrait');
+if(hi&&pp&&!pp.querySelector('img')){var im=document.createElement('img');im.src=hi.src;im.alt='Divya Bajaj';pp.appendChild(im)}
+var pc=document.getElementById('popProofCount');
+if(pc)pc.textContent=Math.floor(Math.random()*35)+34;
+var as=false;var ad=sessionStorage.getItem('popup_dismissed')==='true';
+function autoTrigger(){if(as||ad)return;as=true;openFreeReportPopup()}
+function scrollCheck(){var pct=(window.scrollY/(document.documentElement.scrollHeight-window.innerHeight))*100;if(pct>35){autoTrigger();window.removeEventListener('scroll',scrollCheck)}}
+window.addEventListener('scroll',scrollCheck,{passive:true});
+setTimeout(function(){autoTrigger()},30000);
 })();
+function submitPopup(){
+var nm=document.getElementById('popName').value.trim();
+var dob=document.getElementById('popDob').value;
+var tob=document.getElementById('popTob').value;
+var pob=document.getElementById('popPob').value.trim();
+var ph=document.getElementById('popPhone').value.trim();
+if(!nm||!dob||!tob||!pob||!ph){alert('Please fill Full Name, Date of Birth, Time of Birth, Place of Birth, and WhatsApp Number.');return}
+var btn=document.getElementById('popupSubmitBtn');
+btn.textContent='Generating Report...';btn.disabled=true;btn.style.opacity='0.7';
+var old=document.getElementById('generatedReportBox');
+if(old){old.style.display='none';old.innerHTML='';}
+fetch('/api/reports/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nm,dob:dob,tob:tob,pob:pob,phone:ph,question:'General life clarity from astrology and numerology',source:'landing_page_free_report'})})
+.then(function(r){return r.json()})
+.then(function(d){
+if(d.success||d.report_id){
+btn.textContent='Report Generated!';btn.style.background='#25D366';btn.style.opacity='1';
+var pdfUrl=d.pdf_url||('/api/reports/'+d.report_id+'/pdf');
+var rb=document.getElementById('generatedReportBox');
+rb.innerHTML='<h4>Your Free Report Is Ready</h4><p class="result-sub">Read your report below or download the PDF copy.</p><div class="report-content">'+(d.report_text||'Your report is being prepared.')+'</div><a href="'+pdfUrl+'" target="_blank" class="pdf-download-btn">Download PDF Report</a>';
+rb.style.display='block';rb.scrollIntoView({behavior:'smooth',block:'nearest'});
+sessionStorage.setItem('popup_dismissed','true');
+}else{throw new Error(d.error||'Report generation failed')}
+}).catch(function(e){
+console.error('Report error:',e);
+btn.textContent='Try Again';btn.disabled=false;btn.style.opacity='1';btn.style.background='';
+alert(e.message||'Report generation failed. Please try again.');
+});
+}
 
 // ===== THEME TOGGLE (FIXED) =====
 (function(){

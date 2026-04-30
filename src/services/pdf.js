@@ -4,6 +4,13 @@ function safeText(value) {
   return String(value || '').replace(/\r/g, '').trim();
 }
 
+function paintBackground(doc) {
+  doc.save();
+  doc.rect(0, 0, doc.page.width, doc.page.height).fill('#0B0B0D');
+  doc.restore();
+  doc.fillColor('#F5EFE4');
+}
+
 function generateReportPdf({ lead = {}, report = {}, numbers = {}, reportText = '' }) {
   return new Promise((resolve, reject) => {
     try {
@@ -13,8 +20,9 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, reportText = 
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+      doc.on('pageAdded', () => paintBackground(doc));
 
-      doc.fillColor('#0B0B0D').rect(0, 0, doc.page.width, doc.page.height).fill();
+      paintBackground(doc);
       doc.fillColor('#C9A96E').fontSize(22).text('Divya Bajaj', { align: 'center' });
       doc.moveDown(0.2);
       doc.fillColor('#F5EFE4').fontSize(13).text('Astrology + Numerology Awareness Report', { align: 'center' });
@@ -41,9 +49,7 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, reportText = 
 
       doc.fillColor('#C9A96E').fontSize(14).text('Your Awareness Report');
       doc.moveDown(0.5);
-      doc.fillColor('#F5EFE4').fontSize(10).lineGap(4).text(safeText(reportText), {
-        align: 'left'
-      });
+      doc.fillColor('#F5EFE4').fontSize(10).lineGap(4).text(safeText(reportText), { align: 'left' });
 
       doc.moveDown(1.2);
       doc.fillColor('#C9A96E').fontSize(11).text('Next Step');

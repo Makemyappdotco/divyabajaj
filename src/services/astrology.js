@@ -24,10 +24,7 @@ function getHeaders() {
   const userId = process.env.ASTROLOGYAPI_USER_ID;
   const apiKey = process.env.ASTROLOGYAPI_API_KEY;
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Accept-Language': 'en'
-  };
+  const headers = { 'Content-Type': 'application/json', 'Accept-Language': 'en' };
 
   if (userId && apiKey) {
     headers.Authorization = `Basic ${Buffer.from(`${userId}:${apiKey}`).toString('base64')}`;
@@ -45,43 +42,47 @@ function getHeaders() {
 async function callApi(endpoint, payload) {
   const headers = getHeaders();
   if (!headers) {
-    return {
-      success: false,
-      skipped: true,
-      provider: 'AstrologyAPI.com',
-      error: 'AstrologyAPI credentials missing. Add ASTROLOGYAPI_USER_ID and ASTROLOGYAPI_API_KEY, or ASTROLOGYAPI_ACCESS_TOKEN.'
-    };
+    return { success: false, skipped: true, provider: 'AstrologyAPI.com', error: 'AstrologyAPI credentials missing.' };
   }
 
-  const response = await fetch(`${BASE_URL}/${endpoint}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
-
+  const response = await fetch(`${BASE_URL}/${endpoint}`, { method: 'POST', headers, body: JSON.stringify(payload) });
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-  if (!response.ok) {
-    return { success: false, provider: 'AstrologyAPI.com', endpoint, status: response.status, error: data };
-  }
-
+  if (!response.ok) return { success: false, provider: 'AstrologyAPI.com', endpoint, status: response.status, error: data };
   return { success: true, provider: 'AstrologyAPI.com', endpoint, data };
 }
 
-function pickGeo(data) {
+function normalizePlace(place) {
+  const value = String(place || '').trim();
+  if (!value) return value;
+  const lower = value.toLowerCase();
+  const hasCountry = lower.includes('india') || lower.includes('bharat') || lower.includes(', in');
+  return hasCountry ? value : `${value}, India`;
+}
+
+function allGeoResults(data) {
   const list = data?.geonames || data?.output || data;
-  if (Array.isArray(list)) return list[0];
-  if (list && typeof list === 'object') return list;
-  return null;
+  if (Array.isArray(list)) return list;
+  if (list && typeof list === 'object') return [list];
+  return [];
+}
+
+function pickIndianGeo(data) {
+  const list = allGeoResults(data);
+  if (!list.length) return null;
+  return list.find(item => String(item.country_code || item.countryCode || '').toUpperCase() === 'IN') ||
+    list.find(item => String(item.country_name || item.country || '').toLowerCase().includes('india')) ||
+    list[0];
 }
 
 async function getGeoDetails(place) {
-  const result = await callApi('geo_details', { place, maxRows: 1 });
+  const searchPlace = normalizePlace(place);
+  const result = await callApi('geo_details', { place: searchPlace, maxRows: 10 });
   if (!result.success) return result;
 
-  const geo = pickGeo(result.data);
+  const geo = pickIndianGeo(result.data);
   if (!geo) return { success: false, provider: 'AstrologyAPI.com', error: 'Location not found', raw: result.data };
 
   const latitude = toNumber(geo.latitude, geo.lat);
@@ -91,12 +92,7 @@ async function getGeoDetails(place) {
     return { success: false, provider: 'AstrologyAPI.com', error: 'Geo result missing latitude or longitude', geo, raw: result.data };
   }
 
-  return {
-    success: true,
-    provider: 'AstrologyAPI.com',
-    geo: { ...geo, latitude, longitude },
-    raw: result.data
-  };
+  return { success: true, provider: 'AstrologyAPI.com', geo: { ...geo, latitude, longitude, searched_place: searchPlace }, raw: result.data };
 }
 
 function timezoneDate(dob) {
@@ -105,11 +101,7 @@ function timezoneDate(dob) {
 }
 
 async function getTimezone({ latitude, longitude, dob }) {
-  const result = await callApi('timezone_with_dst', {
-    latitude,
-    longitude,
-    date: timezoneDate(dob)
-  });
+  const result = await callApi('timezone_with_dst', { latitude, longitude, date: timezoneDate(dob) });
 
   if (result.success) {
     const timezone = toNumber(result.data?.timezone, result.data?.tzone, result.data?.offset);
@@ -127,16 +119,7 @@ async function getVedicPlanets({ dob, tob, pob }) {
   const d = parseDob(dob);
   const t = parseTob(tob);
 
-  const payload = {
-    day: d.day,
-    month: d.month,
-    year: d.year,
-    hour: t.hour,
-    min: t.min,
-    lat: geoResult.geo.latitude,
-    lon: geoResult.geo.longitude,
-    tzone: timezoneResult.timezone
-  };
+  const payload = { day: d.day, month: d.month, year: d.year, hour: t.hour, min: t.min, lat: geoResult.geo.latitude, lon: geoResult.geo.longitude, tzone: timezoneResult.timezone };
 
   const birthDetails = await callApi('birth_details', payload);
   const planets = await callApi('planets', payload);
@@ -145,21 +128,20 @@ async function getVedicPlanets({ dob, tob, pob }) {
     success: planets.success,
     provider: 'AstrologyAPI.com',
     geo: {
-      place_name: geoResult.geo.place_name || pob,
+      place_name: geoResult.geo.place_name || geoResult.geo.name || pob,
+      searched_place: geoResult.geo.searched_place,
       latitude: geoResult.geo.latitude,
       longitude: geoResult.geo.longitude,
       timezone: timezoneResult.timezone,
       timezone_id: geoResult.geo.timezone_id,
-      country_code: geoResult.geo.country_code
+      country_code: geoResult.geo.country_code || geoResult.geo.countryCode,
+      country_name: geoResult.geo.country_name || geoResult.geo.country
     },
     input: payload,
     birth_details: birthDetails.success ? birthDetails.data : null,
     planets: planets.success ? planets.data : null,
     error: planets.success ? null : planets.error,
-    debug: {
-      timezone_status: timezoneResult.success ? 'api' : 'fallback_5_5',
-      birth_details_status: birthDetails.success
-    }
+    debug: { timezone_status: timezoneResult.success ? 'api' : 'fallback_5_5', birth_details_status: birthDetails.success }
   };
 }
 

@@ -18,20 +18,32 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', adminAuth, routes);
+
 app.get('/admin', adminAuth, (req, res) => {
   res.sendFile(path.join(publicDir, 'admin.html'));
 });
+
 app.use('/admin', adminAuth, express.static(publicDir));
 app.use(express.static(publicDir));
 
 app.get('/', (req, res) => {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
-  let html = fs.readFileSync(landingPath, 'utf8');
-  const scriptTag = '<script src="/flow-fix.js"></script>';
-  html = html.includes('</body>') ? html.replace('</body>', scriptTag + '</body>') : html + scriptTag;
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
+  res.sendFile(landingPath);
+});
+
+app.use((err, req, res, next) => {
+  console.error('[Global server error]', err);
+  if (res.headersSent) return next(err);
+  const isApi = req.path.startsWith('/api');
+  if (isApi) {
+    return res.status(err.status || 500).json({
+      success: false,
+      error: err.message || 'Something went wrong while processing the request.'
+    });
+  }
+  return res.status(err.status || 500).send('Something went wrong while loading the page.');
 });
 
 if (require.main === module) {

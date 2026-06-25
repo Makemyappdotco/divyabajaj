@@ -6,8 +6,7 @@ const { generateReportPdf } = require('./services/pdf');
 const router = express.Router();
 
 function requiredFields(body) {
-  return ['name', 'phone', 'dob'].filter(field => !String(body[field] || '').trim());
-}
+return ['name', 'phone', 'dob', 'email'].filter(field => !String(body[field] || '').trim());}
 
 router.post('/leads', (req, res) => {
   try {

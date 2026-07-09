@@ -18,12 +18,15 @@
     th{color:#c9a96e;background:#111015}
     pre{white-space:pre-wrap;background:#14131a;border:1px solid #2b251d;border-radius:12px;padding:16px;max-height:320px;overflow:auto}
     .muted{color:#9b9287;font-size:13px}
+    .storage{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:7px 10px;border-radius:999px;background:#1a181f;border:1px solid #2b251d;font-size:12px;color:#c9a96e}
+    .dot{width:8px;height:8px;border-radius:50%;background:#3fd17c;box-shadow:0 0 10px rgba(63,209,124,.45)}
   </style>
 </head>
 <body>
   <header>
     <h1>Divya Bajaj Admin Dashboard</h1>
-    <p>Testing dashboard for leads, reports, stats, and health check.</p>
+    <p>Leads, reports, revenue and system activity.</p>
+    <div class="storage"><span class="dot"></span><span id="storageMode">Checking storage...</span></div>
   </header>
   <main>
     <section class="cards">
@@ -39,7 +42,7 @@
     </section>
     <section>
       <h2>Leads</h2>
-      <table><thead><tr><th>Name</th><th>Phone</th><th>DOB</th><th>Status</th><th>Created</th></tr></thead><tbody id="leadsBody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>DOB</th><th>Status</th><th>Created</th></tr></thead><tbody id="leadsBody"><tr><td colspan="6">Loading...</td></tr></tbody></table>
     </section>
     <section>
       <h2>Reports</h2>
@@ -49,8 +52,8 @@
   </main>
 <script>
 async function api(path, options){const res=await fetch(path,options);const text=await res.text();try{return JSON.parse(text)}catch(e){return{raw:text}}}
-async function loadAll(){const stats=await api('/api/stats');const leads=await api('/api/leads');const reports=await api('/api/reports');document.getElementById('output').textContent=JSON.stringify({stats,leads,reports},null,2);const s=stats.stats||{};document.getElementById('leadsCount').textContent=s.leads||0;document.getElementById('reportsCount').textContent=s.reports||0;document.getElementById('revenue').textContent='₹'+(s.revenue||0);document.getElementById('conversion').textContent=(s.conversion_rate||0)+'%';const leadRows=(leads.leads||[]).map(l=>`<tr><td>${l.name||''}</td><td>${l.phone||''}</td><td>${l.dob||''}</td><td>${l.status||''}</td><td>${(l.created_at||'').slice(0,10)}</td></tr>`).join('');document.getElementById('leadsBody').innerHTML=leadRows||'<tr><td colspan="5">No leads yet</td></tr>';const reportRows=(reports.reports||[]).map(r=>`<tr><td>${r.id}</td><td>${r.lead_id}</td><td>${r.type}</td><td>${r.status}</td><td>${r.generated_by||''}</td></tr>`).join('');document.getElementById('reportsBody').innerHTML=reportRows||'<tr><td colspan="5">No reports yet</td></tr>'}
-async function testReport(){const payload={name:'Test User',phone:'9999999999',dob:'1994-08-23',tob:'10:30',pob:'Delhi',question:'Career clarity'};const result=await api('/api/reports/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});document.getElementById('output').textContent=JSON.stringify(result,null,2);await loadAll()}
+async function loadAll(){const stats=await api('/api/stats');const leads=await api('/api/leads');const reports=await api('/api/reports');document.getElementById('output').textContent=JSON.stringify({stats,leads,reports},null,2);const s=stats.stats||{};document.getElementById('leadsCount').textContent=s.leads||0;document.getElementById('reportsCount').textContent=s.reports||0;document.getElementById('revenue').textContent='₹'+(s.revenue||0);document.getElementById('conversion').textContent=(s.conversion_rate||0)+'%';const storage=stats.storage||leads.storage||reports.storage||'unknown';document.getElementById('storageMode').textContent=storage==='supabase'?'Supabase connected':'Local fallback storage';const leadRows=(leads.leads||[]).map(l=>`<tr><td>${l.name||''}</td><td>${l.email||''}</td><td>${l.phone||''}</td><td>${l.dob||''}</td><td>${l.status||''}</td><td>${(l.created_at||'').slice(0,10)}</td></tr>`).join('');document.getElementById('leadsBody').innerHTML=leadRows||'<tr><td colspan="6">No leads yet</td></tr>';const reportRows=(reports.reports||[]).map(r=>`<tr><td>${r.id}</td><td>${r.lead_id}</td><td>${r.type}</td><td>${r.status}</td><td>${r.generated_by||''}</td></tr>`).join('');document.getElementById('reportsBody').innerHTML=reportRows||'<tr><td colspan="5">No reports yet</td></tr>'}
+async function testReport(){const payload={name:'Test User',email:'test@example.com',phone:'9999999999',dob:'1994-08-23',question:'Career clarity'};const result=await api('/api/reports/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});document.getElementById('output').textContent=JSON.stringify(result,null,2);await loadAll()}
 loadAll();
 </script>
 </body>

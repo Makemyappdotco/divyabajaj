@@ -1,22 +1,14 @@
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
+const localDb = require('./database.local');
 
-const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-const DATA_DIR = isVercel ? '/tmp/divya-bajaj-data' : path.join(__dirname, '..', 'data');
-const TABLES = ['leads', 'reports', 'payments', 'bookings', 'events'];
-
-function ensureStore() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  for (const table of TABLES) {
-    const file = filePath(table);
-    if (!fs.existsSync(file)) fs.writeFileSync(file, '[]');
-  }
-}
-
-function filePath(table) {
-  return path.join(DATA_DIR, `${table}.json`);
-}
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+const supabase = SUPABASE_URL && SUPABASE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+  : null;
 
 function id(prefix) {
   return `${prefix}_${crypto.randomBytes(8).toString('hex')}`;
@@ -26,62 +18,58 @@ function now() {
   return new Date().toISOString();
 }
 
-function read(table) {
-  ensureStore();
-  try {
-    return JSON.parse(fs.readFileSync(filePath(table), 'utf8') || '[]');
-  } catch (error) {
-    return [];
-  }
+function usingSupabase() {
+  return Boolean(supabase);
 }
 
-function write(table, rows) {
-  ensureStore();
-  fs.writeFileSync(filePath(table), JSON.stringify(rows, null, 2));
+function cleanEventData(data = {}) {
+  const clone = { ...data };
+  delete clone.ai_report;
+  delete clone.horosoft_data;
+  delete clone.astrology_data;
+  delete clone.input_data;
+  return clone;
 }
 
-function logEvent(type, entity, entity_id, data = {}) {
-  const events = read('events');
-  const event = { id: id('evt'), type, entity, entity_id, data, created_at: now() };
-  events.unshift(event);
-  write('events', events.slice(0, 1000));
-  return event;
+async function throwIfError(result, context) {
+  if (result.error) throw new Error(`${context}: ${result.error.message}`);
+  return result.data;
 }
 
-function create(table, prefix, data) {
-  const rows = read(table);
-  const row = { id: id(prefix), ...data, created_at: now(), updated_at: now() };
-  rows.unshift(row);
-  write(table, rows);
-  logEvent(`${table}.created`, table, row.id, row);
-  return row;
+async function logEvent(type, entity, entity_id, data = {}) {
+  if (!supabase) return localDb.logEvent(type, entity, entity_id, data);
+  const row = {
+    id: id('evt'),
+    type,
+    entity,
+    entity_id,
+    data: cleanEventData(data),
+    created_at: now()
+  };
+  const result = await supabase.from('events').insert(row).select().single();
+  return throwIfError(result, 'Create event failed');
 }
 
-function update(table, rowId, updates) {
-  const rows = read(table);
-  const index = rows.findIndex(row => row.id === rowId);
-  if (index === -1) return null;
-  rows[index] = { ...rows[index], ...updates, updated_at: now() };
-  write(table, rows);
-  logEvent(`${table}.updated`, table, rowId, updates);
-  return rows[index];
-}
-
-function getLeads(filters = {}) {
-  let leads = read('leads');
-  if (filters.status) leads = leads.filter(l => l.status === filters.status);
-  if (filters.tier) leads = leads.filter(l => l.tier === filters.tier);
-  if (filters.from) leads = leads.filter(l => l.created_at >= filters.from);
-  if (filters.to) leads = leads.filter(l => l.created_at <= filters.to);
+async function getLeads(filters = {}) {
+  if (!supabase) return localDb.getLeads(filters);
+  let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.tier) query = query.eq('tier', filters.tier);
+  if (filters.from) query = query.gte('created_at', filters.from);
+  if (filters.to) query = query.lte('created_at', filters.to);
+  const result = await query;
+  let rows = await throwIfError(result, 'Fetch leads failed');
   if (filters.search) {
     const q = String(filters.search).toLowerCase();
-    leads = leads.filter(l => [l.name, l.phone, l.email].some(v => String(v || '').toLowerCase().includes(q)));
+    rows = rows.filter(row => [row.name, row.phone, row.email].some(v => String(v || '').toLowerCase().includes(q)));
   }
-  return leads;
+  return rows;
 }
 
-function createLead(data) {
-  return create('leads', 'lead', {
+async function createLead(data) {
+  if (!supabase) return localDb.createLead(data);
+  const row = {
+    id: id('lead'),
     name: data.name,
     phone: data.phone,
     email: data.email || '',
@@ -95,108 +83,151 @@ function createLead(data) {
     utm_campaign: data.utm_campaign || '',
     status: data.status || 'new',
     tier: data.tier || 'free_awareness',
-    total_spent: data.total_spent || 0,
-    notes: data.notes || []
-  });
+    total_spent: Number(data.total_spent) || 0,
+    notes: data.notes || [],
+    created_at: now(),
+    updated_at: now()
+  };
+  const result = await supabase.from('leads').insert(row).select().single();
+  const created = await throwIfError(result, 'Create lead failed');
+  await logEvent('leads.created', 'leads', created.id, created);
+  return created;
 }
 
-function getLead(leadId) {
-  return read('leads').find(l => l.id === leadId) || null;
+async function getLead(leadId) {
+  if (!supabase) return localDb.getLead(leadId);
+  const result = await supabase.from('leads').select('*').eq('id', leadId).maybeSingle();
+  return throwIfError(result, 'Fetch lead failed');
 }
 
-function updateLead(leadId, updates) {
-  return update('leads', leadId, updates);
+async function updateLead(leadId, updates) {
+  if (!supabase) return localDb.updateLead(leadId, updates);
+  const result = await supabase.from('leads').update({ ...updates, updated_at: now() }).eq('id', leadId).select().maybeSingle();
+  const updated = await throwIfError(result, 'Update lead failed');
+  if (updated) await logEvent('leads.updated', 'leads', leadId, updates);
+  return updated;
 }
 
-function getReports(filters = {}) {
-  let reports = read('reports');
-  if (filters.lead_id) reports = reports.filter(r => r.lead_id === filters.lead_id);
-  if (filters.type) reports = reports.filter(r => r.type === filters.type);
-  if (filters.status) reports = reports.filter(r => r.status === filters.status);
-  return reports;
+async function getReports(filters = {}) {
+  if (!supabase) return localDb.getReports(filters);
+  let query = supabase.from('reports').select('*').order('created_at', { ascending: false });
+  if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
+  if (filters.type) query = query.eq('type', filters.type);
+  if (filters.status) query = query.eq('status', filters.status);
+  const result = await query;
+  return throwIfError(result, 'Fetch reports failed');
 }
 
-function createReport(data) {
-  return create('reports', 'rep', {
+async function createReport(data) {
+  if (!supabase) return localDb.createReport(data);
+  const row = {
+    id: id('rep'),
     lead_id: data.lead_id,
     type: data.type || 'free_awareness',
     status: data.status || 'created',
     input_data: data.input_data || {},
     horosoft_data: data.horosoft_data || null,
+    astrology_data: data.astrology_data || null,
     ai_report: data.ai_report || '',
-    ai_insights: data.ai_insights || null
-  });
+    ai_insights: data.ai_insights || null,
+    generated_by: data.generated_by || '',
+    pdf_url: data.pdf_url || '',
+    created_at: now(),
+    updated_at: now()
+  };
+  const result = await supabase.from('reports').insert(row).select().single();
+  const created = await throwIfError(result, 'Create report failed');
+  await logEvent('reports.created', 'reports', created.id, created);
+  return created;
 }
 
-function updateReport(reportId, updates) {
-  return update('reports', reportId, updates);
+async function updateReport(reportId, updates) {
+  if (!supabase) return localDb.updateReport(reportId, updates);
+  const result = await supabase.from('reports').update({ ...updates, updated_at: now() }).eq('id', reportId).select().maybeSingle();
+  const updated = await throwIfError(result, 'Update report failed');
+  if (updated) await logEvent('reports.updated', 'reports', reportId, updates);
+  return updated;
 }
 
-function getPayments(filters = {}) {
-  let payments = read('payments');
-  if (filters.lead_id) payments = payments.filter(p => p.lead_id === filters.lead_id);
-  if (filters.status) payments = payments.filter(p => p.status === filters.status);
-  if (filters.tier) payments = payments.filter(p => p.tier === filters.tier);
-  return payments;
+async function getPayments(filters = {}) {
+  if (!supabase) return localDb.getPayments(filters);
+  let query = supabase.from('payments').select('*').order('created_at', { ascending: false });
+  if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.tier) query = query.eq('tier', filters.tier);
+  const result = await query;
+  return throwIfError(result, 'Fetch payments failed');
 }
 
-function createPayment(data) {
-  return create('payments', 'pay', {
-    lead_id: data.lead_id,
-    report_id: data.report_id || '',
-    amount: data.amount || 0,
-    currency: data.currency || 'INR',
-    tier: data.tier || '',
-    status: data.status || 'created',
-    razorpay_order_id: data.razorpay_order_id || '',
-    razorpay_payment_id: data.razorpay_payment_id || '',
-    razorpay_signature: data.razorpay_signature || '',
-    method: data.method || ''
-  });
+async function createPayment(data) {
+  if (!supabase) return localDb.createPayment(data);
+  const row = {
+    id: id('pay'), lead_id: data.lead_id, report_id: data.report_id || '',
+    amount: Number(data.amount) || 0, currency: data.currency || 'INR', tier: data.tier || '',
+    status: data.status || 'created', razorpay_order_id: data.razorpay_order_id || '',
+    razorpay_payment_id: data.razorpay_payment_id || '', razorpay_signature: data.razorpay_signature || '',
+    method: data.method || '', created_at: now(), updated_at: now()
+  };
+  const result = await supabase.from('payments').insert(row).select().single();
+  const created = await throwIfError(result, 'Create payment failed');
+  await logEvent('payments.created', 'payments', created.id, created);
+  return created;
 }
 
-function updatePayment(paymentId, updates) {
-  const payment = update('payments', paymentId, updates);
+async function updatePayment(paymentId, updates) {
+  if (!supabase) return localDb.updatePayment(paymentId, updates);
+  const result = await supabase.from('payments').update({ ...updates, updated_at: now() }).eq('id', paymentId).select().maybeSingle();
+  const payment = await throwIfError(result, 'Update payment failed');
   if (payment && updates.status === 'captured') {
-    const lead = getLead(payment.lead_id);
-    if (lead) updateLead(lead.id, { total_spent: (lead.total_spent || 0) + (payment.amount || 0), tier: payment.tier || lead.tier });
+    const lead = await getLead(payment.lead_id);
+    if (lead) await updateLead(lead.id, { total_spent: (Number(lead.total_spent) || 0) + (Number(payment.amount) || 0), tier: payment.tier || lead.tier });
   }
+  if (payment) await logEvent('payments.updated', 'payments', paymentId, updates);
   return payment;
 }
 
-function getBookings(filters = {}) {
-  let bookings = read('bookings');
-  if (filters.lead_id) bookings = bookings.filter(b => b.lead_id === filters.lead_id);
-  if (filters.status) bookings = bookings.filter(b => b.status === filters.status);
-  if (filters.date) bookings = bookings.filter(b => b.date === filters.date);
-  return bookings;
+async function getBookings(filters = {}) {
+  if (!supabase) return localDb.getBookings(filters);
+  let query = supabase.from('bookings').select('*').order('created_at', { ascending: false });
+  if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.date) query = query.eq('date', filters.date);
+  const result = await query;
+  return throwIfError(result, 'Fetch bookings failed');
 }
 
-function createBooking(data) {
-  return create('bookings', 'book', {
-    lead_id: data.lead_id,
-    date: data.date,
-    time_slot: data.time_slot,
-    mode: data.mode || 'online',
-    payment_id: data.payment_id || '',
-    notes: data.notes || '',
-    status: data.status || 'confirmed'
-  });
+async function createBooking(data) {
+  if (!supabase) return localDb.createBooking(data);
+  const row = {
+    id: id('book'), lead_id: data.lead_id, date: data.date, time_slot: data.time_slot,
+    mode: data.mode || 'online', payment_id: data.payment_id || '', notes: data.notes || '',
+    status: data.status || 'confirmed', created_at: now(), updated_at: now()
+  };
+  const result = await supabase.from('bookings').insert(row).select().single();
+  const created = await throwIfError(result, 'Create booking failed');
+  await logEvent('bookings.created', 'bookings', created.id, created);
+  return created;
 }
 
-function updateBooking(bookingId, updates) {
-  return update('bookings', bookingId, updates);
+async function updateBooking(bookingId, updates) {
+  if (!supabase) return localDb.updateBooking(bookingId, updates);
+  const result = await supabase.from('bookings').update({ ...updates, updated_at: now() }).eq('id', bookingId).select().maybeSingle();
+  const updated = await throwIfError(result, 'Update booking failed');
+  if (updated) await logEvent('bookings.updated', 'bookings', bookingId, updates);
+  return updated;
 }
 
-function getEvents(limit = 100) {
-  return read('events').slice(0, limit);
+async function getEvents(limit = 100) {
+  if (!supabase) return localDb.getEvents(limit);
+  const result = await supabase.from('events').select('*').order('created_at', { ascending: false }).limit(limit);
+  return throwIfError(result, 'Fetch events failed');
 }
 
-function getStats() {
-  const leads = read('leads');
-  const reports = read('reports');
-  const payments = read('payments');
-  const bookings = read('bookings');
+async function getStats() {
+  if (!supabase) return localDb.getStats();
+  const [leads, reports, payments, bookings, recentEvents] = await Promise.all([
+    getLeads(), getReports(), getPayments(), getBookings(), getEvents(20)
+  ]);
   const paid = payments.filter(p => p.status === 'captured');
   const revenue = paid.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   const today = new Date().toISOString().slice(0, 10);
@@ -212,11 +243,12 @@ function getStats() {
       reports: reports.filter(r => r.created_at && r.created_at.startsWith(today)).length,
       revenue: paid.filter(p => p.updated_at && p.updated_at.startsWith(today)).reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
     },
-    recent_events: getEvents(20)
+    recent_events: recentEvents
   };
 }
 
 module.exports = {
+  usingSupabase,
   getLeads, createLead, getLead, updateLead,
   getReports, createReport, updateReport,
   getPayments, createPayment, updatePayment,

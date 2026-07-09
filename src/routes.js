@@ -2,11 +2,34 @@ const express = require('express');
 const db = require('./database');
 const numerology = require('./services/numerology');
 const { generateReportPdf } = require('./services/pdf');
+const { buildCombinedCsv, buildExcelWorkbook } = require('./services/export');
 
 const router = express.Router();
 
 function requiredFields(body) {
   return ['name', 'phone', 'dob', 'email'].filter(field => !String(body[field] || '').trim());
+}
+
+function exportDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function getAllExportData() {
+  const [leads, reports, payments, bookings, events] = await Promise.all([
+    db.getLeads(),
+    db.getReports(),
+    db.getPayments(),
+    db.getBookings(),
+    db.getEvents(10000)
+  ]);
+
+  return {
+    Leads: leads,
+    Reports: reports,
+    Payments: payments,
+    Bookings: bookings,
+    Events: events
+  };
 }
 
 router.post('/leads', async (req, res) => {
@@ -155,6 +178,32 @@ router.get('/events', async (req, res) => {
     const events = await db.getEvents(Number(req.query.limit) || 100);
     return res.json({ success: true, events });
   } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/export/all.csv', async (req, res) => {
+  try {
+    const datasets = await getAllExportData();
+    const csv = buildCombinedCsv(datasets);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.csv"`);
+    return res.send(`\uFEFF${csv}`);
+  } catch (error) {
+    console.error('[CSV export error]', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/export/all.xlsx', async (req, res) => {
+  try {
+    const datasets = await getAllExportData();
+    const workbook = buildExcelWorkbook(datasets);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.xlsx"`);
+    return res.send(workbook);
+  } catch (error) {
+    console.error('[Excel export error]', error);
     return res.status(500).json({ error: error.message });
   }
 });

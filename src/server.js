@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const routes = require('./routes');
+const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
 
 const app = express();
@@ -13,9 +14,11 @@ function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=paid-submit-fix-2"></script>';
   if (!html.includes('/paid-test-flow.js')) {
     html = html.replace('</body>', `${paidScript}\n</body>`);
+  } else {
+    html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/, paidScript);
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   return res.send(html);
@@ -29,6 +32,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
+app.use('/api', publicPaidRoutes);
 app.use('/api', adminAuth, routes);
 
 app.get('/admin', adminAuth, (req, res) => {

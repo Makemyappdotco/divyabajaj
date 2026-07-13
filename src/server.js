@@ -13,14 +13,24 @@ const publicDir = path.join(__dirname, '..', 'public');
 function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
+
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=paid-premium-pdf-1"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=paid-background-base-1"></script>';
+  const backgroundScript = '<script src="/paid-background-patch.js?v=paid-background-poll-1"></script>';
+
   if (!html.includes('/paid-test-flow.js')) {
-    html = html.replace('</body>', `${paidScript}\n</body>`);
+    html = html.replace('</body>', `${paidScript}\n${backgroundScript}\n</body>`);
   } else {
     html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/, paidScript);
+    if (!html.includes('/paid-background-patch.js')) {
+      html = html.replace('</body>', `${backgroundScript}\n</body>`);
+    } else {
+      html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/, backgroundScript);
+    }
   }
+
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   return res.send(html);
 }
 
@@ -47,6 +57,7 @@ app.use(express.static(publicDir));
 app.use((err, req, res, next) => {
   console.error('[Global server error]', err);
   if (res.headersSent) return next(err);
+
   const isApi = req.path.startsWith('/api');
   if (isApi) {
     return res.status(err.status || 500).json({
@@ -54,6 +65,7 @@ app.use((err, req, res, next) => {
       error: err.message || 'Something went wrong while processing the request.'
     });
   }
+
   return res.status(err.status || 500).send('Something went wrong while loading the page.');
 });
 

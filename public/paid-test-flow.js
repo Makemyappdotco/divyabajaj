@@ -1,15 +1,17 @@
 (function(){
-  if (window.__paidBlueprintPatchLoadedV3) return;
-  window.__paidBlueprintPatchLoadedV3 = true;
+  if (window.__paidBlueprintPatchLoadedV4) return;
+  window.__paidBlueprintPatchLoadedV4 = true;
+
+  var latestPdfPayload = null;
 
   function qs(sel, root){ return (root || document).querySelector(sel); }
   function qsa(sel, root){ return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
   function cleanText(el){ return (el && el.textContent || '').trim().toLowerCase().replace(/\s+/g,' '); }
 
   function injectStyle(){
-    if (document.getElementById('paidBlueprintStyleV3')) return;
+    if (document.getElementById('paidBlueprintStyleV4')) return;
     var style = document.createElement('style');
-    style.id = 'paidBlueprintStyleV3';
+    style.id = 'paidBlueprintStyleV4';
     style.textContent = `
       .pb3-modal{position:fixed;inset:0;z-index:9999999;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(3,3,5,.78);backdrop-filter:blur(14px)}
       .pb3-modal.show{display:flex}
@@ -39,7 +41,8 @@
       .pb3-status.success{border-color:rgba(59,211,126,.32);color:#d9f8e6;background:rgba(59,211,126,.06)}
       .pb3-result{margin-top:18px;padding:18px;border:1px solid rgba(201,169,110,.18);background:rgba(201,169,110,.045);display:none}
       .pb3-result.show{display:block}
-      .pb3-download{display:block;margin:12px 0 16px;padding:14px 18px;background:#c9a96e;color:#08070a;text-decoration:none;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;font-size:12px;text-align:center}
+      .pb3-download{display:block;margin:12px 0 16px;padding:16px 18px;background:linear-gradient(135deg,#c9a96e,#ead39c);color:#08070a;text-decoration:none;font-weight:900;letter-spacing:1.7px;text-transform:uppercase;font-size:12px;text-align:center;cursor:pointer;box-shadow:0 14px 34px rgba(201,169,110,.14)}
+      .pb3-download.is-loading{opacity:.65;pointer-events:none}
       .pb3-report{max-height:370px;overflow:auto;white-space:pre-wrap;color:#ddd2c5;line-height:1.72;font-size:14px;padding-right:4px}
       @media(max-width:640px){.pb3-modal{padding:10px;align-items:center}.pb3-card{max-height:94vh;width:100%}.pb3-grid{grid-template-columns:1fr}.pb3-title{font-size:25px}.pb3-head{padding:22px 18px 16px}.pb3-body{padding:20px 18px 30px}.pb3-close{right:12px;top:12px}.pb3-submit{padding:17px 16px}}
     `;
@@ -89,13 +92,13 @@
             <div class="pb3-field full"><label>Main Concern</label><textarea id="pb3Question" placeholder="Career, marriage, money, business, name correction, health routine, etc."></textarea></div>
             <div class="pb3-actions">
               <button class="pb3-submit" id="pb3Submit" type="button" onclick="window.submitPaidBlueprintV3(event)">Generate Full Blueprint</button>
-              <div class="pb3-note">This can take 60 to 120 seconds because it creates a detailed paid report.</div>
+              <div class="pb3-note">This can take up to 5 minutes because it creates a detailed paid report.</div>
               <div class="pb3-status" id="pb3Status"></div>
             </div>
           </div>
           <div class="pb3-result" id="pb3Result">
             <h3 style="margin:0 0 8px;color:#c9a96e;font-family:Georgia,serif;font-size:24px">Your paid report is ready</h3>
-            <a class="pb3-download" id="pb3Download" href="#" target="_blank">Download PDF</a>
+            <a class="pb3-download" id="pb3Download" href="#">Download Premium PDF</a>
             <div class="pb3-report" id="pb3Report"></div>
           </div>
         </div>
@@ -104,6 +107,7 @@
     modal.addEventListener('click', function(e){ if (e.target === modal) closePaidBlueprintV3(); });
     qs('#pb3Close', modal).addEventListener('click', closePaidBlueprintV3);
     qs('#pb3Submit', modal).addEventListener('click', window.submitPaidBlueprintV3, true);
+    qs('#pb3Download', modal).addEventListener('click', window.downloadPaidBlueprintPdfV4, true);
     document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closePaidBlueprintV3(); });
     return modal;
   }
@@ -127,6 +131,7 @@
     if (known.question) qs('#pb3Question', modal).value = known.question;
     qs('#pb3Status', modal).className = 'pb3-status';
     qs('#pb3Result', modal).classList.remove('show');
+    latestPdfPayload = null;
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
     setTimeout(function(){ var first = qs('#pb3Name', modal); if (first) first.focus(); }, 120);
@@ -159,24 +164,86 @@
       return false;
     }
     qs('#pb3Result', modal).classList.remove('show');
+    latestPdfPayload = null;
     button.disabled = true;
     button.textContent = 'Generating... Please wait';
-    setStatus('Click received. Generating your full blueprint now. Please keep this window open. This can take 60 to 120 seconds.', '');
+    setStatus('Generating your full blueprint now. Please keep this window open. This can take up to 5 minutes.', '');
     try {
       var res = await fetch('/api/reports/paid-test', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payload) });
       var raw = await res.text();
       var data;
       try { data = JSON.parse(raw); } catch(e) { data = { error: raw }; }
       if (!res.ok || !data.success) throw new Error(data.error || 'Paid report generation failed.');
-      qs('#pb3Download', modal).href = data.pdf_url;
+
+      latestPdfPayload = {
+        lead: payload,
+        numbers: data.numbers || {},
+        astrology_data: data.astrology_data || null,
+        report_text: data.report_text || '',
+        report_type: 'paid_blueprint_test'
+      };
+
       qs('#pb3Report', modal).textContent = data.report_text || 'Report generated successfully.';
       qs('#pb3Result', modal).classList.add('show');
-      setStatus('Report generated successfully. You can download the PDF now.', 'success');
+      setStatus('Report generated successfully. Use Download Premium PDF to create the designed PDF.', 'success');
     } catch(error) {
       setStatus(error.message || 'Something went wrong while generating the paid report.', 'error');
     } finally {
       button.disabled = false;
       button.textContent = 'Generate Full Blueprint';
+    }
+    return false;
+  };
+
+  window.downloadPaidBlueprintPdfV4 = async function(event){
+    if (event) { event.preventDefault(); event.stopPropagation(); }
+    var modal = ensureModal();
+    var download = qs('#pb3Download', modal);
+    if (!latestPdfPayload || !latestPdfPayload.report_text) {
+      setStatus('Please generate the report first. The PDF is created from the report visible in this window.', 'error');
+      return false;
+    }
+
+    var originalText = download.textContent;
+    download.classList.add('is-loading');
+    download.textContent = 'Preparing Premium PDF...';
+    setStatus('Designing and preparing your premium PDF. This usually takes a few seconds.', '');
+
+    try {
+      var response = await fetch('/api/reports/pdf-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(latestPdfPayload)
+      });
+
+      if (!response.ok) {
+        var raw = await response.text();
+        var message = raw;
+        try {
+          var parsed = JSON.parse(raw);
+          message = parsed.error || raw;
+        } catch (e) {}
+        throw new Error(message || 'Could not create the PDF.');
+      }
+
+      var blob = await response.blob();
+      var url = URL.createObjectURL(blob);
+      var safeName = String(latestPdfPayload.lead.name || 'Divya-Bajaj')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-|-$/g, '');
+      var anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = safeName + '-Full-Blueprint.pdf';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+      setStatus('Premium PDF downloaded successfully.', 'success');
+    } catch (error) {
+      setStatus(error.message || 'Something went wrong while creating the PDF.', 'error');
+    } finally {
+      download.classList.remove('is-loading');
+      download.textContent = originalText;
     }
     return false;
   };
@@ -189,8 +256,8 @@
       var shouldWire = keywords.some(function(k){ return label.indexOf(k) > -1 || href.indexOf(k.replace(/\s+/g,'-')) > -1; });
       if (!shouldWire) return;
       if (label.indexOf('read my numbers free') > -1 || label.indexOf('free report') > -1 || label.indexOf('whatsapp') > -1) return;
-      if (el.__paidBlueprintWiredV3) return;
-      el.__paidBlueprintWiredV3 = true;
+      if (el.__paidBlueprintWiredV4) return;
+      el.__paidBlueprintWiredV4 = true;
       el.addEventListener('click', function(e){ e.preventDefault(); e.stopImmediatePropagation(); openPaidBlueprintV3(); return false; }, true);
     });
   }

@@ -9,6 +9,18 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
 
+function sendLandingWithPatches(res) {
+  const landingPath = path.join(publicDir, 'landing.html');
+  if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
+  let html = fs.readFileSync(landingPath, 'utf8');
+  const paidScript = '<script src="/paid-test-flow.js"></script>';
+  if (!html.includes('/paid-test-flow.js')) {
+    html = html.replace('</body>', `${paidScript}\n</body>`);
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  return res.send(html);
+}
+
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -24,14 +36,9 @@ app.get('/admin', adminAuth, (req, res) => {
 });
 
 app.use('/admin', adminAuth, express.static(publicDir));
+app.get('/', (req, res) => sendLandingWithPatches(res));
+app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
 app.use(express.static(publicDir));
-
-app.get('/', (req, res) => {
-  const landingPath = path.join(publicDir, 'landing.html');
-  if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.sendFile(landingPath);
-});
 
 app.use((err, req, res, next) => {
   console.error('[Global server error]', err);

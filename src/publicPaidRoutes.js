@@ -1,11 +1,18 @@
 const express = require('express');
 const db = require('./database');
 const numerology = require('./services/numerology');
+const { generateReportPdf } = require('./services/pdf');
 
 const router = express.Router();
 
 function missingPaidFields(body) {
   return ['name', 'phone', 'dob', 'email', 'tob', 'pob'].filter(field => !String(body[field] || '').trim());
+}
+
+function safeFileName(value) {
+  return String(value || 'Divya-Bajaj')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '') || 'Divya-Bajaj';
 }
 
 async function findOrCreateLead({ name, phone, dob, email, tob, pob, question, source }) {
@@ -82,6 +89,43 @@ router.post('/reports/paid-test', async (req, res) => {
   } catch (error) {
     console.error('[Public paid blueprint report error]', error);
     return res.status(500).json({ error: error.message || 'Paid report generation failed' });
+  }
+});
+
+router.post('/reports/pdf-direct', async (req, res) => {
+  try {
+    const {
+      lead = {},
+      numbers = {},
+      astrology_data: astrologyData = null,
+      report_text: reportText = '',
+      report_type: reportType = 'paid_blueprint_direct'
+    } = req.body || {};
+
+    if (!String(lead.name || '').trim()) {
+      return res.status(400).json({ error: 'Client name is required for PDF generation' });
+    }
+    if (!String(reportText || '').trim()) {
+      return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
+    }
+
+    const pdfBuffer = await generateReportPdf({
+      lead,
+      report: { type: reportType },
+      numbers,
+      astrologyData,
+      reportText
+    });
+
+    const filename = `${safeFileName(lead.name)}-Full-Blueprint.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(pdfBuffer.length));
+    res.setHeader('Cache-Control', 'no-store');
+    return res.end(pdfBuffer);
+  } catch (error) {
+    console.error('[Direct premium PDF error]', error);
+    return res.status(500).json({ error: error.message || 'Could not generate the premium PDF' });
   }
 });
 

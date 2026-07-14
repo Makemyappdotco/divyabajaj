@@ -18,8 +18,21 @@ function collectPdf(doc) {
 function normalizeKnownLayoutIssues(svg) {
   let output = String(svg || '');
 
+  // Page 6 final relationship-fit callout uses a deliberately short band.
   if (output.includes('What will improve your relationships') && output.includes('RELATIONSHIPS  06')) {
     output = output.replace(/(<text x="61" y=")787("[^>]*>)/g, '$1763$2');
+  }
+
+  // Page 10 needs readable three-plane copy. Give the final band more vertical room
+  // instead of shrinking body text to fit.
+  if (output.includes('YOUR THREE PLANES') && output.includes('HIDDEN PATTERNS  10')) {
+    output = output
+      .replace('<rect x="44" y="680" width="507" height="95"', '<rect x="44" y="665" width="507" height="115"')
+      .replace(/(<text x="62" y=")702("[^>]*>YOUR THREE PLANES)/g, '$1690$2')
+      .replace(/ y="726" /g, ' y="716" ')
+      .replace(/ y="748" /g, ' y="738" ')
+      .replace(/ y="768" /g, ' y="758" ')
+      .replace(/font-size="6\.1"/g, 'font-size="6.8"');
   }
 
   return output;

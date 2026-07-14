@@ -51,6 +51,10 @@ async function main() {
   const { runDirectContentSmoke } = require('./premium-v2-direct-content-smoke');
   const directContent = runDirectContentSmoke();
   console.log('[build-check] direct premium content mapping passed', directContent);
+
+  const { runDirectGeometrySmoke } = require('./premium-v2-direct-geometry-smoke');
+  const directGeometry = runDirectGeometrySmoke();
+  console.log('[build-check] direct premium geometry passed', directGeometry);
 }
 
 main().catch(error => {

@@ -14,9 +14,20 @@ const modules = [
   '../src/server'
 ];
 
-for (const modulePath of modules) {
-  require(modulePath);
-  console.log(`[build-check] loaded ${modulePath}`);
+async function main() {
+  for (const modulePath of modules) {
+    require(modulePath);
+    console.log(`[build-check] loaded ${modulePath}`);
+  }
+
+  console.log('[build-check] premium v2 module graph loaded successfully');
+
+  const { runRenderSmoke } = require('./premium-v2-render-smoke');
+  const result = await runRenderSmoke();
+  console.log('[build-check] premium v2 14-page renderer smoke passed', result);
 }
 
-console.log('[build-check] premium v2 module graph loaded successfully');
+main().catch(error => {
+  console.error('[build-check] failed', error);
+  process.exit(1);
+});

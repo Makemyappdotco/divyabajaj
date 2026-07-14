@@ -41,6 +41,10 @@ async function main() {
   const { runPreviewSmoke } = require('./premium-v2-preview-smoke');
   const previews = await runPreviewSmoke();
   console.log('[build-check] premium v2 PNG preview smoke passed', previews);
+
+  const { runPdfSmoke } = require('./premium-v2-pdf-smoke');
+  const pdf = await runPdfSmoke();
+  console.log('[build-check] premium v2 vector PDF smoke passed', pdf);
 }
 
 main().catch(error => {

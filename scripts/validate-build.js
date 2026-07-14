@@ -7,6 +7,7 @@ const modules = [
   '../src/premiumV2/svgRenderer',
   '../src/premiumV2/renderPipeline',
   '../src/premiumV2/pdfComposer',
+  '../src/premiumV2/directPdf',
   '../src/premiumV2/correctionLoop',
   '../src/premiumV2/orchestrator',
   '../src/premiumV2/store',
@@ -46,6 +47,10 @@ async function main() {
   const { runPdfSmoke } = require('./premium-v2-pdf-smoke');
   const pdf = await runPdfSmoke();
   console.log('[build-check] premium v2 final PDF smoke passed', pdf);
+
+  const { runDirectDownloadSmoke } = require('./premium-v2-direct-download-smoke');
+  const directDownload = await runDirectDownloadSmoke();
+  console.log('[build-check] exact direct premium download flow passed', directDownload);
 }
 
 main().catch(error => {

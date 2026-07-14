@@ -1,8 +1,9 @@
 const PDFDocument = require('pdfkit');
-const sharp = require('sharp');
+const SVGtoPDF = require('svg-to-pdfkit');
 const APPROVED_LOGO_BASE64 = require('./brandAsset');
 const { PAGE } = require('./spec');
-const { embedPremiumFonts } = require('./fontAssets');
+
+const APPROVED_LOGO_BUFFER = Buffer.from(APPROVED_LOGO_BASE64, 'base64');
 
 function collectPdf(doc) {
   return new Promise((resolve, reject) => {
@@ -30,8 +31,6 @@ function normalizeKnownLayoutIssues(svg) {
       .replace(/font-size="6\.1"/g, 'font-size="6.8"');
   }
 
-  // Page 12 previously placed the final commitment copy too close to the footer.
-  // Move the band upward and give its body enough vertical room instead of shrinking text.
   if (output.includes('Your 30-Day Action Plan') && output.includes('ACTION PLAN  12')) {
     output = output
       .replace('<rect x="44" y="730" width="507" height="50"', '<rect x="44" y="690" width="507" height="90"')
@@ -48,26 +47,21 @@ function stripGeneratedBrandMark(svg) {
     .replace(/<g transform="translate\(297,112\) scale\(0\.65\)">[\s\S]*?<\/g>/g, '');
 }
 
-function applyApprovedLogo(svg) {
-  const normalized = normalizeKnownLayoutIssues(svg);
-  const isCover = normalized.includes('translate(297,118) scale(0.7)');
-  const isClosing = normalized.includes('translate(297,112) scale(0.65)');
-  if (!isCover && !isClosing) return normalized;
+function mapSvgFont(family, bold, italic) {
+  const requested = String(family || '').toLowerCase();
+  const isDisplay = requested.includes('georgia') || requested.includes('times') || requested.includes('playfair');
 
-  const cleaned = stripGeneratedBrandMark(normalized);
-  const image = isCover
-    ? `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="207" y="40" width="180" height="146" preserveAspectRatio="xMidYMid meet"/>`
-    : `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="214" y="42" width="166" height="134" preserveAspectRatio="xMidYMid meet"/>`;
+  if (isDisplay) {
+    if (bold && italic) return 'Times-BoldItalic';
+    if (bold) return 'Times-Bold';
+    if (italic) return 'Times-Italic';
+    return 'Times-Roman';
+  }
 
-  return cleaned.replace('</svg>', `${image}</svg>`);
-}
-
-async function renderFinalPage(svg) {
-  const finalSvg = embedPremiumFonts(applyApprovedLogo(svg));
-  return sharp(Buffer.from(finalSvg))
-    .resize({ width: 1654, height: 2339, fit: 'fill' })
-    .png({ compressionLevel: 8, adaptiveFiltering: true })
-    .toBuffer();
+  if (bold && italic) return 'Helvetica-BoldOblique';
+  if (bold) return 'Helvetica-Bold';
+  if (italic) return 'Helvetica-Oblique';
+  return 'Helvetica';
 }
 
 async function composePremiumPdf(svgPages) {
@@ -85,11 +79,34 @@ async function composePremiumPdf(svgPages) {
     }
   });
   const done = collectPdf(doc);
+  const warnings = [];
 
   for (const page of svgPages) {
-    const png = await renderFinalPage(page.svg);
     doc.addPage({ size: [PAGE.width, PAGE.height], margin: 0 });
-    doc.image(png, 0, 0, { width: PAGE.width, height: PAGE.height });
+
+    const normalized = normalizeKnownLayoutIssues(page.svg);
+    const cleanSvg = stripGeneratedBrandMark(normalized);
+
+    SVGtoPDF(doc, cleanSvg, 0, 0, {
+      width: PAGE.width,
+      height: PAGE.height,
+      assumePt: true,
+      preserveAspectRatio: 'xMidYMid meet',
+      precision: 4,
+      fontCallback: mapSvgFont,
+      warningCallback: warning => warnings.push(String(warning || ''))
+    });
+
+    if (page.page_number === 1) {
+      doc.image(APPROVED_LOGO_BUFFER, 207, 40, { width: 180 });
+    } else if (page.page_number === 14) {
+      doc.image(APPROVED_LOGO_BUFFER, 214, 42, { width: 166 });
+    }
+  }
+
+  const seriousWarnings = warnings.filter(warning => /font|glyph|text|parse|error/i.test(warning));
+  if (seriousWarnings.length) {
+    throw new Error(`Premium vector PDF renderer warning: ${seriousWarnings.slice(0, 5).join(' | ')}`);
   }
 
   doc.end();
@@ -98,7 +115,7 @@ async function composePremiumPdf(svgPages) {
 
 module.exports = {
   composePremiumPdf,
-  renderFinalPage,
-  applyApprovedLogo,
-  normalizeKnownLayoutIssues
+  normalizeKnownLayoutIssues,
+  stripGeneratedBrandMark,
+  mapSvgFont
 };

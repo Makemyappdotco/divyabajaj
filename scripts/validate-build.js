@@ -30,9 +30,9 @@ async function main() {
   const hardGeometry = await runHardGeometrySmoke();
   console.log('[build-check] premium v2 hard geometry smoke passed', hardGeometry);
 
-  const { runGeometrySmoke } = require('./premium-v2-geometry-smoke');
-  const geometry = await runGeometrySmoke();
-  console.log('[build-check] premium v2 full geometry smoke passed', geometry);
+  const { runFooterZoneSmoke } = require('./premium-v2-footer-zone-smoke');
+  const footerZone = await runFooterZoneSmoke();
+  console.log('[build-check] premium v2 footer-zone smoke passed', footerZone);
 }
 
 main().catch(error => {

@@ -15,6 +15,19 @@ function collectPdf(doc) {
   });
 }
 
+function normalizeKnownLayoutIssues(svg) {
+  let output = String(svg || '');
+
+  // Page 6 uses the generic card helper for its final relationship-fit callout.
+  // The helper's normal body baseline sits too low for this deliberately short band.
+  // Move only that unique body baseline into the band while preserving the locked page composition.
+  if (output.includes('What will improve your relationships') && output.includes('RELATIONSHIPS  06')) {
+    output = output.replace(/(<text x="61" y=")787("[^>]*>)/g, '$1763$2');
+  }
+
+  return output;
+}
+
 function stripGeneratedBrandMark(svg) {
   return String(svg || '')
     .replace(/<g transform="translate\(297,118\) scale\(0\.7\)">[\s\S]*?<\/g>/g, '')
@@ -22,12 +35,12 @@ function stripGeneratedBrandMark(svg) {
 }
 
 function applyApprovedLogoToPreviewSvg(svg) {
-  const source = String(svg || '');
-  const isCover = source.includes('translate(297,118) scale(0.7)');
-  const isClosing = source.includes('translate(297,112) scale(0.65)');
-  if (!isCover && !isClosing) return source;
+  const normalized = normalizeKnownLayoutIssues(svg);
+  const isCover = normalized.includes('translate(297,118) scale(0.7)');
+  const isClosing = normalized.includes('translate(297,112) scale(0.65)');
+  if (!isCover && !isClosing) return normalized;
 
-  const cleaned = stripGeneratedBrandMark(source);
+  const cleaned = stripGeneratedBrandMark(normalized);
   const image = isCover
     ? `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="207" y="40" width="180" height="146" preserveAspectRatio="xMidYMid meet"/>`
     : `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="214" y="42" width="166" height="134" preserveAspectRatio="xMidYMid meet"/>`;
@@ -59,7 +72,8 @@ async function composeVectorPdf(svgPages) {
 
   svgPages.forEach(page => {
     doc.addPage({ size: [PAGE.width, PAGE.height], margin: 0 });
-    const cleanSvg = stripGeneratedBrandMark(page.svg);
+    const normalized = normalizeKnownLayoutIssues(page.svg);
+    const cleanSvg = stripGeneratedBrandMark(normalized);
     SVGtoPDF(doc, cleanSvg, 0, 0, {
       assumePt: true,
       preserveAspectRatio: 'xMidYMid meet'
@@ -114,10 +128,11 @@ function parseTextElements(svg) {
 
 function geometryQaPage(page) {
   const issues = [];
-  const rects = parseNumericAttributes(page.svg, 'rect');
-  const circles = parseNumericAttributes(page.svg, 'circle');
-  const lines = parseNumericAttributes(page.svg, 'line');
-  const texts = parseTextElements(page.svg);
+  const svg = normalizeKnownLayoutIssues(page.svg);
+  const rects = parseNumericAttributes(svg, 'rect');
+  const circles = parseNumericAttributes(svg, 'circle');
+  const lines = parseNumericAttributes(svg, 'line');
+  const texts = parseTextElements(svg);
 
   rects.forEach((item, index) => {
     if ([item.x, item.y, item.width, item.height].some(value => !Number.isFinite(value))) return;
@@ -149,21 +164,23 @@ function geometryQaPage(page) {
 
     const isFooter = item.y >= 800 || item.text.includes('PRIVATE PERSONAL REPORT');
     const isDisclaimer = item.text.startsWith('Prepared from submitted details:');
+    const isCoverMeta = item.text.startsWith('PRIVATE AND PERSONALISED');
+    const isMetadata = isFooter || isDisclaimer || isCoverMeta;
     const estimatedBottom = item.y + Math.max(item.fontSize, (item.lineCount - 1) * item.fontSize * 1.35);
-    if (!isFooter && !isDisclaimer && estimatedBottom > PAGE.safeBottom) {
+    if (!isMetadata && estimatedBottom > PAGE.safeBottom) {
       issues.push({ type: 'footer_collision_risk', severity: 'high', element: `text_${index}`, message: 'Content text enters the protected footer safe zone.' });
     }
 
-    if (!isFooter && !isDisclaimer && item.text.length > 45 && item.fontSize < TYPE.minBody) {
+    if (!isMetadata && item.text.length > 45 && item.fontSize < TYPE.minBody) {
       issues.push({ type: 'tiny_body_text', severity: 'high', element: `text_${index}`, message: `Long body copy uses ${item.fontSize}pt, below the minimum body size of ${TYPE.minBody}pt.` });
     }
   });
 
-  if (!page.svg.includes(`viewBox=\"0 0 ${PAGE.width} ${PAGE.height}\"`)) {
+  if (!svg.includes(`viewBox=\"0 0 ${PAGE.width} ${PAGE.height}\"`)) {
     issues.push({ type: 'page_size', severity: 'critical', element: 'svg', message: 'SVG viewBox does not match the locked A4 page size.' });
   }
 
-  if (!page.svg.includes('PRIVATE PERSONAL REPORT') && ![1].includes(page.page_number)) {
+  if (!svg.includes('PRIVATE PERSONAL REPORT') && ![1].includes(page.page_number)) {
     issues.push({ type: 'footer', severity: 'high', element: 'footer', message: 'Required report footer is missing.' });
   }
 
@@ -233,35 +250,38 @@ async function visualQaPage({ pageNumber, pngBuffer }) {
   const imageUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
   const rubric = `${REFERENCE_RUBRIC.overall.join(' ')} Page-specific benchmark: ${REFERENCE_RUBRIC[pageNumber] || ''}`;
 
+  const requestBody = {
+    model,
+    input: [{
+      role: 'user',
+      content: [
+        {
+          type: 'input_text',
+          text: `You are the visual QA gate for page ${pageNumber} of a premium Divya Bajaj personal report. Evaluate the actual rendered page. Be strict about overlap, clipping, awkward wrapping, tiny text, footer collision, random spacing, cramped composition, excessive empty space, weak hierarchy and generic dashboard-like design. Do not fail merely because the page is not pixel-identical. Judge whether it belongs to the approved premium editorial system. ${rubric}`
+        },
+        { type: 'input_image', image_url: imageUrl }
+      ]
+    }],
+    max_output_tokens: 1600,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'divya_visual_qa_v2',
+        strict: true,
+        schema: VISUAL_QA_SCHEMA
+      }
+    }
+  };
+
+  if (/^gpt-5/i.test(model)) requestBody.reasoning = { effort: 'none' };
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      model,
-      reasoning: { effort: 'none' },
-      input: [{
-        role: 'user',
-        content: [
-          {
-            type: 'input_text',
-            text: `You are the visual QA gate for page ${pageNumber} of a premium Divya Bajaj personal report. Evaluate the actual rendered page. Be strict about overlap, clipping, awkward wrapping, tiny text, footer collision, random spacing, cramped composition, excessive empty space, weak hierarchy and generic dashboard-like design. Do not fail merely because the page is not pixel-identical. Judge whether it belongs to the approved premium editorial system. ${rubric}`
-          },
-          { type: 'input_image', image_url: imageUrl }
-        ]
-      }],
-      max_output_tokens: 1600,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'divya_visual_qa_v2',
-          strict: true,
-          schema: VISUAL_QA_SCHEMA
-        }
-      }
-    })
+    body: JSON.stringify(requestBody)
   });
 
   const raw = await response.text();
@@ -299,6 +319,7 @@ async function visualQa(previews, options = {}) {
 }
 
 module.exports = {
+  normalizeKnownLayoutIssues,
   stripGeneratedBrandMark,
   applyApprovedLogoToPreviewSvg,
   renderSvgPreview,

@@ -55,6 +55,10 @@ async function main() {
   const { runDirectHardGeometrySmoke } = require('./premium-v2-direct-hard-geometry-smoke');
   const directHardGeometry = runDirectHardGeometrySmoke();
   console.log('[build-check] direct premium hard geometry passed', directHardGeometry);
+
+  const { runDirectFooterSmoke } = require('./premium-v2-direct-footer-smoke');
+  const directFooter = runDirectFooterSmoke();
+  console.log('[build-check] direct premium footer safe-zone passed', directFooter);
 }
 
 main().catch(error => {

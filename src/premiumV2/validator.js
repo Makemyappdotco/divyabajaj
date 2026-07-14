@@ -166,10 +166,21 @@ function scanFactConsistency(pages, factLedger, issues) {
     issues.push({ type: 'fact_consistency', severity: 'high', path: 'page_7.year_label', message: `Current-year label must include Personal Year ${expected.personal_year}.` });
   }
 
-  const hiddenNumbers = new Set((pages?.page_10?.missing_guidance || []).map(item => Number(item.number)));
-  expected.missing_numbers.forEach(number => {
-    if (!hiddenNumbers.has(Number(number))) {
-      issues.push({ type: 'fact_consistency', severity: 'critical', path: 'page_10.missing_guidance', message: `Missing number ${number} is absent from Page 10.` });
+  // The approved Page 10 design has room for up to three missing-number cards.
+  // Validate the displayed cards against the same first-three deterministic values the renderer uses.
+  const expectedDisplayedMissing = (expected.missing_numbers || []).slice(0, 3).map(Number);
+  const renderedMissing = (pages?.page_10?.missing_guidance || []).map(item => Number(item.number));
+  const hiddenNumbers = new Set(renderedMissing);
+
+  expectedDisplayedMissing.forEach(number => {
+    if (!hiddenNumbers.has(number)) {
+      issues.push({ type: 'fact_consistency', severity: 'critical', path: 'page_10.missing_guidance', message: `Displayed missing number ${number} is absent from Page 10.` });
+    }
+  });
+
+  renderedMissing.forEach(number => {
+    if (!expectedDisplayedMissing.includes(number)) {
+      issues.push({ type: 'fact_consistency', severity: 'critical', path: 'page_10.missing_guidance', message: `Page 10 shows ${number} as missing, but it is not one of the deterministic missing numbers selected for display.` });
     }
   });
 }

@@ -15,13 +15,12 @@ function sendLandingWithPatches(res) {
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=paid-fast-base-2"></script>';
-  const fastScript = '<script src="/paid-fast-patch.js?v=paid-fast-parallel-2"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${fastScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -33,12 +32,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    paid_flow: 'fast_parallel_gpt_5_5',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
 app.use('/api', publicPaidRoutes);

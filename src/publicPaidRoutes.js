@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('./database');
-const { generateReportPdf } = require('./services/pdf');
 const { generatePaidReport } = require('./services/paidReport');
+const { createDirectPremiumPdf } = require('./premiumV2/directPdf');
 
 const router = express.Router();
 
@@ -121,13 +121,11 @@ router.post('/reports/paid-test', async (req, res) => {
 });
 
 router.post('/reports/pdf-direct', async (req, res) => {
+  const startedAt = Date.now();
   try {
     const {
       lead = {},
-      numbers = {},
-      astrology_data: astrologyData = null,
-      report_text: reportText = '',
-      report_type: reportType = 'paid_blueprint_direct'
+      report_text: reportText = ''
     } = req.body || {};
 
     if (!String(lead.name || '').trim()) {
@@ -138,25 +136,25 @@ router.post('/reports/pdf-direct', async (req, res) => {
       return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
     }
 
-    const pdfBuffer = await generateReportPdf({
+    const result = await createDirectPremiumPdf({
       lead,
-      report: { type: reportType },
-      numbers,
-      astrologyData,
       reportText
     });
 
-    const filename = `${safeFileName(lead.name)}-Full-Blueprint.pdf`;
+    const filename = `${safeFileName(lead.name)}-Full-Blueprint-Premium.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', String(pdfBuffer.length));
+    res.setHeader('Content-Length', String(result.pdfBuffer.length));
     res.setHeader('Cache-Control', 'no-store');
-    return res.end(pdfBuffer);
+    res.setHeader('X-Premium-Report-Version', 'premium-v2-direct');
+    res.setHeader('X-Premium-Report-Pages', '14');
+    res.setHeader('X-Premium-Report-Generation-Ms', String(Date.now() - startedAt));
+    return res.end(result.pdfBuffer);
   } catch (error) {
-    console.error('[Direct premium PDF error]', error);
+    console.error('[Direct 14-page premium PDF error]', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Could not generate the premium PDF'
+      error: error.message || 'Could not generate the 14-page premium PDF'
     });
   }
 });

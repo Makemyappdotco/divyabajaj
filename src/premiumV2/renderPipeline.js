@@ -1,7 +1,10 @@
 const PDFDocument = require('pdfkit');
 const SVGtoPDF = require('svg-to-pdfkit');
 const sharp = require('sharp');
-const { PAGE, REFERENCE_RUBRIC } = require('./spec');
+const APPROVED_LOGO_BASE64 = require('./brandAsset');
+const { PAGE, TYPE, REFERENCE_RUBRIC } = require('./spec');
+
+const APPROVED_LOGO_BUFFER = Buffer.from(APPROVED_LOGO_BASE64, 'base64');
 
 function collectPdf(doc) {
   return new Promise((resolve, reject) => {
@@ -12,8 +15,28 @@ function collectPdf(doc) {
   });
 }
 
+function stripGeneratedBrandMark(svg) {
+  return String(svg || '')
+    .replace(/<g transform="translate\(297,118\) scale\(0\.7\)">[\s\S]*?<\/g>/g, '')
+    .replace(/<g transform="translate\(297,112\) scale\(0\.65\)">[\s\S]*?<\/g>/g, '');
+}
+
+function applyApprovedLogoToPreviewSvg(svg) {
+  const source = String(svg || '');
+  const isCover = source.includes('translate(297,118) scale(0.7)');
+  const isClosing = source.includes('translate(297,112) scale(0.65)');
+  if (!isCover && !isClosing) return source;
+
+  const cleaned = stripGeneratedBrandMark(source);
+  const image = isCover
+    ? `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="207" y="40" width="180" height="146" preserveAspectRatio="xMidYMid meet"/>`
+    : `<image href="data:image/png;base64,${APPROVED_LOGO_BASE64}" x="214" y="42" width="166" height="134" preserveAspectRatio="xMidYMid meet"/>`;
+  return cleaned.replace('</svg>', `${image}</svg>`);
+}
+
 async function renderSvgPreview(svg) {
-  return sharp(Buffer.from(svg))
+  const previewSvg = applyApprovedLogoToPreviewSvg(svg);
+  return sharp(Buffer.from(previewSvg))
     .resize({ width: 1190, height: 1684, fit: 'fill' })
     .png({ compressionLevel: 9 })
     .toBuffer();
@@ -36,10 +59,17 @@ async function composeVectorPdf(svgPages) {
 
   svgPages.forEach(page => {
     doc.addPage({ size: [PAGE.width, PAGE.height], margin: 0 });
-    SVGtoPDF(doc, page.svg, 0, 0, {
+    const cleanSvg = stripGeneratedBrandMark(page.svg);
+    SVGtoPDF(doc, cleanSvg, 0, 0, {
       assumePt: true,
       preserveAspectRatio: 'xMidYMid meet'
     });
+
+    if (page.page_number === 1) {
+      doc.image(APPROVED_LOGO_BUFFER, 207, 40, { width: 180 });
+    } else if (page.page_number === 14) {
+      doc.image(APPROVED_LOGO_BUFFER, 214, 42, { width: 166 });
+    }
   });
 
   doc.end();
@@ -58,11 +88,36 @@ function parseNumericAttributes(svg, tagName) {
   });
 }
 
+function parseTextElements(svg) {
+  const items = [];
+  const regex = /<text\b([^>]*)>([\s\S]*?)<\/text>/g;
+  let match;
+  while ((match = regex.exec(String(svg || ''))) !== null) {
+    const attrs = match[1];
+    const body = match[2];
+    const attr = name => {
+      const found = attrs.match(new RegExp(`${name}=\"(-?\\d+(?:\\.\\d+)?)\"`));
+      return found ? Number(found[1]) : null;
+    };
+    const text = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const lineCount = Math.max(1, (body.match(/<tspan\b/g) || []).length);
+    items.push({
+      x: attr('x'),
+      y: attr('y'),
+      fontSize: attr('font-size'),
+      lineCount,
+      text
+    });
+  }
+  return items;
+}
+
 function geometryQaPage(page) {
   const issues = [];
   const rects = parseNumericAttributes(page.svg, 'rect');
   const circles = parseNumericAttributes(page.svg, 'circle');
   const lines = parseNumericAttributes(page.svg, 'line');
+  const texts = parseTextElements(page.svg);
 
   rects.forEach((item, index) => {
     if ([item.x, item.y, item.width, item.height].some(value => !Number.isFinite(value))) return;
@@ -86,6 +141,24 @@ function geometryQaPage(page) {
     }
   });
 
+  texts.forEach((item, index) => {
+    if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || !Number.isFinite(item.fontSize)) return;
+    if (item.x < 0 || item.x > PAGE.width + 0.5 || item.y < 0 || item.y > PAGE.height + 0.5) {
+      issues.push({ type: 'text_out_of_bounds', severity: 'critical', element: `text_${index}`, message: 'Text anchor exceeds A4 page bounds.' });
+    }
+
+    const isFooter = item.y >= 800 || item.text.includes('PRIVATE PERSONAL REPORT');
+    const isDisclaimer = item.text.startsWith('Prepared from submitted details:');
+    const estimatedBottom = item.y + Math.max(item.fontSize, (item.lineCount - 1) * item.fontSize * 1.35);
+    if (!isFooter && !isDisclaimer && estimatedBottom > PAGE.safeBottom) {
+      issues.push({ type: 'footer_collision_risk', severity: 'high', element: `text_${index}`, message: 'Content text enters the protected footer safe zone.' });
+    }
+
+    if (!isFooter && !isDisclaimer && item.text.length > 45 && item.fontSize < TYPE.minBody) {
+      issues.push({ type: 'tiny_body_text', severity: 'high', element: `text_${index}`, message: `Long body copy uses ${item.fontSize}pt, below the minimum body size of ${TYPE.minBody}pt.` });
+    }
+  });
+
   if (!page.svg.includes(`viewBox=\"0 0 ${PAGE.width} ${PAGE.height}\"`)) {
     issues.push({ type: 'page_size', severity: 'critical', element: 'svg', message: 'SVG viewBox does not match the locked A4 page size.' });
   }
@@ -99,9 +172,10 @@ function geometryQaPage(page) {
     passed: !issues.some(issue => ['critical', 'high'].includes(issue.severity)),
     issues,
     scores: {
-      bounds: issues.some(issue => issue.type === 'out_of_bounds') ? 0 : 10,
+      bounds: issues.some(issue => ['out_of_bounds', 'text_out_of_bounds'].includes(issue.type)) ? 0 : 10,
       page_size: issues.some(issue => issue.type === 'page_size') ? 0 : 10,
-      footer: issues.some(issue => issue.type === 'footer') ? 0 : 10
+      footer: issues.some(issue => ['footer', 'footer_collision_risk'].includes(issue.type)) ? 0 : 10,
+      body_size: issues.some(issue => issue.type === 'tiny_body_text') ? 0 : 10
     }
   };
 }
@@ -155,7 +229,7 @@ const VISUAL_QA_SCHEMA = {
 async function visualQaPage({ pageNumber, pngBuffer }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is missing for visual QA');
-  const model = process.env.OPENAI_QA_MODEL || process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
+  const model = process.env.OPENAI_QA_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini';
   const imageUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
   const rubric = `${REFERENCE_RUBRIC.overall.join(' ')} Page-specific benchmark: ${REFERENCE_RUBRIC[pageNumber] || ''}`;
 
@@ -225,9 +299,12 @@ async function visualQa(previews, options = {}) {
 }
 
 module.exports = {
+  stripGeneratedBrandMark,
+  applyApprovedLogoToPreviewSvg,
   renderSvgPreview,
   renderAllPreviews,
   composeVectorPdf,
+  parseTextElements,
   geometryQaPage,
   geometryQa,
   visualQaPage,

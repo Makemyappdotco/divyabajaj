@@ -39,13 +39,24 @@ const BASE = [
   'This phase rewards consistency, calmer decision-making and finishing important commitments before creating new ones.'
 ].join(' ');
 
+function headingFor(number, title) {
+  const mode = number % 4;
+  if (mode === 0) return `## ${number}. **${title}**`;
+  if (mode === 1) return `**${number}. ${title}**`;
+  if (mode === 2) return `${number}) ${title}`;
+  return `### Section ${number}: ${title}`;
+}
+
 function buildReport() {
   return TITLES.map((title, index) => {
-    const bullets = index === 24
+    const number = index + 1;
+    // Deliberately omit two headings to prove the recovery layer cannot produce empty required fields.
+    if (number === 11 || number === 15) return '';
+    const bullets = number === 25
       ? '\n- Choose one priority and write it down.\n- Remove one avoidable distraction.\n- Review one pending money decision.\n- Have one honest conversation.'
       : '';
-    return `${index + 1}. ${title}\n${BASE} ${BASE}${bullets}`;
-  }).join('\n\n');
+    return `${headingFor(number, title)}\n${BASE} ${BASE}${bullets}`;
+  }).filter(Boolean).join('\n\n');
 }
 
 async function runDirectDownloadSmoke() {
@@ -72,7 +83,9 @@ async function runDirectDownloadSmoke() {
     pdf_bytes: result.pdfBuffer.length,
     content_passed: result.contentQa.passed,
     geometry_passed: result.geometry.passed,
-    pages: 14
+    pages: 14,
+    heading_variants_tested: true,
+    missing_heading_recovery_tested: true
   };
 }
 

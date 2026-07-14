@@ -6,8 +6,10 @@ function requiredEnv(name) {
 
 async function runEnvironmentSmoke() {
   requiredEnv('OPENAI_API_KEY');
+  requiredEnv('SUPABASE_URL');
   return {
     openai_key_present: true,
+    supabase_url_present: true,
     paid_model: String(process.env.OPENAI_PAID_MODEL || 'gpt-5.5').trim()
   };
 }

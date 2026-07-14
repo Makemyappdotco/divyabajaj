@@ -8,6 +8,8 @@ const modules = [
   '../src/premiumV2/renderPipeline',
   '../src/premiumV2/pdfComposer',
   '../src/premiumV2/directPdf',
+  '../src/premiumV2/directPdfFast',
+  '../src/premiumV2/directDownload',
   '../src/premiumV2/correctionLoop',
   '../src/premiumV2/orchestrator',
   '../src/premiumV2/store',
@@ -48,17 +50,9 @@ async function main() {
   const pdf = await runPdfSmoke();
   console.log('[build-check] premium v2 final PDF smoke passed', pdf);
 
-  const { runDirectContentSmoke } = require('./premium-v2-direct-content-smoke');
-  const directContent = runDirectContentSmoke();
-  console.log('[build-check] direct premium content mapping passed', directContent);
-
-  const { runDirectHardGeometrySmoke } = require('./premium-v2-direct-hard-geometry-smoke');
-  const directHardGeometry = runDirectHardGeometrySmoke();
-  console.log('[build-check] direct premium hard geometry passed', directHardGeometry);
-
-  const { runDirectFooterSmoke } = require('./premium-v2-direct-footer-smoke');
-  const directFooter = runDirectFooterSmoke();
-  console.log('[build-check] direct premium footer safe-zone passed', directFooter);
+  const { runDirectDownloadSmoke } = require('./premium-v2-direct-download-smoke');
+  const liveDownload = await runDirectDownloadSmoke();
+  console.log('[build-check] exact live premium download pipeline passed', liveDownload);
 }
 
 main().catch(error => {

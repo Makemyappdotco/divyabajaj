@@ -18,9 +18,6 @@ function collectPdf(doc) {
 function normalizeKnownLayoutIssues(svg) {
   let output = String(svg || '');
 
-  // Page 6 uses the generic card helper for its final relationship-fit callout.
-  // The helper's normal body baseline sits too low for this deliberately short band.
-  // Move only that unique body baseline into the band while preserving the locked page composition.
   if (output.includes('What will improve your relationships') && output.includes('RELATIONSHIPS  06')) {
     output = output.replace(/(<text x="61" y=")787("[^>]*>)/g, '$1763$2');
   }
@@ -128,7 +125,7 @@ function parseTextElements(svg) {
 
 function geometryQaPage(page) {
   const issues = [];
-  const svg = normalizeKnownLayoutIssues(page.svg);
+  const svg = stripGeneratedBrandMark(normalizeKnownLayoutIssues(page.svg));
   const rects = parseNumericAttributes(svg, 'rect');
   const circles = parseNumericAttributes(svg, 'circle');
   const lines = parseNumericAttributes(svg, 'line');

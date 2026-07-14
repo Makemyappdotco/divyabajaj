@@ -15,7 +15,7 @@ function sendLandingWithPatches(res) {
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-1"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-2"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');

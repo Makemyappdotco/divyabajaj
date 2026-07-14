@@ -6,6 +6,7 @@ const { composePremiumPdf } = require('./pdfComposer');
 const { normalizePremiumLayout } = require('./layoutNormalization');
 const { buildDirectPages } = require('./directPdf');
 const { fitDirectPages } = require('./directPdfFast');
+const { normalizeReportForDirectPdf } = require('./reportNormalizer');
 
 async function buildPremiumDownload({ lead, reportText }) {
   const factLedger = buildFactLedger({
@@ -18,8 +19,14 @@ async function buildPremiumDownload({ lead, reportText }) {
     question: lead.question
   });
 
-  const rawPages = buildDirectPages({ lead, reportText, factLedger });
+  // The paid report can contain markdown headings such as "## 11.", "**11.**" or "11)".
+  // Normalize those variations into the one numbered format the deterministic page mapper consumes.
+  // Missing sections are recovered from the nearest relevant section so a formatting variation can never
+  // create empty required fields in the 14-page product.
+  const normalizedReportText = normalizeReportForDirectPdf(reportText);
+  const rawPages = buildDirectPages({ lead, reportText: normalizedReportText, factLedger });
   const pages = fitDirectPages(rawPages);
+
   const contentQa = validatePremiumContent({ pages, factLedger });
   if (!contentQa.passed) {
     const message = contentQa.issues

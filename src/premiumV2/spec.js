@@ -7,7 +7,7 @@ const PAGE = Object.freeze({
   contentTop: 112,
   footerTop: 801,
   footerBottom: 824,
-  safeBottom: 790
+  safeBottom: 792
 });
 
 const COLORS = Object.freeze({
@@ -38,7 +38,7 @@ const TYPE = Object.freeze({
   note: 7.4,
   footer: 6.2,
   number: 27,
-  minBody: 7.2
+  minBody: 6.2
 });
 
 const SPACING = Object.freeze([8, 12, 16, 20, 24, 32, 40, 48, 64]);

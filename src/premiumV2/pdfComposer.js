@@ -29,6 +29,15 @@ function normalizeKnownLayoutIssues(svg) {
       .replace(/font-size="6\.1"/g, 'font-size="6.8"');
   }
 
+  // Page 12 previously placed the final commitment copy too close to the footer.
+  // Move the band upward and give its body enough vertical room instead of shrinking text.
+  if (output.includes('Your 30-Day Action Plan') && output.includes('ACTION PLAN  12')) {
+    output = output
+      .replace('<rect x="44" y="730" width="507" height="50"', '<rect x="44" y="690" width="507" height="90"')
+      .replace(/(<text x="62" y=")755("[^>]*><\/text>)/g, '$1715$2')
+      .replace(/(<text x="62" y=")779("[^>]*>)/g, '$1738$2');
+  }
+
   return output;
 }
 
@@ -89,5 +98,6 @@ async function composePremiumPdf(svgPages) {
 module.exports = {
   composePremiumPdf,
   renderFinalPage,
-  applyApprovedLogo
+  applyApprovedLogo,
+  normalizeKnownLayoutIssues
 };

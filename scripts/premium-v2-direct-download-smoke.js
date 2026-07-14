@@ -1,4 +1,4 @@
-const { createDirectPremiumPdf } = require('../src/premiumV2/directPdf');
+const { buildPremiumDownload } = require('../src/premiumV2/directDownload');
 
 const TITLES = [
   'Personal Opening From Divya',
@@ -49,7 +49,7 @@ function buildReport() {
 }
 
 async function runDirectDownloadSmoke() {
-  const result = await createDirectPremiumPdf({
+  const result = await buildPremiumDownload({
     lead: {
       name: 'Dhruv Gupta',
       email: 'test@example.com',
@@ -62,17 +62,17 @@ async function runDirectDownloadSmoke() {
     reportText: buildReport()
   });
 
-  if (!Buffer.isBuffer(result.pdfBuffer)) throw new Error('Direct premium download smoke did not return a PDF buffer');
-  if (result.pdfBuffer.length < 10000) throw new Error(`Direct premium download PDF is unexpectedly small: ${result.pdfBuffer.length}`);
-  if (result.pdfBuffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Direct premium download smoke did not return a valid PDF header');
-  if (!result.geometry?.passed) throw new Error('Direct premium download geometry did not pass');
-  if (!result.contentQa?.passed) throw new Error('Direct premium download content validation did not pass');
+  if (!Buffer.isBuffer(result.pdfBuffer)) throw new Error('Live premium download pipeline did not return a PDF buffer');
+  if (result.pdfBuffer.length < 10000) throw new Error(`Live premium download PDF is unexpectedly small: ${result.pdfBuffer.length}`);
+  if (result.pdfBuffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Live premium download pipeline did not return a valid PDF header');
+  if (!result.geometry?.passed) throw new Error('Live premium download geometry did not pass');
+  if (!result.contentQa?.passed) throw new Error('Live premium download content validation did not pass');
 
   return {
     pdf_bytes: result.pdfBuffer.length,
     content_passed: result.contentQa.passed,
     geometry_passed: result.geometry.passed,
-    renderer: result.model
+    pages: 14
   };
 }
 

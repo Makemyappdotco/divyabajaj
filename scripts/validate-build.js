@@ -48,9 +48,9 @@ async function main() {
   const pdf = await runPdfSmoke();
   console.log('[build-check] premium v2 final PDF smoke passed', pdf);
 
-  const { runDirectDownloadSmoke } = require('./premium-v2-direct-download-smoke');
-  const directDownload = await runDirectDownloadSmoke();
-  console.log('[build-check] exact direct premium download flow passed', directDownload);
+  const { runDirectContentSmoke } = require('./premium-v2-direct-content-smoke');
+  const directContent = runDirectContentSmoke();
+  console.log('[build-check] direct premium content mapping passed', directContent);
 }
 
 main().catch(error => {

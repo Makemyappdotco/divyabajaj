@@ -1,0 +1,1 @@
+Premium report v2 is isolated from the current live paid report flow. Do not wire the public landing CTA to this engine until the branch passes end-to-end report generation, 14-page QA, PDF creation, and download verification.

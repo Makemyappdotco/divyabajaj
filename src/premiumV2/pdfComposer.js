@@ -2,6 +2,7 @@ const PDFDocument = require('pdfkit');
 const sharp = require('sharp');
 const APPROVED_LOGO_BASE64 = require('./brandAsset');
 const { PAGE } = require('./spec');
+const { embedPremiumFonts } = require('./fontAssets');
 
 function collectPdf(doc) {
   return new Promise((resolve, reject) => {
@@ -62,7 +63,7 @@ function applyApprovedLogo(svg) {
 }
 
 async function renderFinalPage(svg) {
-  const finalSvg = applyApprovedLogo(svg);
+  const finalSvg = embedPremiumFonts(applyApprovedLogo(svg));
   return sharp(Buffer.from(finalSvg))
     .resize({ width: 1654, height: 2339, fit: 'fill' })
     .png({ compressionLevel: 8, adaptiveFiltering: true })

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "build": "echo \"No build step required\""
+    "build": "node scripts/validate-build.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",

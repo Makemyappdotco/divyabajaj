@@ -1,1 +1,1 @@
-Current state: isolated preview implementation. Production main is untouched. End-to-end branch runtime test required before merge or CTA switch.
+Current state: premium report v2 core engine is integrated as hidden API routes while the existing live customer paid-report CTA remains unchanged. Production activation is blocked until runtime health, one complete 14-page report job, automated QA, final PDF download and visual comparison against the approved benchmark are verified.

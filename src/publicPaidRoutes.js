@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('./database');
 const { generatePaidReport } = require('./services/paidReport');
-const { createDirectPremiumPdf } = require('./premiumV2/directPdf');
+const { buildPremiumDownload } = require('./premiumV2/directDownload');
 
 const router = express.Router();
 
@@ -136,7 +136,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
       return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
     }
 
-    const result = await createDirectPremiumPdf({
+    const result = await buildPremiumDownload({
       lead,
       reportText
     });
@@ -146,7 +146,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', String(result.pdfBuffer.length));
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Premium-Report-Version', 'premium-v2-direct');
+    res.setHeader('X-Premium-Report-Version', 'premium-v2-direct-normalized');
     res.setHeader('X-Premium-Report-Pages', '14');
     res.setHeader('X-Premium-Report-Generation-Ms', String(Date.now() - startedAt));
     return res.end(result.pdfBuffer);

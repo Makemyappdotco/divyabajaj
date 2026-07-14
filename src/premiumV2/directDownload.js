@@ -5,6 +5,7 @@ const { geometryQa } = require('./renderPipeline');
 const { composePremiumPdf } = require('./pdfComposer');
 const { normalizePremiumLayout } = require('./layoutNormalization');
 const { buildDirectPages } = require('./directPdf');
+const { fitDirectPages } = require('./directPdfFast');
 
 async function buildPremiumDownload({ lead, reportText }) {
   const factLedger = buildFactLedger({
@@ -17,7 +18,8 @@ async function buildPremiumDownload({ lead, reportText }) {
     question: lead.question
   });
 
-  const pages = buildDirectPages({ lead, reportText, factLedger });
+  const rawPages = buildDirectPages({ lead, reportText, factLedger });
+  const pages = fitDirectPages(rawPages);
   const contentQa = validatePremiumContent({ pages, factLedger });
   if (!contentQa.passed) {
     const message = contentQa.issues
@@ -37,7 +39,7 @@ async function buildPremiumDownload({ lead, reportText }) {
   if (!geometry.passed) {
     const message = geometry.issues
       .slice(0, 8)
-      .map(issue => `Page ${issue.page_number || '?'}: ${issue.message}`)
+      .map(issue => `Page ${issue.page_number || '?'} ${issue.type || ''}: ${issue.message}`)
       .join(' | ');
     throw new Error(`Premium report layout validation failed: ${message}`);
   }

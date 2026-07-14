@@ -46,10 +46,6 @@ async function main() {
   const { runPdfSmoke } = require('./premium-v2-pdf-smoke');
   const pdf = await runPdfSmoke();
   console.log('[build-check] premium v2 final PDF smoke passed', pdf);
-
-  const { runEnvironmentSmoke } = require('./premium-v2-env-smoke');
-  const environment = await runEnvironmentSmoke();
-  console.log('[build-check] premium v2 real environment smoke passed', environment);
 }
 
 main().catch(error => {

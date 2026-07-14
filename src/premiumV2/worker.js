@@ -3,7 +3,8 @@ const { generateStructuredPremiumContent } = require('./contentEngine');
 const { validatePremiumContent } = require('./validator');
 const { buildLayoutPlan } = require('./layoutPlanner');
 const { renderAllPages } = require('./svgRenderer');
-const { renderSvgPreview, geometryQa, geometryQaPage, visualQaPage, composeVectorPdf } = require('./renderPipeline');
+const { renderSvgPreview, geometryQa, geometryQaPage, visualQaPage } = require('./renderPipeline');
+const { composePremiumPdf } = require('./pdfComposer');
 const { correctPageContent } = require('./correctionLoop');
 const store = require('./store');
 
@@ -242,7 +243,7 @@ async function processFinalise(run) {
     page_number: page.page_number,
     svg: page.svg_text
   }));
-  const pdfBuffer = await composeVectorPdf(svgPages);
+  const pdfBuffer = await composePremiumPdf(svgPages);
   const finalPath = await store.uploadFinalPdf(run, pdfBuffer);
 
   return store.updateRun(run.id, {

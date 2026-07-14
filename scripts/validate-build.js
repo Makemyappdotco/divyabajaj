@@ -22,9 +22,9 @@ async function main() {
 
   console.log('[build-check] premium v2 module graph loaded successfully');
 
-  const { runRenderSmoke } = require('./premium-v2-render-smoke');
-  const result = await runRenderSmoke();
-  console.log('[build-check] premium v2 14-page renderer smoke passed', result);
+  const { runStructureSmoke } = require('./premium-v2-structure-smoke');
+  const result = await runStructureSmoke();
+  console.log('[build-check] premium v2 structure smoke passed', result);
 }
 
 main().catch(error => {

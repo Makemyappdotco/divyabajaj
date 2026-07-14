@@ -37,6 +37,10 @@ async function main() {
   const { runGeometrySmoke } = require('./premium-v2-geometry-smoke');
   const geometry = await runGeometrySmoke();
   console.log('[build-check] premium v2 full geometry smoke passed', geometry);
+
+  const { runPreviewSmoke } = require('./premium-v2-preview-smoke');
+  const previews = await runPreviewSmoke();
+  console.log('[build-check] premium v2 PNG preview smoke passed', previews);
 }
 
 main().catch(error => {

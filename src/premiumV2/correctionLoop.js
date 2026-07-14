@@ -18,6 +18,30 @@ function sameShape(reference, candidate) {
   return true;
 }
 
+function schemaFromValue(value) {
+  if (Array.isArray(value)) {
+    if (!value.length) return { type: 'array', maxItems: 0, items: { type: 'string' } };
+    return {
+      type: 'array',
+      minItems: value.length,
+      maxItems: value.length,
+      items: schemaFromValue(value[0])
+    };
+  }
+  if (value && typeof value === 'object') {
+    const properties = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, schemaFromValue(child)]));
+    return {
+      type: 'object',
+      additionalProperties: false,
+      properties,
+      required: Object.keys(properties)
+    };
+  }
+  if (typeof value === 'number') return { type: 'number' };
+  if (typeof value === 'boolean') return { type: 'boolean' };
+  return { type: 'string' };
+}
+
 async function correctPageContent({ pageNumber, currentContent, issues, factLedger, masterInterpretation }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is missing for correction loop');
@@ -25,9 +49,9 @@ async function correctPageContent({ pageNumber, currentContent, issues, factLedg
 
   const prompt = `Correct page ${pageNumber} of a fixed premium Divya Bajaj report.
 
-You must return the exact same JSON shape as CURRENT PAGE CONTENT. Do not add or remove keys or list items.
+Return the exact same JSON shape as CURRENT PAGE CONTENT. Do not add or remove keys or list items.
 
-Fix only the reported problems. Prefer shortening and rewriting text rather than changing meaning. Preserve all deterministic numbers and facts exactly. Never use an em dash. Do not use generic AI vocabulary. Do not invent exact astrology calculations.
+Fix only the reported problems. Prefer shortening and rewriting text rather than changing meaning. Preserve every deterministic number and fact exactly. Never use an em dash. Do not use generic AI vocabulary. Do not invent exact astrology calculations.
 
 If the problem is excessive density, shorten the most verbose fields by roughly 20 to 35 percent while preserving the useful insight. If the problem is awkward line wrapping, make headings shorter and body copy cleaner. If the problem is repetition, keep the stronger version and make this page focus on how the pattern applies specifically to this section.
 
@@ -53,11 +77,18 @@ ${JSON.stringify(currentContent, null, 2)}`;
       model,
       reasoning: { effort: 'none' },
       input: [
-        { role: 'system', content: 'You are a precise report copy editor. Return JSON only.' },
+        { role: 'system', content: 'You are a precise report copy editor. Return only the corrected structured JSON.' },
         { role: 'user', content: prompt }
       ],
       max_output_tokens: 5000,
-      text: { format: { type: 'json_object' } }
+      text: {
+        format: {
+          type: 'json_schema',
+          name: `divya_page_${pageNumber}_correction_v2`,
+          strict: true,
+          schema: schemaFromValue(currentContent)
+        }
+      }
     })
   });
 
@@ -74,4 +105,4 @@ ${JSON.stringify(currentContent, null, 2)}`;
   return corrected;
 }
 
-module.exports = { correctPageContent, sameShape };
+module.exports = { correctPageContent, sameShape, schemaFromValue };

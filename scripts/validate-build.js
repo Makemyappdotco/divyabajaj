@@ -26,9 +26,9 @@ async function main() {
   const structure = await runStructureSmoke();
   console.log('[build-check] premium v2 structure smoke passed', structure);
 
-  const { runGeometrySmoke } = require('./premium-v2-geometry-smoke');
-  const geometry = await runGeometrySmoke();
-  console.log('[build-check] premium v2 geometry smoke passed', geometry);
+  const { runHardGeometrySmoke } = require('./premium-v2-hard-geometry-smoke');
+  const hardGeometry = await runHardGeometrySmoke();
+  console.log('[build-check] premium v2 hard geometry smoke passed', hardGeometry);
 }
 
 main().catch(error => {

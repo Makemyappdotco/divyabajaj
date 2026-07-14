@@ -1,6 +1,7 @@
 const express = require('express');
 const store = require('./store');
 const { runWorkerStage } = require('./worker');
+const versionInfo = require('./version');
 
 const router = express.Router();
 
@@ -38,6 +39,42 @@ function progressFor(run) {
   if (run.stage === 'finalise') return 95;
   return 2;
 }
+
+router.get('/premium-v2/health', (req, res) => {
+  const openaiConfigured = Boolean(process.env.OPENAI_API_KEY);
+  const supabaseConfigured = Boolean(
+    process.env.SUPABASE_URL &&
+    (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)
+  );
+
+  const dependencies = {};
+  for (const name of ['sharp', 'svg-to-pdfkit', 'pdfkit', '@vercel/functions']) {
+    try {
+      require.resolve(name);
+      dependencies[name] = true;
+    } catch (error) {
+      dependencies[name] = false;
+    }
+  }
+
+  const dependencyReady = Object.values(dependencies).every(Boolean);
+  const ready = openaiConfigured && supabaseConfigured && dependencyReady;
+
+  return res.status(ready ? 200 : 503).json({
+    success: ready,
+    version: versionInfo.version,
+    branch: versionInfo.branch,
+    live_flow_replaced: versionInfo.liveFlowReplaced,
+    openai_configured: openaiConfigured,
+    supabase_configured: supabaseConfigured,
+    dependencies,
+    qa_model_configured: Boolean(process.env.OPENAI_QA_MODEL || process.env.OPENAI_MODEL),
+    paid_model_configured: Boolean(process.env.OPENAI_PAID_MODEL),
+    message: ready
+      ? 'Premium report v2 runtime dependencies are configured.'
+      : 'Premium report v2 is deployed but one or more required runtime dependencies or environment variables are missing.'
+  });
+});
 
 async function continueRun({ runId, publicToken, baseUrl }) {
   const run = await store.getRun(runId);

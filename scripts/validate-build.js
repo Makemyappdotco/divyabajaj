@@ -23,8 +23,12 @@ async function main() {
   console.log('[build-check] premium v2 module graph loaded successfully');
 
   const { runStructureSmoke } = require('./premium-v2-structure-smoke');
-  const result = await runStructureSmoke();
-  console.log('[build-check] premium v2 structure smoke passed', result);
+  const structure = await runStructureSmoke();
+  console.log('[build-check] premium v2 structure smoke passed', structure);
+
+  const { runGeometrySmoke } = require('./premium-v2-geometry-smoke');
+  const geometry = await runGeometrySmoke();
+  console.log('[build-check] premium v2 geometry smoke passed', geometry);
 }
 
 main().catch(error => {

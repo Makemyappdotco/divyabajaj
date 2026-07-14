@@ -33,6 +33,10 @@ async function main() {
   const { runFooterZoneSmoke } = require('./premium-v2-footer-zone-smoke');
   const footerZone = await runFooterZoneSmoke();
   console.log('[build-check] premium v2 footer-zone smoke passed', footerZone);
+
+  const { runGeometrySmoke } = require('./premium-v2-geometry-smoke');
+  const geometry = await runGeometrySmoke();
+  console.log('[build-check] premium v2 full geometry smoke passed', geometry);
 }
 
 main().catch(error => {

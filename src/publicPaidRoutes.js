@@ -1,7 +1,7 @@
 const express = require('express');
 const db = require('./database');
 const { generateReportPdf } = require('./services/pdf');
-const { startPaidBackground, getPaidBackground } = require('./services/paidBackground');
+const { generatePaidReport } = require('./services/paidReport');
 
 const router = express.Router();
 
@@ -17,27 +17,72 @@ function safeFileName(value) {
     .replace(/^-|-$/g, '') || 'Divya-Bajaj';
 }
 
-function errorMessage(error, fallback) {
-  if (!error) return fallback;
-  if (typeof error === 'string') return error;
-  return error.message || error.code || JSON.stringify(error);
-}
+async function saveGeneratedReportBestEffort({ payload, result }) {
+  try {
+    const existing = await db.getLeads({ search: payload.phone });
+    const leadData = {
+      name: payload.name,
+      phone: payload.phone,
+      dob: payload.dob,
+      email: payload.email,
+      tob: payload.tob,
+      pob: payload.pob,
+      question: payload.question,
+      source: payload.source || 'paid_blueprint_public_test_form',
+      status: 'paid_test_report_generated',
+      tier: 'paid_blueprint_test'
+    };
 
-async function findOrCreateLead({ name, phone, dob, email, tob, pob, question, source }) {
-  const existing = await db.getLeads({ search: phone });
-  const leadData = { name, phone, dob, email, tob, pob, question, source };
-  return existing.length
-    ? await db.updateLead(existing[0].id, leadData)
-    : await db.createLead(leadData);
+    const lead = existing.length
+      ? await db.updateLead(existing[0].id, leadData)
+      : await db.createLead(leadData);
+
+    const report = await db.createReport({
+      lead_id: lead.id,
+      type: 'paid_blueprint_test',
+      status: 'completed',
+      input_data: {
+        ...payload,
+        payment_status: 'testing_without_payment_gateway'
+      },
+      horosoft_data: result.numbers,
+      astrology_data: result.astrology_data,
+      ai_report: result.report_text,
+      ai_insights: {
+        ...(result.insights || {}),
+        generation_ms: result.generation_ms,
+        delivery_ready: {
+          email: payload.email,
+          whatsapp: payload.phone
+        }
+      },
+      generated_by: result.model,
+      pdf_url: '/api/reports/pdf-direct'
+    });
+
+    return { lead_id: lead.id, report_id: report.id };
+  } catch (error) {
+    console.warn('[Paid report persistence skipped]', error.message);
+    return { lead_id: '', report_id: '' };
+  }
 }
 
 router.post('/reports/paid-test', async (req, res) => {
-  let report = null;
+  const startedAt = Date.now();
 
   try {
-    const { name, phone, dob, email, tob, pob, question, source } = req.body;
-    const missing = missingPaidFields(req.body);
+    const payload = {
+      name: String(req.body.name || '').trim(),
+      phone: String(req.body.phone || '').trim(),
+      dob: String(req.body.dob || '').trim(),
+      email: String(req.body.email || '').trim(),
+      tob: String(req.body.tob || '').trim(),
+      pob: String(req.body.pob || '').trim(),
+      question: String(req.body.question || '').trim(),
+      source: String(req.body.source || 'paid_blueprint_public_test_form').trim()
+    };
 
+    const missing = missingPaidFields(payload);
     if (missing.length) {
       return res.status(400).json({
         success: false,
@@ -45,190 +90,32 @@ router.post('/reports/paid-test', async (req, res) => {
       });
     }
 
-    const lead = await findOrCreateLead({
-      name,
-      phone,
-      dob,
-      email,
-      tob,
-      pob,
-      question,
-      source: source || 'paid_blueprint_public_test_form'
-    });
-
-    await db.updateLead(lead.id, {
-      status: 'paid_test_report_requested',
-      tier: 'paid_blueprint_test'
-    });
-
-    const inputData = {
-      name,
-      phone,
-      dob,
-      email,
-      tob,
-      pob,
-      question,
-      payment_status: 'testing_without_payment_gateway'
-    };
-
-    report = await db.createReport({
-      lead_id: lead.id,
-      type: 'paid_blueprint_test',
-      status: 'starting',
-      input_data: inputData
-    });
-
-    const background = await startPaidBackground({
-      name,
-      dob,
-      tob,
-      pob,
-      question
-    });
-
-    await db.updateReport(report.id, {
-      status: background.status || 'queued',
-      generated_by: background.model,
-      horosoft_data: background.numbers,
-      astrology_data: background.astrologyData,
-      input_data: {
-        ...inputData,
-        openai_response_id: background.responseId
-      }
-    });
-
-    return res.status(202).json({
-      success: true,
-      background: true,
-      ready: false,
-      status: background.status || 'queued',
-      job_id: background.responseId,
-      report_id: report.id,
-      lead_id: lead.id,
-      generated_by: background.model,
-      storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
-      numbers: background.numbers,
-      astrology_data: background.astrologyData
-    });
-  } catch (error) {
-    console.error('[Start paid background report error]', error);
-
-    if (report?.id) {
-      try {
-        await db.updateReport(report.id, {
-          status: 'failed',
-          ai_insights: { error: error.message }
-        });
-      } catch (updateError) {
-        console.error('[Save paid start error failed]', updateError);
-      }
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Could not start paid report generation'
-    });
-  }
-});
-
-router.get('/reports/paid-test/status/:responseId', async (req, res) => {
-  try {
-    const { responseId } = req.params;
-    const reportId = String(req.query.report_id || '');
-    const leadId = String(req.query.lead_id || '');
-    const result = await getPaidBackground(responseId);
-
-    if (result.status === 'queued' || result.status === 'in_progress') {
-      if (reportId) {
-        try {
-          await db.updateReport(reportId, { status: result.status });
-        } catch (error) {
-          console.warn('[Paid polling status save skipped]', error.message);
-        }
-      }
-
-      return res.json({
-        success: true,
-        ready: false,
-        status: result.status,
-        job_id: result.id,
-        generated_by: result.model
-      });
-    }
-
-    if (result.status !== 'completed') {
-      const message = errorMessage(
-        result.error || result.incompleteDetails,
-        `Paid report ended with status: ${result.status || 'unknown'}`
-      );
-
-      if (reportId) {
-        try {
-          await db.updateReport(reportId, {
-            status: result.status || 'failed',
-            ai_insights: { error: message }
-          });
-        } catch (error) {
-          console.warn('[Paid failure save skipped]', error.message);
-        }
-      }
-
-      return res.status(500).json({
-        success: false,
-        ready: false,
-        status: result.status,
-        error: message
-      });
-    }
-
-    if (!result.reportText) {
-      return res.status(500).json({
-        success: false,
-        ready: false,
-        status: 'completed',
-        error: 'OpenAI completed the job but returned empty report text'
-      });
-    }
-
-    if (reportId) {
-      try {
-        await db.updateReport(reportId, {
-          status: 'completed',
-          ai_report: result.reportText,
-          generated_by: result.model,
-          pdf_url: '/api/reports/pdf-direct'
-        });
-      } catch (error) {
-        console.warn('[Paid completed report save skipped]', error.message);
-      }
-    }
-
-    if (leadId) {
-      try {
-        await db.updateLead(leadId, {
-          status: 'paid_test_report_generated',
-          tier: 'paid_blueprint_test'
-        });
-      } catch (error) {
-        console.warn('[Paid completed lead save skipped]', error.message);
-      }
-    }
+    const result = await generatePaidReport(payload);
+    const saved = await saveGeneratedReportBestEffort({ payload, result });
 
     return res.json({
       success: true,
-      ready: true,
-      status: 'completed',
-      job_id: result.id,
+      test_mode: true,
+      payment_required: false,
+      lead_id: saved.lead_id,
+      report_id: saved.report_id,
       generated_by: result.model,
-      report_text: result.reportText
+      generation_ms: result.generation_ms || (Date.now() - startedAt),
+      storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
+      numbers: result.numbers,
+      astrology_data: result.astrology_data,
+      report_text: result.report_text,
+      pdf_url: '/api/reports/pdf-direct',
+      delivery_ready: {
+        email: payload.email,
+        whatsapp: payload.phone
+      }
     });
   } catch (error) {
-    console.error('[Poll paid background report error]', error);
+    console.error('[Fast paid blueprint report error]', error);
     return res.status(500).json({
       success: false,
-      ready: false,
-      error: error.message || 'Could not check paid report status'
+      error: error.message || 'Paid report generation failed'
     });
   }
 });
@@ -268,6 +155,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
   } catch (error) {
     console.error('[Direct premium PDF error]', error);
     return res.status(500).json({
+      success: false,
       error: error.message || 'Could not generate the premium PDF'
     });
   }

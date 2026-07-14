@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
+const premiumV2Routes = require('./premiumV2/routes');
 const { adminAuth } = require('./auth');
 
 const app = express();
@@ -35,6 +36,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
+app.use('/api', premiumV2Routes);
 app.use('/api', publicPaidRoutes);
 app.use('/api', adminAuth, routes);
 

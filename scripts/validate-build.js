@@ -7,6 +7,7 @@ const modules = [
   '../src/premiumV2/svgRenderer',
   '../src/premiumV2/renderPipeline',
   '../src/premiumV2/pdfComposer',
+  '../src/premiumV2/fontAssets',
   '../src/premiumV2/directPdf',
   '../src/premiumV2/directPdfFast',
   '../src/premiumV2/directDownload',
@@ -25,6 +26,10 @@ async function main() {
   }
 
   console.log('[build-check] premium v2 module graph loaded successfully');
+
+  const { runFontRenderSmoke } = require('./premium-v2-font-render-smoke');
+  const fonts = await runFontRenderSmoke();
+  console.log('[build-check] bundled premium fonts rendered distinctly', fonts);
 
   const { runStructureSmoke } = require('./premium-v2-structure-smoke');
   const structure = await runStructureSmoke();

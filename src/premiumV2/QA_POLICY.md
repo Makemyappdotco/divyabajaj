@@ -1,0 +1,1 @@
+Release gate: all 14 pages must pass deterministic fact checks, hard content limits, geometry bounds, footer checks and visual QA. Failed pages are corrected only within locked page schemas and rerendered before final PDF assembly.

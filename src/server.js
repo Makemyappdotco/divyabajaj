@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
+const premiumV2Routes = require('./premiumV2/routes');
 const { adminAuth } = require('./auth');
 
 const app = express();
@@ -15,7 +16,7 @@ function sendLandingWithPatches(res) {
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-1"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-2"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
@@ -35,6 +36,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
 });
 
+app.use('/api', premiumV2Routes);
 app.use('/api', publicPaidRoutes);
 app.use('/api', adminAuth, routes);
 

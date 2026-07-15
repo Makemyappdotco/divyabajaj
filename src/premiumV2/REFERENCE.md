@@ -1,0 +1,1 @@
+Approved visual reference: the user-approved 14-page Divya Bajaj Full Blueprint redesign. The coded system must preserve its editorial hierarchy, cream/dark rhythm, restrained gold palette, spacing philosophy and premium composition while using dynamic selectable text.

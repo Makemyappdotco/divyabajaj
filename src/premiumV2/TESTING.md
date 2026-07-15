@@ -1,0 +1,1 @@
+Branch runtime acceptance criteria: job creation returns 202; facts/content/render stages complete; all 14 pages pass geometry and visual QA; private PDF is stored; status endpoint returns a signed download URL; current production paid flow remains unchanged until acceptance passes.

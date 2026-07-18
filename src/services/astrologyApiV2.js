@@ -117,19 +117,56 @@ async function post(path, payload, { pdf = false, timeoutMs = 60000 } = {}) {
   }
 }
 
+function normaliseLocationText(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function locationScore(location, query) {
+  const name = normaliseLocationText(location.place_name);
+  const wanted = normaliseLocationText(query);
+  let score = 0;
+
+  if (name === wanted) score += 1000;
+  else if (name.startsWith(wanted)) score += 300;
+  else if (name.includes(wanted)) score += 100;
+
+  // Divya's primary audience is India, but international birth locations remain available.
+  if (location.country_code === 'IN') score += 80;
+  if (location.timezone_id === 'Asia/Kolkata') score += 20;
+
+  return score;
+}
+
 async function searchLocations(place, maxRows = 7) {
   const query = String(place || '').trim();
   if (query.length < 2) return [];
-  const result = await post('geo_details', { place: query, maxRows: String(Math.min(Math.max(maxRows, 1), 10)) });
+
+  const requestedRows = Math.min(Math.max(Number(maxRows) || 7, 1), 10);
+  const result = await post('geo_details', { place: query, maxRows: '10' });
   const rows = Array.isArray(result?.geonames) ? result.geonames : [];
-  return rows.map((row, index) => ({
-    id: `${row.place_name || query}-${row.latitude}-${row.longitude}-${index}`,
-    place_name: String(row.place_name || '').trim(),
-    latitude: Number(row.latitude),
-    longitude: Number(row.longitude),
-    timezone_id: String(row.timezone_id || '').trim(),
-    country_code: String(row.country_code || '').trim()
-  })).filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
+
+  return rows
+    .map((row, index) => ({
+      id: `${row.place_name || query}-${row.latitude}-${row.longitude}-${index}`,
+      place_name: String(row.place_name || '').trim(),
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      timezone_id: String(row.timezone_id || '').trim(),
+      country_code: String(row.country_code || '').trim().toUpperCase()
+    }))
+    .filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude))
+    .sort((a, b) => {
+      const scoreDifference = locationScore(b, query) - locationScore(a, query);
+      if (scoreDifference) return scoreDifference;
+      return a.place_name.localeCompare(b.place_name);
+    })
+    .slice(0, requestedRows);
 }
 
 async function getTimezoneForBirth({ latitude, longitude, dob }) {

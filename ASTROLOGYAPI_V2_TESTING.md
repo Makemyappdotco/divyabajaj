@@ -25,3 +25,5 @@ The old paid-report route and existing production AstrologyAPI variable remain u
 ## Redeploy note
 
 Preview redeployed after the sandbox PDF environment variable was added so the latest deployment can read the current Preview configuration.
+
+A second clean Preview deployment was triggered after the sandbox PDF token was recreated with the exact variable name and Preview scope.

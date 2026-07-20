@@ -2,6 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+
+// Reuse the existing live AstrologyAPI credential until the V2 token is promoted to Production.
+if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS_TOKEN) {
+  process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN = process.env.ASTROLOGYAPI_ACCESS_TOKEN;
+}
+
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
@@ -15,12 +21,14 @@ function sendLandingWithPatches(res) {
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=paid-single-flow-1"></script>';
+  const paidScript = '<script src="/paid-test-flow.js?v=astrology-v2-client-review-1"></script>';
+  const conversionScript = '<script src="/paid-v2-live-conversion.js?v=client-review-conversion-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${conversionScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -45,6 +53,10 @@ app.get('/admin', adminAuth, (req, res) => {
 app.use('/admin', adminAuth, express.static(publicDir));
 app.get('/', (req, res) => sendLandingWithPatches(res));
 app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
+app.get('/consultation', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.sendFile(path.join(publicDir, 'consultation.html'));
+});
 app.use(express.static(publicDir));
 
 app.use((err, req, res, next) => {

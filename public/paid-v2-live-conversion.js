@@ -1,6 +1,6 @@
 (function () {
-  if (window.__divyaPaidV2Conversion) return;
-  window.__divyaPaidV2Conversion = true;
+  if (window.__divyaPaidV2ConversionSafe) return;
+  window.__divyaPaidV2ConversionSafe = true;
 
   var BOOKING_URL = '/consultation';
   var WHATSAPP_URL = 'https://wa.me/919545136766?text=' + encodeURIComponent(
@@ -26,9 +26,11 @@
     document.head.appendChild(style);
   }
 
-  function enhanceModal() {
+  function enhanceModalOnce() {
     var modal = document.getElementById('paidBlueprintModalV4');
-    if (!modal) return;
+    if (!modal || modal.dataset.conversionEnhanced === 'true') return;
+
+    modal.dataset.conversionEnhanced = 'true';
 
     var kicker = modal.querySelector('.pb4-kicker');
     var sub = modal.querySelector('.pb4-sub');
@@ -39,7 +41,7 @@
     if (sub) sub.textContent = 'Generate the current working Full Blueprint using verified astrology, Dasha, location and numerology data. This version is live for client review before the final redesign.';
     if (note) note.textContent = 'No payment is collected in this client-review version. Report generation may take 1 to 3 minutes.';
 
-    if (result && !result.querySelector('.pb4-conversion')) {
+    if (result) {
       var block = document.createElement('div');
       block.className = 'pb4-conversion';
       block.innerHTML = `
@@ -60,8 +62,17 @@
   }
 
   addStyles();
-  enhanceModal();
 
-  var observer = new MutationObserver(enhanceModal);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('button,a') : null;
+    if (!target) return;
+
+    var label = String(target.textContent || '').toLowerCase();
+    var href = String(target.getAttribute('href') || '').toLowerCase();
+    var isBlueprintTrigger = /get blueprint|full blueprint|advanced report|paid report|go deeper|detailed report/.test(label + ' ' + href);
+
+    if (isBlueprintTrigger || target.closest('#paidBlueprintModalV4')) {
+      setTimeout(enhanceModalOnce, 0);
+    }
+  }, false);
 })();

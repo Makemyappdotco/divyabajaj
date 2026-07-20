@@ -1,4 +1,5 @@
 const { generateSourceBundle } = require('./astrologyApiV2');
+const brand = require('../config/divyaBrand');
 
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
@@ -66,6 +67,7 @@ IMPORTANT ACCURACY RULES
 - Do not use em dashes.
 - Avoid AI phrases such as unlock, profound, tapestry, transformative journey, navigate, multifaceted and embrace.
 - Give complete value. The consultation recommendation must be based on areas that genuinely require personal context, timing or comparison.
+- Make the consultation reasons specific to this person. Do not use a generic sales pitch.
 
 Return ONLY valid JSON with exactly this shape:
 {
@@ -191,6 +193,26 @@ function section(number, title, body) {
   return `${number}. ${title}\n${String(body || '').trim()}`;
 }
 
+function consultationOffer(input) {
+  const bookingUrl = `${brand.website}${brand.consultation.bookingPath}`;
+  return `Your report identifies the main patterns. A personal consultation helps apply them to your exact situation, timing and current choices.
+
+What the session can cover
+• The exact question you are facing right now
+• Timing and priorities within your present Dasha
+• Comparing two career, business, relationship or money choices
+• Personal remedies and actions that fit your real circumstances
+
+One-to-One Consultation with Divya Bajaj
+Fee: ₹${brand.consultation.priceInr.toLocaleString('en-IN')}
+Duration: ${brand.consultation.durationMinutes} minutes
+Mode: Phone call or video call
+Book here: ${bookingUrl}
+WhatsApp: ${brand.whatsapp}
+
+This is especially useful for your concern: ${input.question || 'overall life direction'}.`;
+}
+
 function reportTextFromJson(report, input) {
   const summary = report.executive_summary || {};
   const astro = report.astrology_foundation || {};
@@ -233,7 +255,8 @@ function reportTextFromJson(report, input) {
     section(10, 'Your Personal Guidance', guidance),
     section(11, 'Your 30-Day Action Plan', actionPlan),
     section(12, 'What Deserves a Personal Reading', `${consultation.headline}\n\n${list(consultation.reasons)}\n\n${consultation.closing}`),
-    section(13, 'Personal Closing From Divya', `${input.name}, use this report as a practical reference rather than a fixed prediction. The most useful next step is to observe which patterns are already active in your real life and take the actions listed here consistently. For exact timing, comparison between choices or a deeper personal question, you can book a one-to-one consultation with Divya Bajaj.`)
+    section(13, 'Book a One-to-One Consultation', consultationOffer(input)),
+    section(14, 'Personal Closing From Divya', `${input.name}, use this report as a practical reference rather than a fixed prediction. Observe which patterns are already active in your real life and follow the actions consistently. When you need exact timing, comparison between choices or guidance around one important decision, book a personal consultation with Divya Bajaj at ${brand.website}${brand.consultation.bookingPath}.`)
   ].join('\n\n');
 }
 
@@ -252,6 +275,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     report_text: reportText,
     astrology_data: {
       provider: 'AstrologyAPI',
+      note: 'This report uses verified AstrologyAPI planetary positions, chart calculations and Vimshottari Dasha data based on the submitted birth details.',
       planets: sourceBundle.planets,
       current_vdasha: sourceBundle.current_vdasha,
       current_vdasha_all: sourceBundle.current_vdasha_all,

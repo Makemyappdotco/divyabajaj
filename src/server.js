@@ -22,7 +22,7 @@ function sendLandingWithPatches(res) {
 
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-test-flow.js?v=astrology-v2-client-review-1"></script>';
-  const conversionScript = '<script src="/paid-v2-live-conversion.js?v=client-review-conversion-1"></script>';
+  const conversionScript = '<script src="/paid-v2-live-conversion.js?v=client-review-conversion-2"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');

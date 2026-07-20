@@ -222,9 +222,12 @@ function reportTextFromJson(report, input) {
   const relationships = report.relationships || {};
   const consultation = report.consultation || {};
 
-  const chartInsights = (report.chart_insights || []).map(item =>
-    `${item.title}\n${item.explanation}\nPractical effect: ${item.practical_effect}`
-  ).join('\n\n');
+  const chartInsights = (report.chart_insights || []).map(item => {
+    const title = String(item.title || 'Chart insight').trim();
+    const explanation = String(item.explanation || '').trim();
+    const practicalEffect = String(item.practical_effect || '').trim();
+    return `• ${title}: ${explanation}${practicalEffect ? ` Practical effect: ${practicalEffect}` : ''}`;
+  }).join('\n');
 
   const coreNumbers = (numerology.core_numbers || []).map(item =>
     `${item.label}: ${item.number}\n${item.meaning}`
@@ -246,7 +249,7 @@ function reportTextFromJson(report, input) {
     section(1, 'Personal Opening From Divya', `${input.name}, this report combines your verified birth-chart calculations and numerology data into one practical reading. It focuses especially on ${input.question || 'your overall life direction'}.`),
     section(2, 'Your Blueprint in 90 Seconds', `Core nature: ${summary.core_nature}\n\nStrongest advantage: ${summary.strongest_advantage}\n\nMain challenge: ${summary.main_challenge}\n\nCurrent focus: ${summary.current_focus}`),
     section(3, 'Your Astrological Foundation', `Ascendant: ${astro.ascendant}\nMoon sign: ${astro.moon_sign}\nSun sign: ${astro.sun_sign}\nNakshatra: ${astro.nakshatra}\n\n${astro.summary}`),
-    section(4, 'Your Main Chart Insights', chartInsights),
+    section(4, 'Your Main Chart Insights', chartInsights || 'No chart insight was returned for this report.'),
     section(5, 'Your Current Dasha', `Major period: ${dasha.major}\nMinor period: ${dasha.minor}\nPeriod: ${dasha.period}\n\n${dasha.theme}\n\nOpportunities\n${list(dasha.opportunities)}\n\nCautions\n${list(dasha.cautions)}`),
     section(6, 'Your Core Numerology', `${coreNumbers}\n\nHow the numbers work together\n${numerology.synthesis}`),
     section(7, 'Career, Business and Money', `${career.summary}\n\nStrengths\n${list(career.strengths)}\n\nRisks\n${list(career.risks)}\n\nActions\n${list(career.actions)}`),

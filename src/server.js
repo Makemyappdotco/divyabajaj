@@ -37,7 +37,7 @@ function sendLandingWithPatches(res) {
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-2"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-2"></script>';
-  const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-4"></script>';
+  const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-5"></script>';
   const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-2"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');

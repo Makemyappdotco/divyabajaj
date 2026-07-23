@@ -108,7 +108,10 @@
         <button class="dbp-close" type="button" data-dbp-action="close" aria-label="Close">&times;</button>
         <div class="dbp-layout">
           <aside class="dbp-aside">
-            <div class="dbp-brand">Divya Bajaj · Astro-Numerologist</div>
+            <div class="dbp-brand">
+  <span class="dbp-brand-name">DIVYA BAJAJ</span>
+  <span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>
+</div>
             <div class="dbp-price-tag">The Full Blueprint · ₹999</div>
             <h2>Your chart.<br>Your numbers.<br>One clear blueprint.</h2>
             <p class="dbp-aside-copy">A personalised astrology and numerology report created from your exact birth details, verified location, planetary chart and current Dasha.</p>

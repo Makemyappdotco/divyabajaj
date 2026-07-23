@@ -38,9 +38,9 @@
         height:100%!important;
         display:block!important;
         object-fit:cover!important;
-        object-position:center center!important;
+        object-position:center!important;
         border-radius:50%!important;
-        transform:scale(2.08) translateY(16%)!important;
+        transform:none!important;
         transform-origin:center center!important;
       }
       #dbpOverlay .dbp-brand{
@@ -180,35 +180,30 @@
     var target = ensureLayout(overlay);
     if (!target) return false;
 
-    var portrait = findBestPortrait();
-    if (!portrait) {
-      target.removeAttribute('src');
-      target.style.display = 'none';
-      var hiddenProfile = target.closest('.dbp-profile');
-      if (hiddenProfile) hiddenProfile.style.display = 'none';
-      return false;
-    }
+var source = '/divya-profile.png?v=2';
+var profile = target.closest('.dbp-profile');
+var preloader = new Image();
 
-    var source = portrait.currentSrc || portrait.src;
-    var preloader = new Image();
-    preloader.onload = function () {
-      target.alt = 'Divya Bajaj';
-      target.removeAttribute('aria-hidden');
-      target.style.display = 'block';
-      var profile = target.closest('.dbp-profile');
-      if (profile) profile.style.display = '';
-      target.src = source;
-    };
-    preloader.onerror = function () {
-      target.removeAttribute('src');
-      target.alt = '';
-      target.style.display = 'none';
-      var profile = target.closest('.dbp-profile');
-      if (profile) profile.style.display = 'none';
-    };
-    preloader.src = source;
-    return true;
-  }
+preloader.onload = function () {
+  target.alt = 'Divya Bajaj';
+  target.removeAttribute('aria-hidden');
+  target.style.display = 'block';
+
+  if (profile) profile.style.display = '';
+
+  target.src = source;
+};
+
+preloader.onerror = function () {
+  target.removeAttribute('src');
+  target.alt = '';
+  target.style.display = 'none';
+
+  if (profile) profile.style.display = 'none';
+};
+
+preloader.src = source;
+return true;
 
   function repairForFiveSeconds() {
     var started = Date.now();

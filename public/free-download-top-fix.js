@@ -1,170 +1,45 @@
 (function () {
   'use strict';
 
-  if (window.__divyaFreeDownloadTopFixV2) return;
-  window.__divyaFreeDownloadTopFixV2 = true;
-
-  var watcher = null;
-  var watcherStartedAt = 0;
-  var firstPlacedAt = 0;
-
-  function qsa(selector, root) {
-    return Array.prototype.slice.call((root || document).querySelectorAll(selector));
-  }
-
-  function normalise(value) {
-    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
-
-  function visible(element) {
-    if (!element || !element.isConnected) return false;
-    var style = window.getComputedStyle(element);
-    return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
-  }
-
-  function comesAfter(reference, element) {
-    if (!reference || !element || reference === element) return false;
-    return Boolean(reference.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
-  }
+  if (window.__divyaFreeDownloadTopFixV3) return;
+  window.__divyaFreeDownloadTopFixV3 = true;
 
   function injectStyles() {
-    if (document.getElementById('dbFreeDownloadTopStylesV2')) return;
-    var oldStyle = document.getElementById('dbFreeDownloadTopStyles');
-    if (oldStyle) oldStyle.remove();
+    if (document.getElementById('dbFreeDownloadTopStylesV3')) return;
+
+    ['dbFreeDownloadTopStyles', 'dbFreeDownloadTopStylesV2'].forEach(function (id) {
+      var oldStyle = document.getElementById(id);
+      if (oldStyle) oldStyle.remove();
+    });
 
     var style = document.createElement('style');
-    style.id = 'dbFreeDownloadTopStylesV2';
+    style.id = 'dbFreeDownloadTopStylesV3';
     style.textContent = `
-      .db-free-download-slot{
-        display:block!important;
-        width:100%!important;
-        margin:0 0 22px!important;
-        padding:16px 0 4px!important;
-        position:sticky!important;
-        top:0!important;
-        z-index:20!important;
-        background:linear-gradient(180deg,#111015 0%,#111015 82%,rgba(17,16,21,0) 100%)!important;
-      }
-      .db-free-download-slot>button,
-      .db-free-download-slot>a,
-      .db-free-download-primary{
-        display:flex!important;
-        align-items:center!important;
-        justify-content:center!important;
-        width:100%!important;
-        min-height:54px!important;
-        margin:0!important;
-        padding:15px 18px!important;
-        border:1px solid rgba(234,211,156,.55)!important;
-        background:linear-gradient(135deg,#c9a96e,#ead39c)!important;
-        color:#09070a!important;
-        font-weight:900!important;
-        font-size:11px!important;
-        line-height:1.25!important;
-        letter-spacing:1.5px!important;
-        text-align:center!important;
-        text-decoration:none!important;
-        text-transform:uppercase!important;
-        cursor:pointer!important;
-        box-shadow:0 14px 38px rgba(201,169,110,.18)!important;
-      }
+      #generatedReportBox .db-free-download-slot{display:block!important;width:100%!important;margin:18px 0 22px!important;padding:0!important;position:relative!important}
+      #generatedReportBox .db-free-download-slot>.pdf-download-btn,
+      #generatedReportBox .db-free-download-primary{display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:54px!important;margin:0!important;padding:15px 18px!important;border:1px solid rgba(234,211,156,.55)!important;background:linear-gradient(135deg,#c9a96e,#ead39c)!important;color:#09070a!important;font-weight:900!important;font-size:11px!important;line-height:1.25!important;letter-spacing:1.5px!important;text-align:center!important;text-decoration:none!important;text-transform:uppercase!important;cursor:pointer!important;box-shadow:0 14px 38px rgba(201,169,110,.18)!important}
+      body.light #generatedReportBox .db-free-download-slot>.pdf-download-btn,
+      body.light #generatedReportBox .db-free-download-primary{background:linear-gradient(135deg,#b78a43,#dfc17f)!important;color:#191107!important;border-color:rgba(145,108,49,.38)!important;box-shadow:0 12px 28px rgba(145,108,49,.16)!important}
       @media(max-width:600px){
-        .db-free-download-slot{margin-bottom:19px!important;padding-top:14px!important}
-        .db-free-download-slot>button,.db-free-download-slot>a,.db-free-download-primary{
-          min-height:52px!important;padding:14px 12px!important;font-size:10px!important;letter-spacing:1.25px!important
-        }
+        #generatedReportBox .db-free-download-slot{margin:16px 0 20px!important}
+        #generatedReportBox .db-free-download-slot>.pdf-download-btn,
+        #generatedReportBox .db-free-download-primary{min-height:52px!important;padding:14px 12px!important;font-size:10px!important;letter-spacing:1.25px!important}
       }
     `;
     document.head.appendChild(style);
   }
 
-  function smallestMatchingElement(root, selector, pattern) {
-    var matches = qsa(selector, root).filter(function (element) {
-      return visible(element) && pattern.test(normalise(element.textContent));
-    });
-    matches.sort(function (a, b) {
-      return normalise(a.textContent).length - normalise(b.textContent).length;
-    });
-    return matches[0] || null;
-  }
-
-  function findReadyHeading() {
-    return smallestMatchingElement(document, 'h1,h2,h3,h4,h5,h6,div,p,strong', /^(your )?free report is ready$/);
-  }
-
-  function findDeliveryBox(heading) {
-    if (!heading) return null;
-    var pattern = /copy of your report.*(sent|delivered).*(email|whatsapp)|copy.*sent instantly.*email.*whatsapp|sent securely.*email.*whatsapp/;
-    var candidates = qsa('div,section,aside,p', document).filter(function (element) {
-      return visible(element) && comesAfter(heading, element) && pattern.test(normalise(element.textContent));
-    });
-
-    candidates.sort(function (a, b) {
-      var aText = normalise(a.textContent);
-      var bText = normalise(b.textContent);
-      var aChildren = a.children.length;
-      var bChildren = b.children.length;
-      if (aChildren !== bChildren) return aChildren - bChildren;
-      return aText.length - bText.length;
-    });
-
-    var box = candidates[0] || null;
-    if (!box) return null;
-
-    var messageText = normalise(box.textContent);
-    var node = box;
-    for (var i = 0; i < 3 && node.parentElement; i += 1) {
-      var parent = node.parentElement;
-      var parentText = normalise(parent.textContent);
-      if (parentText.length > messageText.length + 90) break;
-      var style = window.getComputedStyle(parent);
-      var hasVisualBox = style.backgroundColor !== 'rgba(0, 0, 0, 0)' ||
-        parseFloat(style.borderTopWidth || '0') > 0 || parseFloat(style.borderLeftWidth || '0') > 0;
-      if (hasVisualBox) box = parent;
-      node = parent;
-    }
-    return box;
-  }
-
-  function findDownloadButton() {
-    var candidates = qsa('button,a', document).filter(function (element) {
-      var text = normalise(element.textContent);
-      return visible(element) && /download pdf copy|download.*pdf|download.*report/.test(text);
-    });
-    candidates.sort(function (a, b) {
-      var aText = normalise(a.textContent);
-      var bText = normalise(b.textContent);
-      return (/download pdf copy/.test(aText) ? 0 : 1) - (/download pdf copy/.test(bText) ? 0 : 1);
-    });
-    return candidates[0] || null;
-  }
-
-  function isCorrectlyPlaced(slot, deliveryBox, button) {
-    return Boolean(
-      slot && deliveryBox && button &&
-      slot.parentNode === deliveryBox.parentNode &&
-      deliveryBox.nextSibling === slot &&
-      slot.contains(button)
-    );
-  }
-
-  function placeDownloadBelowDelivery() {
+  function placeDownloadBelowConfirmation() {
     injectStyles();
 
-    var heading = findReadyHeading();
-    if (!heading) return false;
+    var resultBox = document.getElementById('generatedReportBox');
+    if (!resultBox) return false;
 
-    var deliveryBox = findDeliveryBox(heading);
-    if (!deliveryBox || !deliveryBox.parentNode) return false;
+    var button = resultBox.querySelector('.pdf-download-btn');
+    var reportContent = resultBox.querySelector('.report-content');
+    if (!button || !reportContent || !reportContent.parentNode) return false;
 
-    var button = findDownloadButton();
-    if (!button) return false;
-
-    qsa('.db-free-download-slot', document).forEach(function (slot) {
-      if (!slot.contains(button)) slot.remove();
-    });
-
-    var slot = button.closest('.db-free-download-slot');
+    var slot = resultBox.querySelector('.db-free-download-slot');
     if (!slot) {
       slot = document.createElement('div');
       slot.className = 'db-free-download-slot';
@@ -174,58 +49,32 @@
     button.classList.remove('free-download-top');
     button.classList.add('db-free-download-primary');
 
-    if (!isCorrectlyPlaced(slot, deliveryBox, button)) {
-      deliveryBox.parentNode.insertBefore(slot, deliveryBox.nextSibling);
-      slot.appendChild(button);
+    if (slot.parentNode !== resultBox || slot.nextSibling !== reportContent) {
+      resultBox.insertBefore(slot, reportContent);
     }
+    if (button.parentNode !== slot) slot.appendChild(button);
 
-    return isCorrectlyPlaced(slot, deliveryBox, button);
+    return slot.nextSibling === reportContent && slot.contains(button);
   }
 
-  function stopWatcher() {
-    if (watcher) window.clearInterval(watcher);
-    watcher = null;
-  }
-
-  function startWatcher() {
-    stopWatcher();
-    watcherStartedAt = Date.now();
-    firstPlacedAt = 0;
-
-    watcher = window.setInterval(function () {
-      var placed = placeDownloadBelowDelivery();
-      if (placed && !firstPlacedAt) firstPlacedAt = Date.now();
-
-      // Keep verifying briefly because the older free-report renderer may move the button once after it appears.
-      if (firstPlacedAt && Date.now() - firstPlacedAt > 8000) {
-        stopWatcher();
-        return;
-      }
-      if (Date.now() - watcherStartedAt > 6 * 60 * 1000) stopWatcher();
-    }, 200);
+  function schedulePlacement() {
+    [50, 180, 450, 900, 1600, 3000, 5000].forEach(function (delay) {
+      window.setTimeout(placeDownloadBelowConfirmation, delay);
+    });
   }
 
   document.addEventListener('click', function (event) {
-    var target = event.target && event.target.closest ? event.target.closest('button,a') : null;
-    if (!target) return;
-    var label = normalise(target.textContent);
-
-    if (/generate my free report|generate free report|create my free report/.test(label)) {
-      window.setTimeout(startWatcher, 0);
-    }
-
-    if (/free report|read my numbers free/.test(label)) {
-      window.setTimeout(startWatcher, 100);
-    }
+    var submit = event.target && event.target.closest ? event.target.closest('#popupSubmitBtn') : null;
+    if (submit) schedulePlacement();
   }, true);
 
-  document.addEventListener('DOMContentLoaded', function () {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      injectStyles();
+      placeDownloadBelowConfirmation();
+    }, { once: true });
+  } else {
     injectStyles();
-    window.setTimeout(startWatcher, 150);
-  });
-
-  if (document.readyState !== 'loading') {
-    injectStyles();
-    window.setTimeout(startWatcher, 0);
+    placeDownloadBelowConfirmation();
   }
 })();

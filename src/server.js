@@ -18,16 +18,24 @@ const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
 const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js'];
 
-function assertBrowserScriptsAreValid() {
+function validateBrowserScriptsSafely() {
+  let allValid = true;
+
   browserScripts.forEach(file => {
-    const filePath = path.join(publicDir, file);
-    if (!fs.existsSync(filePath)) throw new Error(`Required browser script is missing: ${file}`);
-    new vm.Script(fs.readFileSync(filePath, 'utf8'), { filename: file });
+    try {
+      const filePath = path.join(publicDir, file);
+      if (!fs.existsSync(filePath)) throw new Error(`Required browser script is missing: ${file}`);
+      new vm.Script(fs.readFileSync(filePath, 'utf8'), { filename: file });
+    } catch (error) {
+      allValid = false;
+      console.error(`[UI script validation] ${file}: ${error.message}`);
+    }
   });
-  return true;
+
+  return allValid;
 }
 
-const browserScriptsValid = assertBrowserScriptsAreValid();
+const browserScriptsValid = validateBrowserScriptsSafely();
 
 function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');

@@ -16,7 +16,7 @@ const { adminAuth } = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
-const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js'];
+const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js', 'free-download-top-fix.js'];
 
 function assertBrowserScriptsAreValid() {
   browserScripts.forEach(file => {
@@ -37,15 +37,17 @@ function sendLandingWithPatches(res) {
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-2"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-scroll-photo-1"></script>';
+  const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-top-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-live-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/landing-live-polish\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-modal-scroll-photo\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/free-download-top-fix\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${modalFixScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${modalFixScript}\n${freeDownloadFixScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');

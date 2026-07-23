@@ -1,20 +1,21 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidProfileRepairV3) return;
-  window.__divyaPaidProfileRepairV3 = true;
+  if (window.__divyaPaidProfileRepairV4) return;
+  window.__divyaPaidProfileRepairV4 = true;
 
-  function normalise(value) {
-    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  }
+  var IMAGE_URL = '/divya-profile.png?v=3';
 
   function injectStyles() {
-    if (document.getElementById('dbPaidProfileRepairStylesV3')) return;
-    var old = document.getElementById('dbPaidProfileRepairStylesV2');
-    if (old) old.remove();
+    if (document.getElementById('dbPaidProfileRepairStylesV4')) return;
+
+    ['dbPaidProfileRepairStylesV2', 'dbPaidProfileRepairStylesV3'].forEach(function (id) {
+      var previous = document.getElementById(id);
+      if (previous) previous.remove();
+    });
 
     var style = document.createElement('style');
-    style.id = 'dbPaidProfileRepairStylesV3';
+    style.id = 'dbPaidProfileRepairStylesV4';
     style.textContent = `
       #dbpOverlay .dbp-profile-row{
         display:flex!important;
@@ -41,7 +42,6 @@
         object-position:center!important;
         border-radius:50%!important;
         transform:none!important;
-        transform-origin:center center!important;
       }
       #dbpOverlay .dbp-brand{
         display:flex!important;
@@ -68,7 +68,7 @@
         color:#d8b36e!important;
         font-size:12px!important;
         line-height:1.15!important;
-        font-weight:750!important;
+        font-weight:800!important;
         letter-spacing:1.8px!important;
         white-space:nowrap!important;
       }
@@ -89,67 +89,24 @@
     document.head.appendChild(style);
   }
 
-  function isUsableImage(image) {
-    if (!image || !image.isConnected || image.closest('#dbpOverlay')) return false;
-    var source = image.currentSrc || image.src || '';
-    var context = normalise([
-      source,
-      image.alt,
-      image.className,
-      image.id,
-      image.parentElement && image.parentElement.className
-    ].join(' '));
+  function ensureProfile() {
+    injectStyles();
 
-    if (!source || !image.complete || image.naturalWidth < 70 || image.naturalHeight < 70) return false;
-    if (/logo|golden logo|normal logo|brand mark|monogram/.test(context)) return false;
-    return true;
-  }
+    var overlay = document.getElementById('dbpOverlay');
+    if (!overlay) return false;
 
-  function scoreImage(image) {
-    var source = normalise(image.currentSrc || image.src);
-    var context = normalise([
-      image.alt,
-      image.className,
-      image.id,
-      image.parentElement && image.parentElement.className,
-      image.parentElement && image.parentElement.parentElement && image.parentElement.parentElement.className
-    ].join(' '));
-    var score = 0;
+    var aside = overlay.querySelector('.dbp-aside');
+    var brand = overlay.querySelector('.dbp-brand');
+    var priceTag = overlay.querySelector('.dbp-price-tag');
+    if (!aside || !brand) return false;
 
-    if (/_abt|portrait|profile|photo/.test(source)) score += 220;
-    if (/divya/.test(source)) score += 120;
-    if (/divya/.test(context)) score += 80;
-    if (image.closest('.popup-photo,.hero-portrait,.about-visual,[class*="portrait"],[class*="photo"]')) score += 260;
-    if (image.closest('[class*="free"][class*="popup"],[id*="free"][id*="popup"],.free-popup')) score += 160;
-    if (image.naturalHeight >= image.naturalWidth) score += 25;
-
-    return score;
-  }
-
-  function findBestPortrait() {
-    var candidates = Array.prototype.slice.call(document.images).filter(isUsableImage);
-    candidates.sort(function (a, b) { return scoreImage(b) - scoreImage(a); });
-    return candidates[0] || null;
-  }
-
-  function formatBrand(brand) {
-    if (!brand) return;
     brand.innerHTML = '<span class="dbp-brand-name">DIVYA BAJAJ</span><span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>';
-  }
-
-  function ensureLayout(overlay) {
-    var aside = overlay && overlay.querySelector('.dbp-aside');
-    var brand = overlay && overlay.querySelector('.dbp-brand');
-    var price = overlay && overlay.querySelector('.dbp-price-tag');
-    if (!aside || !brand) return null;
-
-    formatBrand(brand);
 
     var row = aside.querySelector('.dbp-profile-row');
     if (!row) {
       row = document.createElement('div');
       row.className = 'dbp-profile-row';
-      if (price && price.parentNode === aside) aside.insertBefore(row, price);
+      if (priceTag && priceTag.parentNode === aside) aside.insertBefore(row, priceTag);
       else aside.insertBefore(row, aside.firstChild);
     }
 
@@ -157,77 +114,56 @@
     if (!profile) {
       profile = document.createElement('div');
       profile.className = 'dbp-profile';
-      row.appendChild(profile);
+      row.insertBefore(profile, row.firstChild);
     }
 
     var image = profile.querySelector('img');
     if (!image) {
       image = document.createElement('img');
-      image.alt = '';
-      image.setAttribute('aria-hidden', 'true');
       profile.appendChild(image);
     }
 
+    image.alt = 'Divya Bajaj';
+    image.onerror = function () {
+      profile.style.display = 'none';
+    };
+    image.onload = function () {
+      profile.style.display = '';
+    };
+    if (image.getAttribute('src') !== IMAGE_URL) image.setAttribute('src', IMAGE_URL);
+
     if (!row.contains(brand)) row.appendChild(brand);
-    return image;
+    if (priceTag && row.nextSibling !== priceTag) aside.insertBefore(priceTag, row.nextSibling);
+
+    return true;
   }
 
-  function applyPortrait() {
-    injectStyles();
-    var overlay = document.getElementById('dbpOverlay');
-    if (!overlay) return false;
-
-    var target = ensureLayout(overlay);
-    if (!target) return false;
-
-var source = '/divya-profile.png?v=2';
-var profile = target.closest('.dbp-profile');
-var preloader = new Image();
-
-preloader.onload = function () {
-  target.alt = 'Divya Bajaj';
-  target.removeAttribute('aria-hidden');
-  target.style.display = 'block';
-
-  if (profile) profile.style.display = '';
-
-  target.src = source;
-};
-
-preloader.onerror = function () {
-  target.removeAttribute('src');
-  target.alt = '';
-  target.style.display = 'none';
-
-  if (profile) profile.style.display = 'none';
-};
-
-preloader.src = source;
-return true;
-
-  function repairForFiveSeconds() {
+  function repairBriefly() {
     var started = Date.now();
-    applyPortrait();
+    ensureProfile();
     var timer = window.setInterval(function () {
-      applyPortrait();
-      if (Date.now() - started > 5000) window.clearInterval(timer);
+      ensureProfile();
+      if (Date.now() - started > 3000) window.clearInterval(timer);
     }, 250);
   }
 
   document.addEventListener('click', function (event) {
     var trigger = event.target && event.target.closest ? event.target.closest('button,a') : null;
     if (!trigger) return;
-    var text = normalise((trigger.textContent || '') + ' ' + (trigger.getAttribute('href') || ''));
+    var text = String((trigger.textContent || '') + ' ' + (trigger.getAttribute('href') || '')).toLowerCase();
     if (/get blueprint|full blueprint|advanced report|paid report|go deeper|detailed report/.test(text)) {
-      window.setTimeout(repairForFiveSeconds, 0);
+      window.setTimeout(repairBriefly, 0);
     }
   }, true);
 
-  document.addEventListener('DOMContentLoaded', function () {
-    injectStyles();
-    window.setTimeout(applyPortrait, 300);
+  var observer = new MutationObserver(function () {
+    if (ensureProfile()) observer.disconnect();
   });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  injectStyles();
-  if (document.readyState !== 'loading') window.setTimeout(applyPortrait, 0);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureProfile, { once: true });
+  } else {
+    ensureProfile();
+  }
 })();

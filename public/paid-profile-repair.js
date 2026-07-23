@@ -1,32 +1,35 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidProfileRepairV2) return;
-  window.__divyaPaidProfileRepairV2 = true;
+  if (window.__divyaPaidProfileRepairV3) return;
+  window.__divyaPaidProfileRepairV3 = true;
 
   function normalise(value) {
     return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
   function injectStyles() {
-    if (document.getElementById('dbPaidProfileRepairStylesV2')) return;
+    if (document.getElementById('dbPaidProfileRepairStylesV3')) return;
+    var old = document.getElementById('dbPaidProfileRepairStylesV2');
+    if (old) old.remove();
+
     var style = document.createElement('style');
-    style.id = 'dbPaidProfileRepairStylesV2';
+    style.id = 'dbPaidProfileRepairStylesV3';
     style.textContent = `
       #dbpOverlay .dbp-profile-row{
         display:flex!important;
         align-items:center!important;
         gap:16px!important;
-        margin:0 0 18px!important;
+        margin:0 0 14px!important;
       }
       #dbpOverlay .dbp-profile{
-        width:88px!important;
-        height:88px!important;
-        flex:0 0 88px!important;
+        width:92px!important;
+        height:92px!important;
+        flex:0 0 92px!important;
         border-radius:50%!important;
         overflow:hidden!important;
         padding:3px!important;
-        border:1px solid rgba(201,169,110,.72)!important;
+        border:1px solid rgba(201,169,110,.78)!important;
         background:#151117!important;
         box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 6px rgba(201,169,110,.045)!important;
       }
@@ -35,16 +38,17 @@
         height:100%!important;
         display:block!important;
         object-fit:cover!important;
-        object-position:center 14%!important;
+        object-position:center center!important;
         border-radius:50%!important;
-        transform:none!important;
+        transform:scale(2.08) translateY(16%)!important;
+        transform-origin:center center!important;
       }
       #dbpOverlay .dbp-brand{
         display:flex!important;
         flex-direction:column!important;
         align-items:flex-start!important;
         justify-content:center!important;
-        gap:5px!important;
+        gap:7px!important;
         margin:0!important;
         max-width:none!important;
         min-width:0!important;
@@ -53,32 +57,33 @@
       #dbpOverlay .dbp-brand-name{
         display:block!important;
         color:#d8b36e!important;
-        font-size:21px!important;
-        line-height:1.05!important;
-        font-weight:800!important;
-        letter-spacing:2.4px!important;
+        font-size:24px!important;
+        line-height:1!important;
+        font-weight:900!important;
+        letter-spacing:2.2px!important;
         white-space:nowrap!important;
       }
       #dbpOverlay .dbp-brand-title{
         display:block!important;
         color:#d8b36e!important;
-        font-size:11px!important;
-        line-height:1.2!important;
-        font-weight:700!important;
-        letter-spacing:2px!important;
+        font-size:12px!important;
+        line-height:1.15!important;
+        font-weight:750!important;
+        letter-spacing:1.8px!important;
         white-space:nowrap!important;
       }
       #dbpOverlay .dbp-price-tag{margin-top:0!important}
       @media(max-width:430px){
-        #dbpOverlay .dbp-profile-row{gap:14px!important;margin-bottom:16px!important}
-        #dbpOverlay .dbp-profile{width:82px!important;height:82px!important;flex-basis:82px!important}
-        #dbpOverlay .dbp-brand-name{font-size:19px!important;letter-spacing:2px!important}
-        #dbpOverlay .dbp-brand-title{font-size:10px!important;letter-spacing:1.55px!important}
+        #dbpOverlay .dbp-profile-row{gap:14px!important;margin-bottom:14px!important}
+        #dbpOverlay .dbp-profile{width:88px!important;height:88px!important;flex-basis:88px!important}
+        #dbpOverlay .dbp-brand-name{font-size:21px!important;letter-spacing:1.8px!important}
+        #dbpOverlay .dbp-brand-title{font-size:10.5px!important;letter-spacing:1.35px!important}
       }
-      @media(max-width:360px){
-        #dbpOverlay .dbp-profile{width:74px!important;height:74px!important;flex-basis:74px!important}
-        #dbpOverlay .dbp-brand-name{font-size:17px!important;letter-spacing:1.55px!important}
-        #dbpOverlay .dbp-brand-title{font-size:9px!important;letter-spacing:1.15px!important}
+      @media(max-width:370px){
+        #dbpOverlay .dbp-profile{width:80px!important;height:80px!important;flex-basis:80px!important}
+        #dbpOverlay .dbp-profile-row{gap:12px!important}
+        #dbpOverlay .dbp-brand-name{font-size:18px!important;letter-spacing:1.35px!important}
+        #dbpOverlay .dbp-brand-title{font-size:9px!important;letter-spacing:.95px!important}
       }
     `;
     document.head.appendChild(style);
@@ -129,9 +134,7 @@
 
   function formatBrand(brand) {
     if (!brand) return;
-    if (!brand.querySelector('.dbp-brand-name')) {
-      brand.innerHTML = '<span class="dbp-brand-name">DIVYA BAJAJ</span><span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>';
-    }
+    brand.innerHTML = '<span class="dbp-brand-name">DIVYA BAJAJ</span><span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>';
   }
 
   function ensureLayout(overlay) {
@@ -192,7 +195,6 @@
       target.alt = 'Divya Bajaj';
       target.removeAttribute('aria-hidden');
       target.style.display = 'block';
-      target.style.objectPosition = 'center 14%';
       var profile = target.closest('.dbp-profile');
       if (profile) profile.style.display = '';
       target.src = source;

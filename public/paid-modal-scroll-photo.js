@@ -39,16 +39,38 @@
         height:100%!important;
         display:block!important;
         object-fit:cover!important;
-        object-position:center!important;
+        object-position:center 12%!important;
         border-radius:50%!important;
       }
       .dbp-profile-row .dbp-brand{
-        margin:0!important;
-        max-width:175px!important;
-        line-height:1.55!important;
-        font-size:10px!important;
-        letter-spacing:2.25px!important;
-      }
+  margin:0!important;
+  max-width:none!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  gap:7px!important;
+  line-height:1!important;
+}
+
+.dbp-brand-name{
+  display:block!important;
+  color:#d8b66f!important;
+  font-size:22px!important;
+  font-weight:900!important;
+  line-height:1!important;
+  letter-spacing:1.2px!important;
+  white-space:nowrap!important;
+}
+
+.dbp-brand-title{
+  display:block!important;
+  color:#d8b66f!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  line-height:1.1!important;
+  letter-spacing:1.5px!important;
+  white-space:nowrap!important;
+}
       .dbp-aside.has-profile .dbp-price-tag{margin-top:0!important}
 
       @media(min-width:821px){

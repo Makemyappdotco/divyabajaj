@@ -16,7 +16,7 @@ const { adminAuth } = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
-const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js'];
+const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js', 'reveal-failsafe.js'];
 
 function validateBrowserScriptsSafely() {
   let allValid = true;
@@ -47,6 +47,7 @@ function sendLandingWithPatches(res) {
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-2"></script>';
   const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-5"></script>';
   const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-2"></script>';
+  const revealFailsafeScript = '<script src="/reveal-failsafe.js?v=reveal-failsafe-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
@@ -56,9 +57,10 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/paid-profile-repair\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/free-download-top-fix\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/light-mode-live-fixes\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/reveal-failsafe\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');

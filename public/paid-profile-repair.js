@@ -1,11 +1,87 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidProfileRepair) return;
-  window.__divyaPaidProfileRepair = true;
+  if (window.__divyaPaidProfileRepairV2) return;
+  window.__divyaPaidProfileRepairV2 = true;
 
   function normalise(value) {
     return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  function injectStyles() {
+    if (document.getElementById('dbPaidProfileRepairStylesV2')) return;
+    var style = document.createElement('style');
+    style.id = 'dbPaidProfileRepairStylesV2';
+    style.textContent = `
+      #dbpOverlay .dbp-profile-row{
+        display:flex!important;
+        align-items:center!important;
+        gap:16px!important;
+        margin:0 0 18px!important;
+      }
+      #dbpOverlay .dbp-profile{
+        width:88px!important;
+        height:88px!important;
+        flex:0 0 88px!important;
+        border-radius:50%!important;
+        overflow:hidden!important;
+        padding:3px!important;
+        border:1px solid rgba(201,169,110,.72)!important;
+        background:#151117!important;
+        box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 6px rgba(201,169,110,.045)!important;
+      }
+      #dbpOverlay .dbp-profile img{
+        width:100%!important;
+        height:100%!important;
+        display:block!important;
+        object-fit:cover!important;
+        object-position:center 14%!important;
+        border-radius:50%!important;
+        transform:none!important;
+      }
+      #dbpOverlay .dbp-brand{
+        display:flex!important;
+        flex-direction:column!important;
+        align-items:flex-start!important;
+        justify-content:center!important;
+        gap:5px!important;
+        margin:0!important;
+        max-width:none!important;
+        min-width:0!important;
+        line-height:1!important;
+      }
+      #dbpOverlay .dbp-brand-name{
+        display:block!important;
+        color:#d8b36e!important;
+        font-size:21px!important;
+        line-height:1.05!important;
+        font-weight:800!important;
+        letter-spacing:2.4px!important;
+        white-space:nowrap!important;
+      }
+      #dbpOverlay .dbp-brand-title{
+        display:block!important;
+        color:#d8b36e!important;
+        font-size:11px!important;
+        line-height:1.2!important;
+        font-weight:700!important;
+        letter-spacing:2px!important;
+        white-space:nowrap!important;
+      }
+      #dbpOverlay .dbp-price-tag{margin-top:0!important}
+      @media(max-width:430px){
+        #dbpOverlay .dbp-profile-row{gap:14px!important;margin-bottom:16px!important}
+        #dbpOverlay .dbp-profile{width:82px!important;height:82px!important;flex-basis:82px!important}
+        #dbpOverlay .dbp-brand-name{font-size:19px!important;letter-spacing:2px!important}
+        #dbpOverlay .dbp-brand-title{font-size:10px!important;letter-spacing:1.55px!important}
+      }
+      @media(max-width:360px){
+        #dbpOverlay .dbp-profile{width:74px!important;height:74px!important;flex-basis:74px!important}
+        #dbpOverlay .dbp-brand-name{font-size:17px!important;letter-spacing:1.55px!important}
+        #dbpOverlay .dbp-brand-title{font-size:9px!important;letter-spacing:1.15px!important}
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function isUsableImage(image) {
@@ -51,11 +127,20 @@
     return candidates[0] || null;
   }
 
+  function formatBrand(brand) {
+    if (!brand) return;
+    if (!brand.querySelector('.dbp-brand-name')) {
+      brand.innerHTML = '<span class="dbp-brand-name">DIVYA BAJAJ</span><span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>';
+    }
+  }
+
   function ensureLayout(overlay) {
     var aside = overlay && overlay.querySelector('.dbp-aside');
     var brand = overlay && overlay.querySelector('.dbp-brand');
     var price = overlay && overlay.querySelector('.dbp-price-tag');
     if (!aside || !brand) return null;
+
+    formatBrand(brand);
 
     var row = aside.querySelector('.dbp-profile-row');
     if (!row) {
@@ -85,6 +170,7 @@
   }
 
   function applyPortrait() {
+    injectStyles();
     var overlay = document.getElementById('dbpOverlay');
     if (!overlay) return false;
 
@@ -95,8 +181,8 @@
     if (!portrait) {
       target.removeAttribute('src');
       target.style.display = 'none';
-      var profile = target.closest('.dbp-profile');
-      if (profile) profile.style.display = 'none';
+      var hiddenProfile = target.closest('.dbp-profile');
+      if (hiddenProfile) hiddenProfile.style.display = 'none';
       return false;
     }
 
@@ -106,6 +192,7 @@
       target.alt = 'Divya Bajaj';
       target.removeAttribute('aria-hidden');
       target.style.display = 'block';
+      target.style.objectPosition = 'center 14%';
       var profile = target.closest('.dbp-profile');
       if (profile) profile.style.display = '';
       target.src = source;
@@ -140,8 +227,10 @@
   }, true);
 
   document.addEventListener('DOMContentLoaded', function () {
+    injectStyles();
     window.setTimeout(applyPortrait, 300);
   });
 
+  injectStyles();
   if (document.readyState !== 'loading') window.setTimeout(applyPortrait, 0);
 })();

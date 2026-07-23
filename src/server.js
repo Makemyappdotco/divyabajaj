@@ -36,8 +36,8 @@ function sendLandingWithPatches(res) {
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-2"></script>';
-  const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-scroll-photo-1"></script>';
-  const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-top-1"></script>';
+  const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-2"></script>';
+  const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-2"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');

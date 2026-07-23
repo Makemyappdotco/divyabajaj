@@ -21,14 +21,16 @@ function sendLandingWithPatches(res) {
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-test-flow.js?v=astrology-v2-client-review-1"></script>';
-  const conversionScript = '<script src="/paid-v2-live-conversion.js?v=client-review-conversion-2"></script>';
+  const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-1"></script>';
+  const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/paid-live-flow\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/landing-live-polish\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${conversionScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${polishScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');

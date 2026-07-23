@@ -1,77 +1,28 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidProfileRepairV4) return;
-  window.__divyaPaidProfileRepairV4 = true;
+  if (window.__divyaPaidProfileRepairV5) return;
+  window.__divyaPaidProfileRepairV5 = true;
 
   var IMAGE_URL = '/divya-profile.png?v=3';
 
   function injectStyles() {
-    if (document.getElementById('dbPaidProfileRepairStylesV4')) return;
+    if (document.getElementById('dbPaidProfileRepairStylesV5')) return;
 
-    ['dbPaidProfileRepairStylesV2', 'dbPaidProfileRepairStylesV3'].forEach(function (id) {
+    ['dbPaidProfileRepairStylesV2', 'dbPaidProfileRepairStylesV3', 'dbPaidProfileRepairStylesV4'].forEach(function (id) {
       var previous = document.getElementById(id);
       if (previous) previous.remove();
     });
 
     var style = document.createElement('style');
-    style.id = 'dbPaidProfileRepairStylesV4';
+    style.id = 'dbPaidProfileRepairStylesV5';
     style.textContent = `
-      #dbpOverlay .dbp-profile-row{
-        display:flex!important;
-        align-items:center!important;
-        gap:16px!important;
-        margin:0 0 14px!important;
-      }
-      #dbpOverlay .dbp-profile{
-        width:92px!important;
-        height:92px!important;
-        flex:0 0 92px!important;
-        border-radius:50%!important;
-        overflow:hidden!important;
-        padding:3px!important;
-        border:1px solid rgba(201,169,110,.78)!important;
-        background:#151117!important;
-        box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 6px rgba(201,169,110,.045)!important;
-      }
-      #dbpOverlay .dbp-profile img{
-        width:100%!important;
-        height:100%!important;
-        display:block!important;
-        object-fit:cover!important;
-        object-position:center!important;
-        border-radius:50%!important;
-        transform:none!important;
-      }
-      #dbpOverlay .dbp-brand{
-        display:flex!important;
-        flex-direction:column!important;
-        align-items:flex-start!important;
-        justify-content:center!important;
-        gap:7px!important;
-        margin:0!important;
-        max-width:none!important;
-        min-width:0!important;
-        line-height:1!important;
-      }
-      #dbpOverlay .dbp-brand-name{
-        display:block!important;
-        color:#d8b36e!important;
-        font-size:24px!important;
-        line-height:1!important;
-        font-weight:900!important;
-        letter-spacing:2.2px!important;
-        white-space:nowrap!important;
-      }
-      #dbpOverlay .dbp-brand-title{
-        display:block!important;
-        color:#d8b36e!important;
-        font-size:12px!important;
-        line-height:1.15!important;
-        font-weight:800!important;
-        letter-spacing:1.8px!important;
-        white-space:nowrap!important;
-      }
+      #dbpOverlay .dbp-profile-row{display:flex!important;align-items:center!important;gap:16px!important;margin:0 0 14px!important}
+      #dbpOverlay .dbp-profile{width:92px!important;height:92px!important;flex:0 0 92px!important;border-radius:50%!important;overflow:hidden!important;padding:3px!important;border:1px solid rgba(201,169,110,.78)!important;background:#151117!important;box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 0 6px rgba(201,169,110,.045)!important}
+      #dbpOverlay .dbp-profile img{width:100%!important;height:100%!important;display:block!important;object-fit:cover!important;object-position:center!important;border-radius:50%!important;transform:none!important}
+      #dbpOverlay .dbp-brand{display:flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;gap:7px!important;margin:0!important;max-width:none!important;min-width:0!important;line-height:1!important}
+      #dbpOverlay .dbp-brand-name{display:block!important;color:#d8b36e!important;font-size:24px!important;line-height:1!important;font-weight:900!important;letter-spacing:2.2px!important;white-space:nowrap!important}
+      #dbpOverlay .dbp-brand-title{display:block!important;color:#d8b36e!important;font-size:12px!important;line-height:1.15!important;font-weight:800!important;letter-spacing:1.8px!important;white-space:nowrap!important}
       #dbpOverlay .dbp-price-tag{margin-top:0!important}
       @media(max-width:430px){
         #dbpOverlay .dbp-profile-row{gap:14px!important;margin-bottom:14px!important}
@@ -114,21 +65,24 @@
     if (!profile) {
       profile = document.createElement('div');
       profile.className = 'dbp-profile';
+      profile.setAttribute('role', 'img');
+      profile.setAttribute('aria-label', 'Divya Bajaj');
       row.insertBefore(profile, row.firstChild);
     }
 
     var image = profile.querySelector('img');
     if (!image) {
       image = document.createElement('img');
+      image.alt = '';
+      image.setAttribute('aria-hidden', 'true');
       profile.appendChild(image);
     }
 
-    image.alt = 'Divya Bajaj';
     image.onerror = function () {
-      profile.style.display = 'none';
+      image.style.visibility = 'hidden';
     };
     image.onload = function () {
-      profile.style.display = '';
+      image.style.visibility = 'visible';
     };
     if (image.getAttribute('src') !== IMAGE_URL) image.setAttribute('src', IMAGE_URL);
 
@@ -138,28 +92,18 @@
     return true;
   }
 
-  function repairBriefly() {
-    var started = Date.now();
-    ensureProfile();
-    var timer = window.setInterval(function () {
-      ensureProfile();
-      if (Date.now() - started > 3000) window.clearInterval(timer);
-    }, 250);
+  function scheduleRepair() {
+    [0, 80, 240].forEach(function (delay) {
+      window.setTimeout(ensureProfile, delay);
+    });
   }
 
   document.addEventListener('click', function (event) {
     var trigger = event.target && event.target.closest ? event.target.closest('button,a') : null;
     if (!trigger) return;
-    var text = String((trigger.textContent || '') + ' ' + (trigger.getAttribute('href') || '')).toLowerCase();
-    if (/get blueprint|full blueprint|advanced report|paid report|go deeper|detailed report/.test(text)) {
-      window.setTimeout(repairBriefly, 0);
-    }
+    var label = String(trigger.textContent || '').trim().toLowerCase();
+    if (/get blueprint|full blueprint|advanced report|paid report|go deeper|detailed report/.test(label)) scheduleRepair();
   }, true);
-
-  var observer = new MutationObserver(function () {
-    if (ensureProfile()) observer.disconnect();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', ensureProfile, { once: true });

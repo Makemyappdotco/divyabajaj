@@ -1,0 +1,93 @@
+name: Preview production-foundation smoke test
+
+on:
+  push:
+    branches:
+      - production-system-foundation-2
+    paths:
+      - .github/workflows/preview-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PREVIEW_BASE: https://divyabajaj-git-production-system-fou-a43b2e-makemyapps-projects.vercel.app
+
+    steps:
+      - name: Wait for Preview deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            if health=$(curl --silent --show-error --fail --max-time 20 "$PREVIEW_BASE/health"); then
+              echo "$health" | jq .
+              if echo "$health" | jq -e '.storage_mode == "supabase" and .persistent_storage_ready == true and .foundation_ready == true and .report_preview_ready == true' >/dev/null; then
+                exit 0
+              fi
+            fi
+            echo "Preview not ready yet, attempt $attempt/40"
+            sleep 10
+          done
+          echo "Preview did not become ready"
+          exit 1
+
+      - name: Verify direct Full Blueprint route
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail --max-time 30 "$PREVIEW_BASE/full-blueprint" --output full-blueprint.html
+          grep -q 'paid-direct-link.js' full-blueprint.html
+          grep -q 'The Full Blueprint' full-blueprint.html
+
+      - name: Verify consultation redirect
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --max-time 30 --dump-header consultation.headers --output /dev/null "$PREVIEW_BASE/book-consultation?utm_source=github_smoke"
+          grep -Eq '^HTTP/.* 302' consultation.headers
+          grep -Eiq '^location: /consultation\?utm_source=github_smoke#bookingForm' consultation.headers
+
+      - name: Verify customer data routes are private
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --max-time 30 --output private-response.txt --write-out '%{http_code}' "$PREVIEW_BASE/api/leads")
+          test "$status" = "401"
+
+      - name: Generate and download a free report
+        shell: bash
+        run: |
+          set -euo pipefail
+          phone="9$(printf '%09d' $((GITHUB_RUN_ID % 1000000000)))"
+          email="preview-smoke-${GITHUB_RUN_ID}@makemyapp.co"
+          jq -n \
+            --arg name "Preview Smoke Test" \
+            --arg phone "$phone" \
+            --arg email "$email" \
+            --arg dob "1994-08-23" \
+            --arg question "Testing permanent free report generation and PDF delivery" \
+            --arg source "github_preview_smoke" \
+            '{name:$name,phone:$phone,email:$email,dob:$dob,question:$question,source:$source}' > payload.json
+
+          curl --silent --show-error --fail --max-time 300 \
+            --header 'Content-Type: application/json' \
+            --data @payload.json \
+            "$PREVIEW_BASE/api/reports/free" > free-report.json
+
+          jq '{success,storage,lead_id,report_id,generated_by,pdf_url}' free-report.json
+          jq -e '.success == true and .storage == "supabase" and (.lead_id | length > 0) and (.report_id | length > 0) and (.report_text | length > 500)' free-report.json >/dev/null
+
+          pdf_path=$(jq -r '.pdf_url' free-report.json)
+          curl --silent --show-error --fail --max-time 120 \
+            --dump-header pdf.headers \
+            "$PREVIEW_BASE$pdf_path" \
+            --output free-report.pdf
+          grep -Eiq '^content-type: application/pdf' pdf.headers
+          test -s free-report.pdf
+
+      - name: Smoke test complete
+        run: echo 'Preview foundation smoke test passed.'

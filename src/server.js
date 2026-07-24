@@ -44,7 +44,7 @@ function sendLandingWithPatches(res) {
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-3"></script>';
-  const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-3"></script>';
+  const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-4"></script>';
   const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-6"></script>';
   const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-3"></script>';
   const revealFailsafeScript = '<script src="/reveal-failsafe.js?v=reveal-failsafe-1"></script>';

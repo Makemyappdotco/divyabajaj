@@ -9,6 +9,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
   process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN = process.env.ASTROLOGYAPI_ACCESS_TOKEN;
 }
 
+const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
@@ -67,6 +68,25 @@ function sendLandingWithPatches(res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   return res.send(html);
+}
+
+function isProductionRuntime() {
+  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+}
+
+function persistentStorageGuard(req, res, next) {
+  const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  const storageRequired = isProductionRuntime() || process.env.REQUIRE_PERSISTENT_STORAGE === 'true';
+
+  if (isWrite && storageRequired && !db.usingSupabase()) {
+    return res.status(503).json({
+      success: false,
+      error: 'Persistent storage is not configured. This request was stopped to prevent customer data loss.',
+      code: 'PERSISTENT_STORAGE_REQUIRED'
+    });
+  }
+
+  return next();
 }
 
 function cleanDigits(value) {
@@ -136,10 +156,20 @@ function validateReportInput(req, res, next) {
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/api', persistentStorageGuard);
 app.use('/api', validateReportInput);
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', ui_scripts_valid: browserScriptsValid, uptime: process.uptime(), timestamp: new Date().toISOString() });
+  const storageMode = db.usingSupabase() ? 'supabase' : 'local_fallback';
+  res.json({
+    status: 'ok',
+    ui_scripts_valid: browserScriptsValid,
+    storage_mode: storageMode,
+    persistent_storage_ready: db.usingSupabase(),
+    production_ready: browserScriptsValid && (!isProductionRuntime() || db.usingSupabase()),
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.use('/api', publicPaidRoutes);
@@ -152,6 +182,13 @@ app.get('/admin', adminAuth, (req, res) => {
 app.use('/admin', adminAuth, express.static(publicDir));
 app.get('/', (req, res) => sendLandingWithPatches(res));
 app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
+
+app.get(['/book-consultation', '/private-consultation', '/consultation/book'], (req, res) => {
+  const queryIndex = req.originalUrl.indexOf('?');
+  const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+  return res.redirect(302, `/consultation${query}#bookingForm`);
+});
+
 app.get('/consultation', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.sendFile(path.join(publicDir, 'consultation.html'));

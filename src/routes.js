@@ -50,17 +50,80 @@ router.post('/calculate', (req, res) => {
 });
 
 router.post('/reports/free', async (req, res) => {
+  let lead = null;
+  let report = null;
   try {
     const { name, phone, dob, email, question, source } = req.body;
     const missing = requiredFields(req.body);
     if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
-    const lead = await findOrCreateLead({ name, phone, dob, email, question, source: source || 'free_numerology_report_form' });
-    const report = await db.createReport({ lead_id: lead.id, type: 'free_numerology_awareness', status: 'generating', input_data: { name, phone, dob, email, question } });
+
+    lead = await findOrCreateLead({ name, phone, dob, email, question, source: source || 'free_numerology_report_form' });
+    if (!lead?.id) throw new Error('Lead record was not created');
+
+    report = await db.createReport({
+      lead_id: lead.id,
+      type: 'free_numerology_awareness',
+      status: 'generating',
+      report_contract_version: 'free-v1-draft',
+      calculation_contract_version: 'numerology-v1',
+      prompt_version: 'free-legacy-prompt-v1',
+      knowledge_version: 'none',
+      pdf_template_version: 'legacy-free-v1',
+      input_data: { name, phone, dob, email, question }
+    });
+    if (!report?.id) throw new Error('Report record was not created');
+
     const result = await createNumerologyReport({ lead, type: 'free_numerology_awareness', question });
-    const updatedReport = await db.updateReport(report.id, { status: 'completed', horosoft_data: result.numbers, astrology_data: null, ai_report: result.report_text, ai_insights: result.insights, generated_by: result.model || 'openai', pdf_url: `/api/reports/${report.id}/pdf` });
-    await db.updateLead(lead.id, { status: 'free_report_generated' });
-    return res.json({ success: true, lead_id: lead.id, report_id: report.id, generated_by: result.model || 'openai', storage: db.usingSupabase() ? 'supabase' : 'local_fallback', numbers: result.numbers, report_text: result.report_text, pdf_url: `/api/reports/${report.id}/pdf`, report: updatedReport });
-  } catch (error) { console.error('[Free numerology report error]', error); return res.status(500).json({ error: error.message }); }
+    const updatedReport = await db.updateReport(report.id, {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      horosoft_data: result.numbers,
+      astrology_data: null,
+      ai_report: result.report_text,
+      ai_insights: result.insights,
+      report_json: {
+        report_type: 'free_numerology_awareness',
+        numbers: result.numbers,
+        report_text: result.report_text,
+        insights: result.insights || {}
+      },
+      generated_by: result.model || 'openai',
+      pdf_url: `/api/reports/${report.id}/pdf`,
+      failure_code: '',
+      failure_message: ''
+    });
+    await db.updateLead(lead.id, { status: 'free_report_generated', tier: 'free_awareness' });
+
+    return res.json({
+      success: true,
+      lead_id: lead.id,
+      report_id: report.id,
+      generated_by: result.model || 'openai',
+      storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
+      numbers: result.numbers,
+      report_text: result.report_text,
+      pdf_url: `/api/reports/${report.id}/pdf`,
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error('[Free numerology report error]', error);
+    if (report?.id) {
+      try {
+        await db.updateReport(report.id, {
+          status: 'failed',
+          failure_code: 'FREE_REPORT_GENERATION_FAILED',
+          failure_message: String(error.message || 'Unknown free report error').slice(0, 1000)
+        });
+      } catch (persistenceError) {
+        console.error('[Free report failure status error]', persistenceError);
+      }
+    }
+    if (lead?.id) {
+      try { await db.updateLead(lead.id, { status: 'free_report_failed' }); }
+      catch (leadError) { console.error('[Free report lead failure status error]', leadError); }
+    }
+    return res.status(500).json({ success: false, error: error.message || 'Free report generation failed' });
+  }
 });
 
 router.post('/reports/paid-test', async (req, res) => {
@@ -72,7 +135,7 @@ router.post('/reports/paid-test', async (req, res) => {
     await db.updateLead(lead.id, { status: 'paid_test_report_requested', tier: 'paid_blueprint_test' });
     const report = await db.createReport({ lead_id: lead.id, type: 'paid_blueprint_test', status: 'generating', input_data: { name, phone, dob, email, tob, pob, question, payment_status: 'testing_without_payment_gateway' } });
     const result = await createNumerologyReport({ lead, type: 'paid_blueprint_test', question });
-    const updatedReport = await db.updateReport(report.id, { status: 'completed', horosoft_data: result.numbers, astrology_data: result.astrology_data || null, ai_report: result.report_text, ai_insights: { ...(result.insights || {}), delivery_ready: { email, whatsapp: phone } }, generated_by: result.model || 'gpt-5.5', pdf_url: `/api/reports/${report.id}/pdf` });
+    const updatedReport = await db.updateReport(report.id, { status: 'completed', completed_at: new Date().toISOString(), horosoft_data: result.numbers, astrology_data: result.astrology_data || null, ai_report: result.report_text, ai_insights: { ...(result.insights || {}), delivery_ready: { email, whatsapp: phone } }, generated_by: result.model || 'gpt-5.5', pdf_url: `/api/reports/${report.id}/pdf` });
     await db.updateLead(lead.id, { status: 'paid_test_report_generated', tier: 'paid_blueprint_test' });
     return res.json({ success: true, test_mode: true, payment_required: false, lead_id: lead.id, report_id: report.id, generated_by: result.model || 'gpt-5.5', storage: db.usingSupabase() ? 'supabase' : 'local_fallback', numbers: result.numbers, astrology_data: result.astrology_data, report_text: result.report_text, pdf_url: `/api/reports/${report.id}/pdf`, delivery_ready: { email, whatsapp: phone }, report: updatedReport });
   } catch (error) { console.error('[Paid test blueprint report error]', error); return res.status(500).json({ error: error.message }); }
@@ -97,6 +160,14 @@ router.get('/reports', adminAuth, async (req, res) => { try { const reports = aw
 router.get('/reports/:id', async (req, res) => { try { const reports = await db.getReports({}); const report = reports.find(item => item.id === req.params.id); if (!report) return res.status(404).json({ error: 'Report not found' }); return res.json({ success: true, report }); } catch (error) { return res.status(500).json({ error: error.message }); } });
 router.get('/stats', adminAuth, async (req, res) => { try { const stats = await db.getStats(); return res.json({ success: true, stats, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' }); } catch (error) { return res.status(500).json({ error: error.message }); } });
 router.get('/events', adminAuth, async (req, res) => { try { const events = await db.getEvents(Number(req.query.limit) || 100); return res.json({ success: true, events }); } catch (error) { return res.status(500).json({ error: error.message }); } });
+router.get('/export/all.json', adminAuth, async (req, res) => {
+  try {
+    const datasets = await getAllExportData();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.json"`);
+    return res.send(JSON.stringify({ exported_at: new Date().toISOString(), storage: db.usingSupabase() ? 'supabase' : 'local_fallback', datasets }, null, 2));
+  } catch (error) { console.error('[JSON export error]', error); return res.status(500).json({ error: error.message }); }
+});
 router.get('/export/all.csv', adminAuth, async (req, res) => { try { const datasets = await getAllExportData(); const csv = buildCombinedCsv(datasets); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.csv"`); return res.send(`﻿${csv}`); } catch (error) { console.error('[CSV export error]', error); return res.status(500).json({ error: error.message }); } });
 router.get('/export/all.xlsx', adminAuth, async (req, res) => { try { const datasets = await getAllExportData(); const workbook = buildExcelWorkbook(datasets); res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.xlsx"`); return res.send(workbook); } catch (error) { console.error('[Excel export error]', error); return res.status(500).json({ error: error.message }); } });
 router.get('/export/leads', adminAuth, async (req, res) => { try { const leads = await db.getLeads(); return res.json({ success: true, leads }); } catch (error) { return res.status(500).json({ error: error.message }); } });

@@ -18,6 +18,20 @@ function now() {
   return new Date().toISOString();
 }
 
+function runtimeEnvironment() {
+  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+    ? 'production'
+    : 'test';
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function usingSupabase() {
   return Boolean(supabase);
 }
@@ -55,13 +69,14 @@ async function getLeads(filters = {}) {
   let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.tier) query = query.eq('tier', filters.tier);
+  if (filters.environment) query = query.eq('environment', filters.environment);
   if (filters.from) query = query.gte('created_at', filters.from);
   if (filters.to) query = query.lte('created_at', filters.to);
   const result = await query;
   let rows = await throwIfError(result, 'Fetch leads failed');
   if (filters.search) {
     const q = String(filters.search).toLowerCase();
-    rows = rows.filter(row => [row.name, row.phone, row.email].some(v => String(v || '').toLowerCase().includes(q)));
+    rows = rows.filter(row => [row.name, row.phone, row.email, row.normalized_phone, row.normalized_email].some(v => String(v || '').toLowerCase().includes(q)));
   }
   return rows;
 }
@@ -70,9 +85,12 @@ async function createLead(data) {
   if (!supabase) return localDb.createLead(data);
   const row = {
     id: id('lead'),
+    environment: data.environment || runtimeEnvironment(),
     name: data.name,
     phone: data.phone,
+    normalized_phone: normalizePhone(data.phone),
     email: data.email || '',
+    normalized_email: normalizeEmail(data.email),
     dob: data.dob,
     tob: data.tob || '',
     pob: data.pob || '',
@@ -102,9 +120,12 @@ async function getLead(leadId) {
 
 async function updateLead(leadId, updates) {
   if (!supabase) return localDb.updateLead(leadId, updates);
-  const result = await supabase.from('leads').update({ ...updates, updated_at: now() }).eq('id', leadId).select().maybeSingle();
+  const patch = { ...updates, updated_at: now() };
+  if (Object.prototype.hasOwnProperty.call(updates, 'phone')) patch.normalized_phone = normalizePhone(updates.phone);
+  if (Object.prototype.hasOwnProperty.call(updates, 'email')) patch.normalized_email = normalizeEmail(updates.email);
+  const result = await supabase.from('leads').update(patch).eq('id', leadId).select().maybeSingle();
   const updated = await throwIfError(result, 'Update lead failed');
-  if (updated) await logEvent('leads.updated', 'leads', leadId, updates);
+  if (updated) await logEvent('leads.updated', 'leads', leadId, patch);
   return updated;
 }
 
@@ -114,6 +135,7 @@ async function getReports(filters = {}) {
   if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
   if (filters.type) query = query.eq('type', filters.type);
   if (filters.status) query = query.eq('status', filters.status);
+  if (filters.environment) query = query.eq('environment', filters.environment);
   const result = await query;
   return throwIfError(result, 'Fetch reports failed');
 }
@@ -122,6 +144,7 @@ async function createReport(data) {
   if (!supabase) return localDb.createReport(data);
   const row = {
     id: id('rep'),
+    environment: data.environment || runtimeEnvironment(),
     lead_id: data.lead_id,
     type: data.type || 'free_awareness',
     status: data.status || 'created',
@@ -132,6 +155,15 @@ async function createReport(data) {
     ai_insights: data.ai_insights || null,
     generated_by: data.generated_by || '',
     pdf_url: data.pdf_url || '',
+    report_contract_version: data.report_contract_version || 'legacy',
+    calculation_contract_version: data.calculation_contract_version || 'legacy',
+    prompt_version: data.prompt_version || 'legacy',
+    knowledge_version: data.knowledge_version || 'legacy',
+    pdf_template_version: data.pdf_template_version || 'legacy',
+    report_json: data.report_json || null,
+    failure_code: data.failure_code || '',
+    failure_message: data.failure_message || '',
+    completed_at: data.completed_at || null,
     created_at: now(),
     updated_at: now()
   };

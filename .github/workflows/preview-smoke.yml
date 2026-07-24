@@ -6,6 +6,15 @@ on:
       - production-system-foundation-2
     paths:
       - .github/workflows/preview-smoke.yml
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - .github/workflows/preview-smoke.yml
 
 permissions:
   contents: read

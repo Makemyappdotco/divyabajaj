@@ -33,8 +33,16 @@ function safeFileName(value) {
     .replace(/^-|-$/g, '') || 'Divya-Bajaj';
 }
 
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function previewOnly(req, res, next) {
-  if (process.env.VERCEL_ENV === 'production' && getMode() !== 'sandbox') {
+  if (process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production') {
     return res.status(404).json({ success: false, error: 'Not found' });
   }
   return next();
@@ -57,6 +65,7 @@ function normaliseV2Payload(body = {}) {
     timezone_id: String(body.timezone_id || '').trim(),
     country_code: String(body.country_code || '').trim(),
     question: String(body.question || '').trim(),
+    include_source_pdfs: body.include_source_pdfs === true,
     source: String(body.source || 'paid_blueprint_v2_preview').trim()
   };
 }
@@ -75,39 +84,57 @@ function numbersFromV2(result = {}) {
   };
 }
 
+async function findExactLead(payload) {
+  const phoneKey = normalizePhone(payload.phone);
+  const emailKey = normalizeEmail(payload.email);
+  const candidates = await db.getLeads({ search: phoneKey });
+  return candidates.find(row =>
+    normalizePhone(row.normalized_phone || row.phone) === phoneKey &&
+    normalizeEmail(row.normalized_email || row.email) === emailKey
+  ) || null;
+}
+
 async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_test' }) {
   try {
-    const existing = await db.getLeads({ search: payload.phone });
+    const existing = await findExactLead(payload);
     const leadData = {
       name: payload.name,
       phone: payload.phone,
       dob: payload.dob,
       email: payload.email,
-      gender: payload.gender,
+      gender: payload.gender || '',
       tob: payload.tob,
-      birth_time_accuracy: payload.birth_time_accuracy,
+      birth_time_accuracy: payload.birth_time_accuracy || '',
       pob: payload.pob,
       latitude: payload.latitude,
       longitude: payload.longitude,
       timezone: payload.timezone,
-      timezone_id: payload.timezone_id,
-      country_code: payload.country_code,
+      timezone_id: payload.timezone_id || '',
+      country_code: payload.country_code || '',
       question: payload.question,
       source: payload.source || 'paid_blueprint_public_test_form',
       status: 'paid_test_report_generated',
       tier: type
     };
 
-    const lead = existing.length
-      ? await db.updateLead(existing[0].id, leadData)
+    const lead = existing
+      ? await db.updateLead(existing.id, leadData)
       : await db.createLead(leadData);
 
     if (!lead?.id) throw new Error('Lead record was not created');
 
+    const isV2 = type === 'paid_blueprint_v2_preview';
+    const completedAt = new Date().toISOString();
     const report = await db.createReport({
       lead_id: lead.id,
       type,
       status: 'completed',
+      completed_at: completedAt,
+      report_contract_version: isV2 ? 'paid-v2-preview' : 'paid-legacy-preview',
+      calculation_contract_version: isV2 ? 'astrologyapi-v2' : 'numerology-legacy',
+      prompt_version: isV2 ? 'paid-v2-structured-v1' : 'paid-legacy-prompt-v1',
+      knowledge_version: 'none',
+      pdf_template_version: 'legacy-paid-v1',
       input_data: {
         ...payload,
         payment_status: 'testing_without_payment_gateway'
@@ -115,9 +142,9 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
       horosoft_data: result.numbers || result.numerology_data || {},
       astrology_data: result.astrology_data,
       ai_report: result.report_text,
+      report_json: result.report_json || null,
       ai_insights: {
         ...(result.insights || {}),
-        report_json: result.report_json || null,
         numerology_data: result.numerology_data || null,
         source_pdfs: result.source_pdfs || null,
         generation_ms: result.generation_ms,
@@ -139,6 +166,7 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
 }
 
 router.get('/astrology-v2/status', previewOnly, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.json({
     success: true,
     mode: getMode(),
@@ -185,7 +213,7 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
     }
 
     const bundle = await generateSourceBundle(payload, {
-      includePdfs: req.body.include_source_pdfs === true
+      includePdfs: payload.include_source_pdfs
     });
 
     const summary = {
@@ -227,7 +255,7 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
     }
 
     const result = await generatePaidReportV2(payload, {
-      includePdfs: req.body.include_source_pdfs === true
+      includePdfs: payload.include_source_pdfs
     });
     result.numbers = numbersFromV2(result);
 
@@ -265,7 +293,7 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/reports/paid-test', async (req, res) => {
+router.post('/reports/paid-test', previewOnly, async (req, res) => {
   const startedAt = Date.now();
 
   try {
@@ -318,7 +346,7 @@ router.post('/reports/paid-test', async (req, res) => {
   }
 });
 
-router.post('/reports/pdf-direct', async (req, res) => {
+router.post('/reports/pdf-direct', previewOnly, async (req, res) => {
   try {
     const {
       lead = {},
@@ -348,7 +376,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', String(pdfBuffer.length));
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     return res.end(pdfBuffer);
   } catch (error) {
     console.error('[Direct premium PDF error]', error);

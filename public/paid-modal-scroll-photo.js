@@ -1,28 +1,49 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidModalScrollPhotoFixV3) return;
-  window.__divyaPaidModalScrollPhotoFixV3 = true;
+  if (window.__divyaPaidModalScrollPhotoFixV4) return;
+  window.__divyaPaidModalScrollPhotoFixV4 = true;
 
   var IMAGE_URL = '/divya-profile.png?v=3';
 
   function injectStyles() {
-    if (document.getElementById('dbPaidModalScrollPhotoStylesV3')) return;
+    if (document.getElementById('dbPaidModalScrollPhotoStylesV4')) return;
 
-    ['dbPaidModalScrollPhotoStyles', 'dbPaidModalScrollPhotoStylesV2'].forEach(function (id) {
+    ['dbPaidModalScrollPhotoStyles', 'dbPaidModalScrollPhotoStylesV2', 'dbPaidModalScrollPhotoStylesV3'].forEach(function (id) {
       var oldStyle = document.getElementById(id);
       if (oldStyle) oldStyle.remove();
     });
 
     var style = document.createElement('style');
-    style.id = 'dbPaidModalScrollPhotoStylesV3';
+    style.id = 'dbPaidModalScrollPhotoStylesV4';
     style.textContent = `
-      #dbpOverlay{overflow:auto!important;overscroll-behavior:contain!important}
-      #dbpOverlay .dbp-shell{max-height:min(92vh,900px)!important;overflow:hidden!important}
-      #dbpOverlay .dbp-layout{max-height:min(92vh,900px)!important;min-height:0!important}
-      #dbpOverlay .dbp-main{min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important}
+      #dbpOverlay{overscroll-behavior:contain!important}
+
+      @media(min-width:821px){
+        #dbpOverlay{overflow:hidden!important;padding:20px!important}
+        #dbpOverlay .dbp-shell{
+          height:min(92vh,900px)!important;
+          max-height:min(92vh,900px)!important;
+          overflow-y:auto!important;
+          overflow-x:hidden!important;
+          overscroll-behavior:contain!important;
+          -webkit-overflow-scrolling:touch!important;
+          scrollbar-gutter:stable!important;
+        }
+        #dbpOverlay .dbp-layout{
+          height:auto!important;
+          min-height:100%!important;
+          max-height:none!important;
+        }
+        #dbpOverlay .dbp-aside{min-height:100%!important}
+        #dbpOverlay .dbp-main{
+          min-height:0!important;
+          overflow:visible!important;
+        }
+      }
+
       @media(max-width:820px){
-        #dbpOverlay{overflow:hidden!important}
+        #dbpOverlay{overflow:hidden!important;padding:0!important}
         #dbpOverlay .dbp-shell{height:100dvh!important;max-height:none!important;overflow:hidden!important}
         #dbpOverlay .dbp-layout{height:100%!important;max-height:none!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important}
         #dbpOverlay .dbp-main{overflow:visible!important}

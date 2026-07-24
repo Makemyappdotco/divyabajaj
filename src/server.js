@@ -16,7 +16,7 @@ const { adminAuth } = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
-const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js', 'reveal-failsafe.js'];
+const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'why-section-balance.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js', 'reveal-failsafe.js'];
 
 function validateBrowserScriptsSafely() {
   let allValid = true;
@@ -44,6 +44,7 @@ function sendLandingWithPatches(res) {
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-3"></script>';
+  const whyBalanceScript = '<script src="/why-section-balance.js?v=why-balance-1"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-4"></script>';
   const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-6"></script>';
   const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-3"></script>';
@@ -53,6 +54,7 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-live-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/landing-live-polish\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/why-section-balance\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-modal-scroll-photo\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-profile-repair\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/free-download-top-fix\.js[^>]*><\/script>/g, '');
@@ -60,7 +62,7 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/reveal-failsafe\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');

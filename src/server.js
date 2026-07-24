@@ -17,7 +17,7 @@ const { adminAuth } = require('./auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, '..', 'public');
-const browserScripts = ['paid-live-flow.js', 'landing-live-polish.js', 'why-section-balance.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js', 'reveal-failsafe.js'];
+const browserScripts = ['paid-live-flow.js', 'paid-direct-link.js', 'landing-live-polish.js', 'why-section-balance.js', 'paid-modal-scroll-photo.js', 'paid-profile-repair.js', 'free-download-top-fix.js', 'reveal-failsafe.js'];
 
 function validateBrowserScriptsSafely() {
   let allValid = true;
@@ -44,6 +44,7 @@ function sendLandingWithPatches(res) {
 
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>';
+  const directPaidScript = '<script src="/paid-direct-link.js?v=paid-direct-link-1"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-3"></script>';
   const whyBalanceScript = '<script src="/why-section-balance.js?v=why-balance-1"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-4"></script>';
@@ -54,6 +55,7 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-live-flow\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/paid-direct-link\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/landing-live-polish\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/why-section-balance\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-modal-scroll-photo\.js[^>]*><\/script>/g, '');
@@ -63,7 +65,7 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/reveal-failsafe\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -161,12 +163,21 @@ app.use('/api', validateReportInput);
 
 app.get('/health', (req, res) => {
   const storageMode = db.usingSupabase() ? 'supabase' : 'local_fallback';
+  const reportPreviewReady = Boolean(
+    process.env.OPENAI_API_KEY &&
+    (process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN || process.env.ASTROLOGYAPI_ACCESS_TOKEN)
+  );
+  const foundationReady = browserScriptsValid && db.usingSupabase();
+  const productionReleaseApproved = process.env.SYSTEM_PRODUCTION_READY === 'true';
+
   res.json({
     status: 'ok',
     ui_scripts_valid: browserScriptsValid,
     storage_mode: storageMode,
     persistent_storage_ready: db.usingSupabase(),
-    production_ready: browserScriptsValid && (!isProductionRuntime() || db.usingSupabase()),
+    foundation_ready: foundationReady,
+    report_preview_ready: reportPreviewReady,
+    production_ready: foundationReady && reportPreviewReady && productionReleaseApproved,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -182,6 +193,7 @@ app.get('/admin', adminAuth, (req, res) => {
 app.use('/admin', adminAuth, express.static(publicDir));
 app.get('/', (req, res) => sendLandingWithPatches(res));
 app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
+app.get(['/full-blueprint', '/paid-report'], (req, res) => sendLandingWithPatches(res));
 
 app.get(['/book-consultation', '/private-consultation', '/consultation/book'], (req, res) => {
   const queryIndex = req.originalUrl.indexOf('?');

@@ -1,10 +1,9 @@
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const vm = require('vm');
 
-// Reuse the existing live AstrologyAPI credential until the V2 token is promoted to Production.
+// Reuse the existing AstrologyAPI credential in Preview until a dedicated V2 token is promoted.
 if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS_TOKEN) {
   process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN = process.env.ASTROLOGYAPI_ACCESS_TOKEN;
 }
@@ -12,7 +11,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
-const { adminAuth } = require('./auth');
+const { adminAuth, adminConfigured } = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -155,7 +154,7 @@ function validateReportInput(req, res, next) {
   return next();
 }
 
-app.use(cors({ origin: '*' }));
+app.disable('x-powered-by');
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/api', persistentStorageGuard);
@@ -163,11 +162,19 @@ app.use('/api', validateReportInput);
 
 app.get('/health', (req, res) => {
   const storageMode = db.usingSupabase() ? 'supabase' : 'local_fallback';
-  const reportPreviewReady = Boolean(
+  const downloadSigningReady = Boolean(
+    process.env.REPORT_DOWNLOAD_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY
+  );
+  const explicitDownloadSecretReady = Boolean(process.env.REPORT_DOWNLOAD_SECRET);
+  const freeReportReady = Boolean(process.env.OPENAI_API_KEY && downloadSigningReady);
+  const paidPreviewReady = Boolean(
     process.env.OPENAI_API_KEY &&
     (process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN || process.env.ASTROLOGYAPI_ACCESS_TOKEN)
   );
   const foundationReady = browserScriptsValid && db.usingSupabase();
+  const adminReady = adminConfigured();
   const productionReleaseApproved = process.env.SYSTEM_PRODUCTION_READY === 'true';
 
   res.json({
@@ -175,9 +182,12 @@ app.get('/health', (req, res) => {
     ui_scripts_valid: browserScriptsValid,
     storage_mode: storageMode,
     persistent_storage_ready: db.usingSupabase(),
+    download_signing_ready: downloadSigningReady,
+    admin_ready: adminReady,
     foundation_ready: foundationReady,
-    report_preview_ready: reportPreviewReady,
-    production_ready: foundationReady && reportPreviewReady && productionReleaseApproved,
+    free_report_ready: freeReportReady,
+    report_preview_ready: paidPreviewReady,
+    production_ready: foundationReady && freeReportReady && adminReady && explicitDownloadSecretReady && productionReleaseApproved,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });

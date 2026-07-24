@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const db = require('./database');
 const { adminAuth } = require('./auth');
@@ -6,6 +7,7 @@ const { generateReportPdf } = require('./services/pdf');
 const { buildCombinedCsv, buildExcelWorkbook } = require('./services/export');
 
 const router = express.Router();
+const PDF_LINK_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 function requiredFields(body) {
   return ['name', 'phone', 'dob', 'email'].filter(field => !String(body[field] || '').trim());
@@ -15,21 +17,78 @@ function requiredPaidFields(body) {
   return ['name', 'phone', 'dob', 'email', 'tob', 'pob'].filter(field => !String(body[field] || '').trim());
 }
 
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function exportDate() { return new Date().toISOString().slice(0, 10); }
+
+function pdfSigningSecret() {
+  const secret = process.env.REPORT_DOWNLOAD_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (!secret) throw new Error('Report download signing is not configured');
+  return secret;
+}
+
+function pdfSignature(reportId, expires) {
+  return crypto
+    .createHmac('sha256', pdfSigningSecret())
+    .update(`${reportId}.${expires}`)
+    .digest('hex');
+}
+
+function signedPdfUrl(reportId, ttlSeconds = PDF_LINK_TTL_SECONDS) {
+  const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = pdfSignature(reportId, expires);
+  return `/api/reports/${encodeURIComponent(reportId)}/pdf?expires=${expires}&token=${token}`;
+}
+
+function validPdfRequest(reportId, expiresValue, tokenValue) {
+  const expires = Number(expiresValue);
+  const token = String(tokenValue || '');
+  if (!Number.isInteger(expires) || expires <= Math.floor(Date.now() / 1000) || !/^[a-f0-9]{64}$/i.test(token)) return false;
+
+  const expected = pdfSignature(reportId, expires);
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const suppliedBuffer = Buffer.from(token, 'hex');
+  return expectedBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(expectedBuffer, suppliedBuffer);
+}
+
 async function getAllExportData() {
-  const [leads, reports, payments, bookings, events] = await Promise.all([db.getLeads(), db.getReports(), db.getPayments(), db.getBookings(), db.getEvents(10000)]);
+  const [leads, reports, payments, bookings, events] = await Promise.all([
+    db.getLeads(),
+    db.getReports(),
+    db.getPayments(),
+    db.getBookings(),
+    db.getEvents(10000)
+  ]);
   return { Leads: leads, Reports: reports, Payments: payments, Bookings: bookings, Events: events };
 }
 
 async function findOrCreateLead({ name, phone, dob, email, tob = '', pob = '', question, source }) {
-  const existing = await db.getLeads({ search: phone });
+  const phoneKey = normalizePhone(phone);
+  const emailKey = normalizeEmail(email);
+  const candidates = await db.getLeads({ search: phoneKey });
+  const existing = candidates.find(row =>
+    normalizePhone(row.normalized_phone || row.phone) === phoneKey &&
+    normalizeEmail(row.normalized_email || row.email) === emailKey
+  );
+
   const leadData = { name, phone, dob, email, tob, pob, question, source };
-  return existing.length ? await db.updateLead(existing[0].id, leadData) : await db.createLead(leadData);
+  return existing ? await db.updateLead(existing.id, leadData) : await db.createLead(leadData);
 }
 
 async function createNumerologyReport({ lead, type, question }) {
   const userFocus = question || `${type.includes('paid') ? 'Paid' : 'Free'} report for ${lead.name}, born on ${lead.dob}.`;
-  return numerology.generateReport(type, lead.name, lead.dob, userFocus, { tob: lead.tob, pob: lead.pob, email: lead.email, phone: lead.phone });
+  return numerology.generateReport(type, lead.name, lead.dob, userFocus, {
+    tob: lead.tob,
+    pob: lead.pob,
+    email: lead.email,
+    phone: lead.phone
+  });
 }
 
 router.post('/leads', async (req, res) => {
@@ -37,16 +96,35 @@ router.post('/leads', async (req, res) => {
     const { name, phone, dob, email, tob, pob, question, source, utm_source, utm_medium, utm_campaign } = req.body;
     const missing = requiredFields(req.body);
     if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
-    const existing = await db.getLeads({ search: phone });
-    if (existing.length) return res.json({ success: true, lead: existing[0], existing: true });
-    const lead = await db.createLead({ name, phone, dob, email, tob, pob, question, source, utm_source, utm_medium, utm_campaign });
-    return res.status(201).json({ success: true, lead, existing: false });
-  } catch (error) { console.error('[Create lead error]', error); return res.status(500).json({ error: error.message }); }
+
+    const lead = await db.createLead({
+      name,
+      phone,
+      dob,
+      email,
+      tob,
+      pob,
+      question,
+      source,
+      utm_source,
+      utm_medium,
+      utm_campaign
+    });
+    return res.status(201).json({ success: true, lead });
+  } catch (error) {
+    console.error('[Create lead error]', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 router.post('/calculate', (req, res) => {
-  try { const { name, dob } = req.body; if (!name || !dob) return res.status(400).json({ error: 'Name and DOB are required' }); return res.json({ success: true, numbers: numerology.calcAllNumbers(name, dob) }); }
-  catch (error) { return res.status(500).json({ error: error.message }); }
+  try {
+    const { name, dob } = req.body;
+    if (!name || !dob) return res.status(400).json({ error: 'Name and DOB are required' });
+    return res.json({ success: true, numbers: numerology.calcAllNumbers(name, dob) });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 router.post('/reports/free', async (req, res) => {
@@ -74,6 +152,7 @@ router.post('/reports/free', async (req, res) => {
     if (!report?.id) throw new Error('Report record was not created');
 
     const result = await createNumerologyReport({ lead, type: 'free_numerology_awareness', question });
+    const pdfUrl = signedPdfUrl(report.id);
     const updatedReport = await db.updateReport(report.id, {
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -88,10 +167,12 @@ router.post('/reports/free', async (req, res) => {
         insights: result.insights || {}
       },
       generated_by: result.model || 'openai',
-      pdf_url: `/api/reports/${report.id}/pdf`,
+      pdf_url: pdfUrl,
       failure_code: '',
       failure_message: ''
     });
+    if (!updatedReport?.id) throw new Error('Completed report record was not saved');
+
     await db.updateLead(lead.id, { status: 'free_report_generated', tier: 'free_awareness' });
 
     return res.json({
@@ -102,8 +183,7 @@ router.post('/reports/free', async (req, res) => {
       storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
       numbers: result.numbers,
       report_text: result.report_text,
-      pdf_url: `/api/reports/${report.id}/pdf`,
-      report: updatedReport
+      pdf_url: pdfUrl
     });
   } catch (error) {
     console.error('[Free numerology report error]', error);
@@ -131,45 +211,163 @@ router.post('/reports/paid-test', async (req, res) => {
     const { name, phone, dob, email, tob, pob, question, source } = req.body;
     const missing = requiredPaidFields(req.body);
     if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+
     const lead = await findOrCreateLead({ name, phone, dob, email, tob, pob, question, source: source || 'paid_blueprint_test_form' });
     await db.updateLead(lead.id, { status: 'paid_test_report_requested', tier: 'paid_blueprint_test' });
-    const report = await db.createReport({ lead_id: lead.id, type: 'paid_blueprint_test', status: 'generating', input_data: { name, phone, dob, email, tob, pob, question, payment_status: 'testing_without_payment_gateway' } });
+    const report = await db.createReport({
+      lead_id: lead.id,
+      type: 'paid_blueprint_test',
+      status: 'generating',
+      input_data: { name, phone, dob, email, tob, pob, question, payment_status: 'testing_without_payment_gateway' }
+    });
     const result = await createNumerologyReport({ lead, type: 'paid_blueprint_test', question });
-    const updatedReport = await db.updateReport(report.id, { status: 'completed', completed_at: new Date().toISOString(), horosoft_data: result.numbers, astrology_data: result.astrology_data || null, ai_report: result.report_text, ai_insights: { ...(result.insights || {}), delivery_ready: { email, whatsapp: phone } }, generated_by: result.model || 'gpt-5.5', pdf_url: `/api/reports/${report.id}/pdf` });
+    const pdfUrl = signedPdfUrl(report.id);
+    const updatedReport = await db.updateReport(report.id, {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      horosoft_data: result.numbers,
+      astrology_data: result.astrology_data || null,
+      ai_report: result.report_text,
+      ai_insights: { ...(result.insights || {}), delivery_ready: { email, whatsapp: phone } },
+      generated_by: result.model || 'gpt-5.5',
+      pdf_url: pdfUrl
+    });
     await db.updateLead(lead.id, { status: 'paid_test_report_generated', tier: 'paid_blueprint_test' });
-    return res.json({ success: true, test_mode: true, payment_required: false, lead_id: lead.id, report_id: report.id, generated_by: result.model || 'gpt-5.5', storage: db.usingSupabase() ? 'supabase' : 'local_fallback', numbers: result.numbers, astrology_data: result.astrology_data, report_text: result.report_text, pdf_url: `/api/reports/${report.id}/pdf`, delivery_ready: { email, whatsapp: phone }, report: updatedReport });
-  } catch (error) { console.error('[Paid test blueprint report error]', error); return res.status(500).json({ error: error.message }); }
+
+    return res.json({
+      success: true,
+      test_mode: true,
+      payment_required: false,
+      lead_id: lead.id,
+      report_id: report.id,
+      generated_by: result.model || 'gpt-5.5',
+      storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
+      numbers: result.numbers,
+      astrology_data: result.astrology_data,
+      report_text: result.report_text,
+      pdf_url: pdfUrl,
+      delivery_ready: { email, whatsapp: phone },
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error('[Paid test blueprint report error]', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 router.get('/reports/:id/pdf', async (req, res) => {
   try {
+    if (!validPdfRequest(req.params.id, req.query.expires, req.query.token)) {
+      return res.status(403).json({ success: false, error: 'This report download link is invalid or has expired.' });
+    }
+
     const reports = await db.getReports({});
     const report = reports.find(item => item.id === req.params.id);
-    if (!report) return res.status(404).json({ error: 'Report not found' });
+    if (!report || report.status !== 'completed') return res.status(404).json({ error: 'Report not found' });
+
     const lead = await db.getLead(report.lead_id) || {};
-    const pdfBuffer = await generateReportPdf({ lead, report, numbers: report.horosoft_data || {}, astrologyData: report.astrology_data || null, reportText: report.ai_report || 'Report content is not available.' });
+    const pdfBuffer = await generateReportPdf({
+      lead,
+      report,
+      numbers: report.horosoft_data || {},
+      astrologyData: report.astrology_data || null,
+      reportText: report.ai_report || 'Report content is not available.'
+    });
     const safeName = String(lead.name || 'Divya-Bajaj-Report').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}-${report.type && report.type.includes('paid') ? 'full-blueprint' : 'numerology'}-report.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
     return res.send(pdfBuffer);
-  } catch (error) { console.error('[PDF error]', error); return res.status(500).json({ error: error.message }); }
+  } catch (error) {
+    console.error('[PDF error]', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
-router.get('/leads', adminAuth, async (req, res) => { try { const leads = await db.getLeads(req.query); return res.json({ success: true, leads, total: leads.length, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' }); } catch (error) { return res.status(500).json({ error: error.message }); } });
-router.get('/reports', adminAuth, async (req, res) => { try { const reports = await db.getReports(req.query); return res.json({ success: true, reports, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' }); } catch (error) { return res.status(500).json({ error: error.message }); } });
-router.get('/reports/:id', async (req, res) => { try { const reports = await db.getReports({}); const report = reports.find(item => item.id === req.params.id); if (!report) return res.status(404).json({ error: 'Report not found' }); return res.json({ success: true, report }); } catch (error) { return res.status(500).json({ error: error.message }); } });
-router.get('/stats', adminAuth, async (req, res) => { try { const stats = await db.getStats(); return res.json({ success: true, stats, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' }); } catch (error) { return res.status(500).json({ error: error.message }); } });
-router.get('/events', adminAuth, async (req, res) => { try { const events = await db.getEvents(Number(req.query.limit) || 100); return res.json({ success: true, events }); } catch (error) { return res.status(500).json({ error: error.message }); } });
+router.get('/leads', adminAuth, async (req, res) => {
+  try {
+    const leads = await db.getLeads(req.query);
+    return res.json({ success: true, leads, total: leads.length, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
+router.get('/reports', adminAuth, async (req, res) => {
+  try {
+    const reports = await db.getReports(req.query);
+    return res.json({ success: true, reports, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
+router.get('/reports/:id', adminAuth, async (req, res) => {
+  try {
+    const reports = await db.getReports({});
+    const report = reports.find(item => item.id === req.params.id);
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+    return res.json({ success: true, report });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
+router.get('/stats', adminAuth, async (req, res) => {
+  try {
+    const stats = await db.getStats();
+    return res.json({ success: true, stats, storage: db.usingSupabase() ? 'supabase' : 'local_fallback' });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
+router.get('/events', adminAuth, async (req, res) => {
+  try {
+    const events = await db.getEvents(Number(req.query.limit) || 100);
+    return res.json({ success: true, events });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
+
 router.get('/export/all.json', adminAuth, async (req, res) => {
   try {
     const datasets = await getAllExportData();
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.json"`);
-    return res.send(JSON.stringify({ exported_at: new Date().toISOString(), storage: db.usingSupabase() ? 'supabase' : 'local_fallback', datasets }, null, 2));
-  } catch (error) { console.error('[JSON export error]', error); return res.status(500).json({ error: error.message }); }
+    return res.send(JSON.stringify({
+      exported_at: new Date().toISOString(),
+      storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
+      datasets
+    }, null, 2));
+  } catch (error) {
+    console.error('[JSON export error]', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
-router.get('/export/all.csv', adminAuth, async (req, res) => { try { const datasets = await getAllExportData(); const csv = buildCombinedCsv(datasets); res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.csv"`); return res.send(`﻿${csv}`); } catch (error) { console.error('[CSV export error]', error); return res.status(500).json({ error: error.message }); } });
-router.get('/export/all.xlsx', adminAuth, async (req, res) => { try { const datasets = await getAllExportData(); const workbook = buildExcelWorkbook(datasets); res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.xlsx"`); return res.send(workbook); } catch (error) { console.error('[Excel export error]', error); return res.status(500).json({ error: error.message }); } });
-router.get('/export/leads', adminAuth, async (req, res) => { try { const leads = await db.getLeads(); return res.json({ success: true, leads }); } catch (error) { return res.status(500).json({ error: error.message }); } });
+
+router.get('/export/all.csv', adminAuth, async (req, res) => {
+  try {
+    const datasets = await getAllExportData();
+    const csv = buildCombinedCsv(datasets);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.csv"`);
+    return res.send(`﻿${csv}`);
+  } catch (error) {
+    console.error('[CSV export error]', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/export/all.xlsx', adminAuth, async (req, res) => {
+  try {
+    const datasets = await getAllExportData();
+    const workbook = buildExcelWorkbook(datasets);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-all-data-${exportDate()}.xlsx"`);
+    return res.send(workbook);
+  } catch (error) {
+    console.error('[Excel export error]', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/export/leads', adminAuth, async (req, res) => {
+  try {
+    const leads = await db.getLeads();
+    return res.json({ success: true, leads });
+  } catch (error) { return res.status(500).json({ error: error.message }); }
+});
 
 module.exports = router;

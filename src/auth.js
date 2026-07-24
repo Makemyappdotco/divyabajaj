@@ -1,5 +1,5 @@
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'divya';
-const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'changethispassword123';
+const ADMIN_PASS = process.env.ADMIN_PASSWORD || '';
 
 function requestLogin(res) {
   res.setHeader('WWW-Authenticate', 'Basic realm="Divya Bajaj Admin"');
@@ -20,18 +20,29 @@ function adminAuth(req, res, next) {
     return requestLogin(res);
   }
 
-  const credentials = Buffer.from(authHeader.split(' ')[1], 'base64').toString();
+  const encoded = authHeader.split(' ')[1] || '';
+  let credentials = '';
+  try { credentials = Buffer.from(encoded, 'base64').toString(); }
+  catch (error) { return requestLogin(res); }
+
   const separatorIndex = credentials.indexOf(':');
+  if (separatorIndex < 0) return requestLogin(res);
+
   const user = credentials.slice(0, separatorIndex);
   const pass = credentials.slice(separatorIndex + 1);
 
-  if (user === ADMIN_USER && pass === ADMIN_PASS) return next();
+  if (ADMIN_PASS && user === ADMIN_USER && pass === ADMIN_PASS) return next();
 
   return requestLogin(res);
 }
 
 function generateToken() {
+  if (!ADMIN_PASS) return '';
   return Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`).toString('base64');
 }
 
-module.exports = { adminAuth, generateToken, ADMIN_USER, ADMIN_PASS };
+function adminConfigured() {
+  return Boolean(ADMIN_PASS);
+}
+
+module.exports = { adminAuth, generateToken, adminConfigured, ADMIN_USER, ADMIN_PASS };

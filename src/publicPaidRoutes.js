@@ -75,7 +75,7 @@ function numbersFromV2(result = {}) {
   };
 }
 
-async function saveGeneratedReportBestEffort({ payload, result, type = 'paid_blueprint_test' }) {
+async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_test' }) {
   try {
     const existing = await db.getLeads({ search: payload.phone });
     const leadData = {
@@ -101,6 +101,8 @@ async function saveGeneratedReportBestEffort({ payload, result, type = 'paid_blu
     const lead = existing.length
       ? await db.updateLead(existing[0].id, leadData)
       : await db.createLead(leadData);
+
+    if (!lead?.id) throw new Error('Lead record was not created');
 
     const report = await db.createReport({
       lead_id: lead.id,
@@ -128,10 +130,11 @@ async function saveGeneratedReportBestEffort({ payload, result, type = 'paid_blu
       pdf_url: '/api/reports/pdf-direct'
     });
 
+    if (!report?.id) throw new Error('Report record was not created');
     return { lead_id: lead.id, report_id: report.id };
   } catch (error) {
-    console.warn('[Paid report persistence skipped]', error.message);
-    return { lead_id: '', report_id: '' };
+    console.error('[Paid report persistence failed]', error);
+    throw new Error(`Report generation completed, but saving failed: ${error.message}`);
   }
 }
 
@@ -228,7 +231,7 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
     });
     result.numbers = numbersFromV2(result);
 
-    const saved = await saveGeneratedReportBestEffort({
+    const saved = await saveGeneratedReport({
       payload,
       result,
       type: 'paid_blueprint_v2_preview'
@@ -286,7 +289,7 @@ router.post('/reports/paid-test', async (req, res) => {
     }
 
     const result = await generatePaidReport(payload);
-    const saved = await saveGeneratedReportBestEffort({ payload, result });
+    const saved = await saveGeneratedReport({ payload, result });
 
     return res.json({
       success: true,

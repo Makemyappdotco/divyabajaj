@@ -32,6 +32,12 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function optionalNumber(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function usingSupabase() {
   return Boolean(supabase);
 }
@@ -42,6 +48,7 @@ function cleanEventData(data = {}) {
   delete clone.horosoft_data;
   delete clone.astrology_data;
   delete clone.input_data;
+  delete clone.report_json;
   return clone;
 }
 
@@ -83,6 +90,7 @@ async function getLeads(filters = {}) {
 
 async function createLead(data) {
   if (!supabase) return localDb.createLead(data);
+  const createdAt = now();
   const row = {
     id: id('lead'),
     environment: data.environment || runtimeEnvironment(),
@@ -92,19 +100,30 @@ async function createLead(data) {
     email: data.email || '',
     normalized_email: normalizeEmail(data.email),
     dob: data.dob,
+    gender: data.gender || '',
     tob: data.tob || '',
+    birth_time_accuracy: data.birth_time_accuracy || '',
     pob: data.pob || '',
+    latitude: optionalNumber(data.latitude),
+    longitude: optionalNumber(data.longitude),
+    timezone: optionalNumber(data.timezone),
+    timezone_id: data.timezone_id || '',
+    country_code: data.country_code || '',
     question: data.question || '',
     source: data.source || 'website',
     utm_source: data.utm_source || '',
     utm_medium: data.utm_medium || '',
     utm_campaign: data.utm_campaign || '',
+    email_consent: data.email_consent === true,
+    whatsapp_consent: data.whatsapp_consent === true,
+    consent_recorded_at: data.consent_recorded_at || null,
+    last_activity_at: data.last_activity_at || createdAt,
     status: data.status || 'new',
     tier: data.tier || 'free_awareness',
     total_spent: Number(data.total_spent) || 0,
     notes: data.notes || [],
-    created_at: now(),
-    updated_at: now()
+    created_at: createdAt,
+    updated_at: createdAt
   };
   const result = await supabase.from('leads').insert(row).select().single();
   const created = await throwIfError(result, 'Create lead failed');
@@ -120,9 +139,12 @@ async function getLead(leadId) {
 
 async function updateLead(leadId, updates) {
   if (!supabase) return localDb.updateLead(leadId, updates);
-  const patch = { ...updates, updated_at: now() };
+  const patch = { ...updates, updated_at: now(), last_activity_at: updates.last_activity_at || now() };
   if (Object.prototype.hasOwnProperty.call(updates, 'phone')) patch.normalized_phone = normalizePhone(updates.phone);
   if (Object.prototype.hasOwnProperty.call(updates, 'email')) patch.normalized_email = normalizeEmail(updates.email);
+  ['latitude', 'longitude', 'timezone'].forEach(field => {
+    if (Object.prototype.hasOwnProperty.call(updates, field)) patch[field] = optionalNumber(updates[field]);
+  });
   const result = await supabase.from('leads').update(patch).eq('id', leadId).select().maybeSingle();
   const updated = await throwIfError(result, 'Update lead failed');
   if (updated) await logEvent('leads.updated', 'leads', leadId, patch);

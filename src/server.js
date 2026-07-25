@@ -8,6 +8,13 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
   process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN = process.env.ASTROLOGYAPI_ACCESS_TOKEN;
 }
 
+// Vercel can run Preview builds with NODE_ENV=production. Normalize it before
+// loading route and database modules so Preview-only endpoints stay available
+// and Preview records remain tagged as test data.
+if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
+  process.env.NODE_ENV = 'test';
+}
+
 const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
@@ -72,7 +79,8 @@ function sendLandingWithPatches(res) {
 }
 
 function isProductionRuntime() {
-  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+  if (process.env.VERCEL_ENV) return process.env.VERCEL_ENV === 'production';
+  return process.env.NODE_ENV === 'production';
 }
 
 function persistentStorageGuard(req, res, next) {

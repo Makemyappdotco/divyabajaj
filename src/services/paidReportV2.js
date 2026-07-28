@@ -14,6 +14,43 @@ function extractText(data) {
     .trim();
 }
 
+function compactKpPlanets(bundle) {
+  if (!bundle?.kp_planets?.ok || !Array.isArray(bundle.kp_planets.data)) return null;
+  return bundle.kp_planets.data.map(item => ({
+    planet_id: item.planet_id,
+    planet_name: item.planet_name || item.name,
+    degree: item.degree,
+    formatted_degree: item.formatted_degree,
+    norm_degree: item.norm_degree ?? item.normDegree,
+    formatted_norm_degree: item.formatted_norm_degree,
+    house: item.house,
+    sign: item.sign,
+    sign_lord: item.sign_lord || item.signLord,
+    nakshatra: item.nakshatra,
+    nakshatra_lord: item.nakshatra_lord || item.nakshatraLord,
+    charan: item.charan,
+    sub_lord: item.sub_lord || item.subLord,
+    sub_sub_lord: item.sub_sub_lord || item.subSubLord,
+    retrograde: item.is_retro ?? item.isRetro
+  }));
+}
+
+function compactKpCusps(bundle) {
+  if (!bundle?.kp_house_cusps?.ok || !Array.isArray(bundle.kp_house_cusps.data)) return null;
+  return bundle.kp_house_cusps.data.map(item => ({
+    house_id: item.house_id,
+    cusp_full_degree: item.cusp_full_degree,
+    formatted_degree: item.formatted_degree,
+    sign_id: item.sign_id,
+    sign: item.sign,
+    sign_lord: item.sign_lord,
+    nakshatra: item.nakshatra,
+    nakshatra_lord: item.nakshatra_lord,
+    sub_lord: item.sub_lord,
+    sub_sub_lord: item.sub_sub_lord
+  }));
+}
+
 function compactSource(bundle) {
   const planets = bundle?.planets?.ok && Array.isArray(bundle.planets.data)
     ? bundle.planets.data.map(item => ({
@@ -33,7 +70,18 @@ function compactSource(bundle) {
   });
 
   return {
+    source_generated_at: bundle?.generated_at || null,
     planets,
+    kp_source_status: {
+      kp_planets: Boolean(bundle?.kp_planets?.ok),
+      kp_house_cusps: Boolean(bundle?.kp_house_cusps?.ok),
+      kp_planet_significators: Boolean(bundle?.kp_planet_significators?.ok),
+      kp_house_significators: Boolean(bundle?.kp_house_significators?.ok)
+    },
+    kp_planets: compactKpPlanets(bundle),
+    kp_house_cusps: compactKpCusps(bundle),
+    kp_planet_significators: bundle?.kp_planet_significators?.ok ? bundle.kp_planet_significators.data : null,
+    kp_house_significators: bundle?.kp_house_significators?.ok ? bundle.kp_house_significators.data : null,
     current_vdasha: bundle?.current_vdasha?.ok ? bundle.current_vdasha.data : null,
     current_vdasha_all: bundle?.current_vdasha_all?.ok ? bundle.current_vdasha_all.data : null,
     numerological_numbers: bundle?.numerological_numbers?.ok ? bundle.numerological_numbers.data : null,
@@ -59,8 +107,9 @@ ${JSON.stringify(source, null, 2)}
 
 IMPORTANT ACCURACY RULES
 - Use only facts supported by the source data.
-- Never invent a planet, house, sign, nakshatra, dasha, date, degree or numerology number.
-- When a field is missing, write that it needs a deeper personal reading instead of guessing.
+- Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp or numerology number.
+- Use KP planets, cusps and significator maps only when the corresponding kp_source_status value is true and the actual data is present.
+- When a required field is missing, write DATA REQUIRED followed by the exact missing item instead of guessing.
 - Do not predict guaranteed events, medical diagnoses, exact marriage dates or guaranteed money outcomes.
 - Keep the language very simple, natural Indian English.
 - Sound warm, direct and practical, like Divya personally explaining the report.
@@ -278,8 +327,12 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     report_text: reportText,
     astrology_data: {
       provider: 'AstrologyAPI',
-      note: 'This report uses verified AstrologyAPI planetary positions, chart calculations and Vimshottari Dasha data based on the submitted birth details.',
+      note: 'This report uses verified AstrologyAPI planetary positions, KP planets, KP house cusps, significator maps, chart calculations and Vimshottari Dasha data based on the submitted birth details.',
       planets: sourceBundle.planets,
+      kp_planets: sourceBundle.kp_planets,
+      kp_house_cusps: sourceBundle.kp_house_cusps,
+      kp_planet_significators: sourceBundle.kp_planet_significators,
+      kp_house_significators: sourceBundle.kp_house_significators,
       current_vdasha: sourceBundle.current_vdasha,
       current_vdasha_all: sourceBundle.current_vdasha_all,
       charts: sourceBundle.charts,

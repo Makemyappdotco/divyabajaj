@@ -41,8 +41,13 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function isProductionRuntime() {
+  if (process.env.VERCEL_ENV) return process.env.VERCEL_ENV === 'production';
+  return process.env.NODE_ENV === 'production';
+}
+
 function previewOnly(req, res, next) {
-  if (process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production') {
+  if (isProductionRuntime()) {
     return res.status(404).json({ success: false, error: 'Not found' });
   }
   return next();
@@ -73,11 +78,12 @@ function normaliseV2Payload(body = {}) {
 function numbersFromV2(result = {}) {
   const western = result.numerology_data?.numerological_numbers?.data || {};
   const indian = result.numerology_data?.numero_table?.data || {};
+  const deterministic = result.numerology_data?.deterministic || {};
   return {
-    ruling_number: indian.radical_number || indian.radical_num || '',
-    destiny_number: indian.destiny_number || western.lifepath_number || '',
-    name_number: indian.name_number || western.expression_number || '',
-    personal_year: '',
+    ruling_number: deterministic.psychic_number || indian.radical_number || indian.radical_num || '',
+    destiny_number: deterministic.destiny_number || indian.destiny_number || western.lifepath_number || '',
+    name_number: deterministic.name_number || indian.name_number || western.expression_number || '',
+    personal_year: deterministic.personal_year || '',
     lifepath_number: western.lifepath_number || '',
     personality_number: western.personality_number || '',
     soul_urge_number: western.soul_urge_number || ''
@@ -131,8 +137,8 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
       status: 'completed',
       completed_at: completedAt,
       report_contract_version: isV2 ? 'paid-v2-preview' : 'paid-legacy-preview',
-      calculation_contract_version: isV2 ? 'astrologyapi-v2' : 'numerology-legacy',
-      prompt_version: isV2 ? 'paid-v2-structured-v1' : 'paid-legacy-prompt-v1',
+      calculation_contract_version: isV2 ? 'astrologyapi-kp-v1' : 'numerology-legacy',
+      prompt_version: isV2 ? 'paid-v2-kp-source-v1' : 'paid-legacy-prompt-v1',
       knowledge_version: 'none',
       pdf_template_version: 'legacy-paid-v1',
       input_data: {
@@ -218,6 +224,10 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
 
     const summary = {
       planets: bundle.planets?.ok,
+      kp_planets: bundle.kp_planets?.ok,
+      kp_house_cusps: bundle.kp_house_cusps?.ok,
+      kp_planet_significators: bundle.kp_planet_significators?.ok,
+      kp_house_significators: bundle.kp_house_significators?.ok,
       current_vdasha: bundle.current_vdasha?.ok,
       current_vdasha_all: bundle.current_vdasha_all?.ok,
       numerological_numbers: bundle.numerological_numbers?.ok,

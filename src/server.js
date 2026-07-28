@@ -8,17 +8,16 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
   process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN = process.env.ASTROLOGYAPI_ACCESS_TOKEN;
 }
 
-// Vercel can run Preview builds with NODE_ENV=production. Normalize it before
-// loading route and database modules so Preview-only endpoints stay available
-// and Preview records remain tagged as test data.
-if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
-  process.env.NODE_ENV = 'test';
-}
-
 const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
+const {
+  getKpHouseCusps,
+  getKpHouseSignificators,
+  getKpPlanetSignificators,
+  getKpPlanets
+} = require('./services/astrologyApiV2');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -198,6 +197,53 @@ app.get('/health', (req, res) => {
     production_ready: foundationReady && freeReportReady && adminReady && explicitDownloadSecretReady && productionReleaseApproved,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (isProductionRuntime()) return res.status(404).json({ success: false, error: 'Not found' });
+
+  const sample = {
+    name: 'KP Access Diagnostic',
+    gender: 'male',
+    dob: '2000-01-06',
+    tob: '07:45',
+    pob: 'Mumbai, Maharashtra, India',
+    latitude: 19.132,
+    longitude: 72.342,
+    timezone: 5.5
+  };
+
+  const checks = [
+    ['kp_planets', getKpPlanets(sample)],
+    ['kp_house_cusps', getKpHouseCusps(sample)],
+    ['kp_planet_significator', getKpPlanetSignificators(sample)],
+    ['kp_house_significator', getKpHouseSignificators(sample)]
+  ];
+  const settled = await Promise.allSettled(checks.map(([, promise]) => promise));
+  const endpoints = {};
+
+  checks.forEach(([name], index) => {
+    const result = settled[index];
+    if (result.status === 'fulfilled') {
+      endpoints[name] = {
+        ok: true,
+        rows: Array.isArray(result.value) ? result.value.length : null
+      };
+    } else {
+      endpoints[name] = {
+        ok: false,
+        error: String(result.reason?.message || 'Unknown AstrologyAPI error').slice(0, 500)
+      };
+    }
+  });
+
+  const success = Object.values(endpoints).every(item => item.ok);
+  return res.json({
+    success,
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local',
+    endpoints
   });
 });
 

@@ -19,9 +19,10 @@ function now() {
 }
 
 function runtimeEnvironment() {
-  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
-    ? 'production'
-    : 'test';
+  if (process.env.VERCEL_ENV) {
+    return process.env.VERCEL_ENV === 'production' ? 'production' : 'test';
+  }
+  return process.env.NODE_ENV === 'production' ? 'production' : 'test';
 }
 
 function normalizePhone(value) {

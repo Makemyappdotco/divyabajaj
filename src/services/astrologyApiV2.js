@@ -216,6 +216,22 @@ async function getPlanets(input) {
   return post('planets', birthPayload(input));
 }
 
+async function getKpPlanets(input) {
+  return post('kp_planets', birthPayload(input));
+}
+
+async function getKpHouseCusps(input) {
+  return post('kp_house_cusps', birthPayload(input));
+}
+
+async function getKpPlanetSignificators(input) {
+  return post('kp_planet_significator', birthPayload(input));
+}
+
+async function getKpHouseSignificators(input) {
+  return post('kp_house_significator', birthPayload(input));
+}
+
 async function getCurrentVdasha(input) {
   return post('current_vdasha', birthPayload(input));
 }
@@ -273,6 +289,10 @@ async function generateSourceBundle(input, { includePdfs = false } = {}) {
   const chartIds = ['D1', 'D9', 'D10'];
   const jobs = [
     getPlanets(input),
+    getKpPlanets(input),
+    getKpHouseCusps(input),
+    getKpPlanetSignificators(input),
+    getKpHouseSignificators(input),
     getCurrentVdasha(input),
     getCurrentVdashaAll(input),
     getNumerologicalNumbers(input),
@@ -289,6 +309,10 @@ async function generateSourceBundle(input, { includePdfs = false } = {}) {
     mode: getMode(),
     generated_at: new Date().toISOString(),
     planets: resultOf(settled[index++]),
+    kp_planets: resultOf(settled[index++]),
+    kp_house_cusps: resultOf(settled[index++]),
+    kp_planet_significators: resultOf(settled[index++]),
+    kp_house_significators: resultOf(settled[index++]),
     current_vdasha: resultOf(settled[index++]),
     current_vdasha_all: resultOf(settled[index++]),
     numerological_numbers: resultOf(settled[index++]),
@@ -319,6 +343,10 @@ module.exports = {
   getChartImage,
   getCurrentVdasha,
   getCurrentVdashaAll,
+  getKpHouseCusps,
+  getKpHouseSignificators,
+  getKpPlanetSignificators,
+  getKpPlanets,
   getMode,
   getNumeroTable,
   getNumerologicalNumbers,

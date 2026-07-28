@@ -1,4 +1,5 @@
 const { generateSourceBundle } = require('./astrologyApiV2');
+const { calculateNumerology } = require('./numerologyEngine');
 const brand = require('../config/divyaBrand');
 
 function getPaidModel() {
@@ -51,7 +52,7 @@ function compactKpCusps(bundle) {
   }));
 }
 
-function compactSource(bundle) {
+function compactSource(bundle, deterministicNumerology) {
   const planets = bundle?.planets?.ok && Array.isArray(bundle.planets.data)
     ? bundle.planets.data.map(item => ({
         name: item.name,
@@ -84,8 +85,9 @@ function compactSource(bundle) {
     kp_house_significators: bundle?.kp_house_significators?.ok ? bundle.kp_house_significators.data : null,
     current_vdasha: bundle?.current_vdasha?.ok ? bundle.current_vdasha.data : null,
     current_vdasha_all: bundle?.current_vdasha_all?.ok ? bundle.current_vdasha_all.data : null,
-    numerological_numbers: bundle?.numerological_numbers?.ok ? bundle.numerological_numbers.data : null,
-    numero_table: bundle?.numero_table?.ok ? bundle.numero_table.data : null,
+    deterministic_numerology: deterministicNumerology,
+    astrologyapi_numerological_numbers: bundle?.numerological_numbers?.ok ? bundle.numerological_numbers.data : null,
+    astrologyapi_numero_table: bundle?.numero_table?.ok ? bundle.numero_table.data : null,
     charts
   };
 }
@@ -102,12 +104,14 @@ Place of birth: ${input.pob}
 Birth-time accuracy: ${input.birth_time_accuracy || 'not stated'}
 Main concern: ${input.question || 'Complete life clarity'}
 
-VERIFIED ASTROLOGYAPI SOURCE DATA
+VERIFIED ASTROLOGYAPI SOURCE DATA AND BACKEND NUMEROLOGY
 ${JSON.stringify(source, null, 2)}
 
 IMPORTANT ACCURACY RULES
 - Use only facts supported by the source data.
 - Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp or numerology number.
+- Treat deterministic_numerology as the primary source for Psychic, Destiny, Name and Personal Year numbers.
+- AstrologyAPI numerology fields are an independent cross-check. Never silently replace deterministic values with them.
 - Use KP planets, cusps and significator maps only when the corresponding kp_source_status value is true and the actual data is present.
 - When a required field is missing, write DATA REQUIRED followed by the exact missing item instead of guessing.
 - Do not predict guaranteed events, medical diagnoses, exact marriage dates or guaranteed money outcomes.
@@ -315,7 +319,12 @@ function reportTextFromJson(report, input) {
 async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   const startedAt = Date.now();
   const sourceBundle = await generateSourceBundle(input, { includePdfs });
-  const compact = compactSource(sourceBundle);
+  const deterministicNumerology = calculateNumerology({
+    name: input.name,
+    dob: input.dob,
+    reportDate: new Date()
+  });
+  const compact = compactSource(sourceBundle, deterministicNumerology);
   const raw = await callOpenAI(buildPrompt(input, compact));
   const reportJson = parseJson(raw);
   const reportText = reportTextFromJson(reportJson, input);
@@ -339,7 +348,8 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
       chart_images: sourceBundle.chart_images
     },
     numerology_data: {
-      provider: 'AstrologyAPI',
+      provider: 'backend_deterministic_with_astrologyapi_cross_check',
+      deterministic: deterministicNumerology,
       numerological_numbers: sourceBundle.numerological_numbers,
       numero_table: sourceBundle.numero_table
     },

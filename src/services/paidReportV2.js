@@ -1,5 +1,6 @@
 const { generateSourceBundle } = require('./astrologyApiV2');
 const { calculateNumerology } = require('./numerologyEngine');
+const { verifySourceBundle } = require('./reportVerification');
 const brand = require('../config/divyaBrand');
 
 function getPaidModel() {
@@ -52,7 +53,7 @@ function compactKpCusps(bundle) {
   }));
 }
 
-function compactSource(bundle, deterministicNumerology) {
+function compactSource(bundle, deterministicNumerology, verification) {
   const planets = bundle?.planets?.ok && Array.isArray(bundle.planets.data)
     ? bundle.planets.data.map(item => ({
         name: item.name,
@@ -72,6 +73,7 @@ function compactSource(bundle, deterministicNumerology) {
 
   return {
     source_generated_at: bundle?.generated_at || null,
+    source_verification: verification,
     planets,
     kp_source_status: {
       kp_planets: Boolean(bundle?.kp_planets?.ok),
@@ -112,6 +114,7 @@ IMPORTANT ACCURACY RULES
 - Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp or numerology number.
 - Treat deterministic_numerology as the primary source for Psychic, Destiny, Name and Personal Year numbers.
 - AstrologyAPI numerology fields are an independent cross-check. Never silently replace deterministic values with them.
+- Read source_verification before writing. Never override a blocking issue or discrepancy.
 - Use KP planets, cusps and significator maps only when the corresponding kp_source_status value is true and the actual data is present.
 - When a required field is missing, write DATA REQUIRED followed by the exact missing item instead of guessing.
 - Do not predict guaranteed events, medical diagnoses, exact marriage dates or guaranteed money outcomes.
@@ -318,13 +321,20 @@ function reportTextFromJson(report, input) {
 
 async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   const startedAt = Date.now();
+  const reportDate = new Date();
   const sourceBundle = await generateSourceBundle(input, { includePdfs });
   const deterministicNumerology = calculateNumerology({
     name: input.name,
     dob: input.dob,
-    reportDate: new Date()
+    reportDate
   });
-  const compact = compactSource(sourceBundle, deterministicNumerology);
+  const verification = verifySourceBundle(sourceBundle, deterministicNumerology, { reportDate });
+  const requireVerifiedSource = process.env.PAID_REPORT_REQUIRE_VERIFIED_SOURCE === 'true';
+  if (requireVerifiedSource && !verification.ready_for_personal_life_blueprint) {
+    throw new Error(`Source verification failed: ${verification.blocking_issues.join(' | ')}`);
+  }
+
+  const compact = compactSource(sourceBundle, deterministicNumerology, verification);
   const raw = await callOpenAI(buildPrompt(input, compact));
   const reportJson = parseJson(raw);
   const reportText = reportTextFromJson(reportJson, input);
@@ -334,6 +344,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     model: getPaidModel(),
     report_json: reportJson,
     report_text: reportText,
+    verification,
     astrology_data: {
       provider: 'AstrologyAPI',
       note: 'This report uses verified AstrologyAPI planetary positions, KP planets, KP house cusps, significator maps, chart calculations and Vimshottari Dasha data based on the submitted birth details.',
@@ -356,7 +367,10 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     source_pdfs: sourceBundle.pdfs,
     source_bundle: sourceBundle,
     generation_ms: Date.now() - startedAt,
-    insights: { concerns: input.question ? [input.question] : [] }
+    insights: {
+      concerns: input.question ? [input.question] : [],
+      source_verification: verification
+    }
   };
 }
 

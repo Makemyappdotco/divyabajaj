@@ -1,4 +1,5 @@
 const express = require('express');
+const { renderPersonalBlueprintPreviewPage } = require('./personalBlueprintPreviewPage');
 const { preparePersonalLifeBlueprintSource } = require('./services/personalLifeBlueprintSource');
 const { generateStage } = require('./services/personalLifeBlueprintGenerator');
 const {
@@ -99,6 +100,12 @@ function sourceSummary(source) {
   };
 }
 
+router.get('/reports/personal-life-blueprint-v2/preview', previewOnly, (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  return res.send(renderPersonalBlueprintPreviewPage());
+});
+
 router.get('/astrology-v2/personal-blueprint-source-test', previewOnly, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   try {
@@ -160,6 +167,29 @@ router.get('/reports/personal-life-blueprint-v2/stage1-test', previewOnly, async
   }
 });
 
+router.get('/reports/personal-life-blueprint-v2/diagnostic-start', previewOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  try {
+    const started = await startPersonalLifeBlueprint(diagnosticInput(), { reportDate: new Date() });
+    return res.status(202).json({
+      success: true,
+      test_mode: true,
+      ...started,
+      status_url: `/api/reports/personal-life-blueprint-v2/${started.report_id}/status`,
+      advance_url: `/api/reports/personal-life-blueprint-v2/${started.report_id}/advance`
+    });
+  } catch (error) {
+    console.error('[Personal Blueprint diagnostic start error]', error);
+    return res.status(error.status || 500).json({
+      success: false,
+      error: error.message || 'Diagnostic Personal Life Blueprint could not be started',
+      verification: error.verification || null,
+      openai_request_id: error.openai_request_id || '',
+      client_request_id: error.client_request_id || ''
+    });
+  }
+});
+
 router.post('/reports/personal-life-blueprint-v2/start', previewOnly, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   try {
@@ -195,6 +225,21 @@ router.get('/reports/personal-life-blueprint-v2/:reportId/status', previewOnly, 
     return res.json({ success: true, ...status });
   } catch (error) {
     return res.status(error.status || 500).json({ success: false, error: error.message || 'Could not read report status' });
+  }
+});
+
+router.get('/reports/personal-life-blueprint-v2/:reportId/document.txt', previewOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  try {
+    const status = await getPersonalLifeBlueprintStatus(String(req.params.reportId || ''));
+    if (status.status !== 'completed' || !status.document?.plain_text) {
+      return res.status(409).json({ success: false, error: 'The report document is not complete yet.' });
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="Personal-Life-Blueprint-${status.report_id}.txt"`);
+    return res.send(status.document.plain_text);
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, error: error.message || 'Could not download report document' });
   }
 });
 

@@ -25,7 +25,7 @@ function generationMetadata({ stage, sourceContext, earlierStages }) {
     stage,
     source_generated_at: sourceContext?.source_generated_at || '',
     report_date: sourceContext?.input?.report_date || '',
-    earlier_stage_count: Object.keys(earlierStages || {}).length
+    earlier_stage_count: String(Object.keys(earlierStages || {}).length)
   };
 }
 

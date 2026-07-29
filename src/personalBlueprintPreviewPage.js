@@ -6,7 +6,7 @@ function renderPersonalBlueprintPreviewPage() {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Personal Life Blueprint V2 Preview</title>
   <style>
-    :root { color-scheme: dark; --bg:#111014; --panel:#1b191f; --line:#302c36; --text:#f5f0e8; --muted:#aaa3b0; --gold:#d6ad62; --ok:#80d6a3; --bad:#ff9b9b; }
+    :root { color-scheme: dark; --panel:#1b191f; --line:#302c36; --text:#f5f0e8; --muted:#aaa3b0; --gold:#d6ad62; --ok:#80d6a3; --bad:#ff9b9b; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:radial-gradient(circle at top,#24202b 0,#111014 46%); color:var(--text); font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; }
     main { width:min(900px,calc(100% - 32px)); margin:0 auto; padding:54px 0 80px; }
@@ -70,22 +70,28 @@ function renderPersonalBlueprintPreviewPage() {
 (() => {
   const stages = ['verification_big_picture','life_areas_one_to_three','life_areas_four_to_seven','remedies_audit_closing'];
   const key = 'divya_personal_blueprint_preview_report_id';
-  const els = Object.fromEntries(['status','detail','bar','start','resume','download','clear','reportId','currentStage','completedStages','error','result'].map(id => [id, document.getElementById(id)]));
+  const ids = ['status','detail','bar','start','resume','download','clear','reportId','currentStage','completedStages','error','result'];
+  const els = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
   let reportId = localStorage.getItem(key) || '';
-  let timer = null;
-  let inFlight = false;
+  let busy = false;
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const label = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase());
 
-  function paint(workflow = {}, stageAudit = []) {
-    const completed = Array.isArray(stageAudit) ? stageAudit.length : 0;
+  function completedCount(workflow = {}) {
+    if (workflow.status === 'completed') return 4;
+    const index = Number(workflow.stage_index);
+    return Number.isFinite(index) ? Math.max(0, Math.min(index, 3)) : 0;
+  }
+
+  function paint(workflow = {}) {
+    const completed = completedCount(workflow);
     els.reportId.textContent = reportId || 'Not started';
-    els.currentStage.textContent = workflow.current_stage ? label(workflow.current_stage) : (workflow.status || 'Not started');
-    els.completedStages.textContent = Math.min(completed,4) + ' / 4';
-    els.bar.style.width = ((Math.min(completed,4) / 4) * 100) + '%';
+    els.currentStage.textContent = workflow.current_stage ? label(workflow.current_stage) : label(workflow.status || 'Not started');
+    els.completedStages.textContent = completed + ' / 4';
+    els.bar.style.width = ((completed / 4) * 100) + '%';
     document.querySelectorAll('.stage').forEach((node, index) => {
-      node.classList.toggle('done', index < completed);
+      node.classList.toggle('done', index < completed || workflow.status === 'completed');
       node.classList.toggle('active', node.dataset.stage === workflow.current_stage && workflow.status !== 'completed');
     });
   }
@@ -99,51 +105,71 @@ function renderPersonalBlueprintPreviewPage() {
     return data;
   }
 
+  function setBusy(value) {
+    busy = value;
+    els.start.disabled = value;
+    els.resume.disabled = value;
+  }
+
   async function start() {
-    if (inFlight) return;
-    inFlight = true;
-    els.start.disabled = true;
+    if (busy) return;
+    setBusy(true);
     els.error.textContent = '';
+    els.status.classList.remove('success');
     els.status.textContent = 'Verifying source data and starting Stage 1';
     els.detail.textContent = 'Please keep this tab open. The workflow is resumable even if you close it.';
     try {
       const data = await jsonFetch('/api/reports/personal-life-blueprint-v2/diagnostic-start');
       reportId = data.report_id;
       localStorage.setItem(key, reportId);
+      els.start.hidden = true;
       els.clear.hidden = false;
-      paint(data.workflow, []);
-      await run();
+      paint(data.workflow || {});
     } catch (error) {
       els.status.textContent = 'Could not start the report';
       els.error.textContent = error.message;
-      els.start.disabled = false;
-    } finally { inFlight = false; }
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await drive();
   }
 
-  async function run() {
-    if (!reportId || inFlight) return;
-    inFlight = true;
-    els.start.disabled = true;
-    els.resume.disabled = true;
+  async function drive() {
+    if (!reportId || busy) return;
+    setBusy(true);
     els.resume.hidden = true;
     els.clear.hidden = false;
     els.error.textContent = '';
     try {
       while (true) {
-        const data = await jsonFetch('/api/reports/personal-life-blueprint-v2/' + encodeURIComponent(reportId) + '/advance');
-        paint(data.workflow || {}, data.stage_audit || []);
+        const url = '/api/reports/personal-life-blueprint-v2/' + encodeURIComponent(reportId) + '/advance';
+        const data = await jsonFetch(url);
+        paint(data.workflow || {});
+
         if (data.status === 'completed') {
           els.status.textContent = 'Full diagnostic report completed';
           els.status.classList.add('success');
           els.detail.textContent = 'All four stages passed and the final document was composed.';
           els.bar.style.width = '100%';
+          els.completedStages.textContent = '4 / 4';
           els.download.href = '/api/reports/personal-life-blueprint-v2/' + encodeURIComponent(reportId) + '/document.txt';
           els.download.hidden = false;
           els.result.hidden = false;
-          els.result.textContent = JSON.stringify({ workflow:data.workflow, document:data.document ? { character_count:data.document.character_count, section_count:data.document.section_count } : null }, null, 2);
+          els.result.textContent = JSON.stringify({
+            workflow: data.workflow,
+            document: data.document ? {
+              character_count: data.document.character_count,
+              section_count: data.document.section_count
+            } : null
+          }, null, 2);
           break;
         }
-        if (data.status === 'failed') throw new Error(data.failure?.message || data.workflow?.failure?.message || 'Generation failed');
+
+        if (data.status === 'failed') {
+          throw new Error(data.failure?.message || data.workflow?.failure?.message || 'Generation failed');
+        }
+
         const current = data.workflow?.current_stage ? label(data.workflow.current_stage) : 'next stage';
         els.status.textContent = 'Generating ' + current;
         els.detail.textContent = 'OpenAI status: ' + (data.workflow?.response_status || 'working') + '. This page will check again automatically.';
@@ -155,8 +181,7 @@ function renderPersonalBlueprintPreviewPage() {
       els.error.textContent = error.message;
       els.resume.hidden = false;
     } finally {
-      inFlight = false;
-      els.resume.disabled = false;
+      setBusy(false);
     }
   }
 
@@ -167,7 +192,7 @@ function renderPersonalBlueprintPreviewPage() {
   }
 
   els.start.addEventListener('click', start);
-  els.resume.addEventListener('click', run);
+  els.resume.addEventListener('click', drive);
   els.clear.addEventListener('click', clearRun);
 
   if (reportId) {

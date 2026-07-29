@@ -9,10 +9,62 @@ function resultSnapshot(result) {
     : { ok: false, error: String(result?.error || 'Source unavailable') };
 }
 
-function compactCharts(charts = {}) {
-  return Object.fromEntries(
-    Object.entries(charts).map(([chartId, result]) => [chartId, resultSnapshot(result)])
-  );
+function formatZodiacDegree(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '';
+  const normalised = ((numeric % 30) + 30) % 30;
+  let degrees = Math.floor(normalised);
+  let minutesFloat = (normalised - degrees) * 60;
+  let minutes = Math.floor(minutesFloat);
+  let seconds = Math.round((minutesFloat - minutes) * 60);
+  if (seconds === 60) {
+    seconds = 0;
+    minutes += 1;
+  }
+  if (minutes === 60) {
+    minutes = 0;
+    degrees += 1;
+  }
+  return `${String(degrees).padStart(2, '0')}°${String(minutes).padStart(2, '0')}′${String(seconds).padStart(2, '0')}″`;
+}
+
+function compactKpPlanets(result) {
+  if (!result?.ok) return resultSnapshot(result);
+  const rows = Array.isArray(result.data) ? result.data : [];
+  return {
+    ok: true,
+    data: rows.map(row => ({
+      planet_name: row.planet_name || row.name || '',
+      sign: row.sign || '',
+      house: row.house ?? null,
+      display_position: [row.sign, formatZodiacDegree(row.norm_degree ?? row.normDegree ?? row.degree)].filter(Boolean).join(' '),
+      norm_degree: row.norm_degree ?? row.normDegree ?? null,
+      is_retro: Boolean(row.is_retro ?? row.isRetro),
+      nakshatra: row.nakshatra || '',
+      nakshatra_lord: row.nakshatra_lord || row.nakshatraLord || '',
+      sub_lord: row.sub_lord || '',
+      sub_sub_lord: row.sub_sub_lord || ''
+    }))
+  };
+}
+
+function compactKpCusps(result) {
+  if (!result?.ok) return resultSnapshot(result);
+  const rows = Array.isArray(result.data) ? result.data : [];
+  return {
+    ok: true,
+    data: rows.map(row => ({
+      house_id: row.house_id ?? null,
+      sign: row.sign || '',
+      display_position: [row.sign, formatZodiacDegree(row.cusp_full_degree)].filter(Boolean).join(' '),
+      cusp_full_degree: row.cusp_full_degree ?? null,
+      sign_lord: row.sign_lord || '',
+      nakshatra: row.nakshatra || '',
+      nakshatra_lord: row.nakshatra_lord || '',
+      sub_lord: row.sub_lord || '',
+      sub_sub_lord: row.sub_sub_lord || ''
+    }))
+  };
 }
 
 function buildSourceContext({ input, bundle, deterministicNumerology, verification, dominantPlanets, doubleConfirmationResult, reportDate }) {
@@ -30,19 +82,22 @@ function buildSourceContext({ input, bundle, deterministicNumerology, verificati
     },
     source_generated_at: bundle.generated_at,
     provider_mode: bundle.mode,
+    source_policy: {
+      system: 'Nadi-KP event-oriented astrology',
+      authoritative_house_source: 'KP planets, KP house cusps and KP significators',
+      rule: 'Use KP house and significator fields as authoritative. Do not compare regular Vedic house placement with KP house placement as though it were a chart contradiction.'
+    },
     verification,
     deterministic_numerology: deterministicNumerology,
     dominant_planet_scoring: dominantPlanets,
     double_confirmation: doubleConfirmationResult,
     astrology: {
-      planets: resultSnapshot(bundle.planets),
-      kp_planets: resultSnapshot(bundle.kp_planets),
-      kp_house_cusps: resultSnapshot(bundle.kp_house_cusps),
+      kp_planets: compactKpPlanets(bundle.kp_planets),
+      kp_house_cusps: compactKpCusps(bundle.kp_house_cusps),
       kp_planet_significators: resultSnapshot(bundle.kp_planet_significators),
       kp_house_significators: resultSnapshot(bundle.kp_house_significators),
       current_vdasha: resultSnapshot(bundle.current_vdasha),
-      current_vdasha_all: resultSnapshot(bundle.current_vdasha_all),
-      charts: compactCharts(bundle.charts)
+      current_vdasha_all: resultSnapshot(bundle.current_vdasha_all)
     },
     numerology_cross_check: {
       numerological_numbers: resultSnapshot(bundle.numerological_numbers),
@@ -50,7 +105,7 @@ function buildSourceContext({ input, bundle, deterministicNumerology, verificati
     },
     transit: {
       available: false,
-      note: 'A verified current-residence transit source is not yet connected. Transit confirmation and exact date-level timing are not claimed.'
+      note: 'A verified current-residence transit source and client-approved KP transit-confirmation rule are not yet connected. Exact date-level timing is not claimed.'
     }
   };
 }
@@ -91,6 +146,9 @@ async function preparePersonalLifeBlueprintSource(input, { includePdfs = false, 
 
 module.exports = {
   buildSourceContext,
+  compactKpCusps,
+  compactKpPlanets,
+  formatZodiacDegree,
   preparePersonalLifeBlueprintSource,
   resultSnapshot
 };

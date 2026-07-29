@@ -30,8 +30,45 @@ function callout(title, body) {
   return `> **${text(title)}**\n>\n${content}`;
 }
 
+function isGlobalTransitGap(value) {
+  return /verified current-residence transit|transit confirmation|exact date-level timing/i.test(text(value));
+}
+
+function uniqueItems(items) {
+  return [...new Set((Array.isArray(items) ? items : []).map(item => text(item)).filter(Boolean))];
+}
+
+function sectionDataGaps(items) {
+  return uniqueItems(items).filter(item => !isGlobalTransitGap(item));
+}
+
+function formatDateValue(value) {
+  const raw = text(value);
+  if (!raw) return '';
+
+  const apiMatch = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (apiMatch) {
+    const [, day, month, year, hour, minute] = apiMatch;
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour || 0), Number(minute || 0)));
+    const datePart = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date);
+    return hour === undefined ? datePart : `${datePart}, ${String(hour).padStart(2, '0')}:${minute}`;
+  }
+
+  const iso = new Date(raw);
+  if (!Number.isNaN(iso.getTime()) && /^\d{4}-\d{2}-\d{2}T/.test(raw)) {
+    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(iso);
+  }
+
+  return raw;
+}
+
+function humaniseEmbeddedDates(value) {
+  return text(value).replace(/\b(\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2})\b/g, match => formatDateValue(match));
+}
+
 function lifeArea(title, area, extras = []) {
   const section = area || {};
+  const gaps = sectionDataGaps(section.data_gaps);
   const blocks = [
     `## ${title}`,
     section.subtitle ? `*${text(section.subtitle)}*` : '',
@@ -45,8 +82,7 @@ function lifeArea(title, area, extras = []) {
     callout('Example: what this looks like in real life', section.example),
     '### What to actually do',
     lines(section.actions),
-    section.data_gaps?.length ? `### Data required\n${lines(section.data_gaps)}` : '',
-    section.technical_basis?.length ? `### Technical basis\n${lines(section.technical_basis)}` : '',
+    gaps.length ? `### Data required\n${lines(gaps)}` : '',
     ...extras.filter(Boolean)
   ];
   return blocks.filter(Boolean).join('\n\n');
@@ -76,8 +112,8 @@ function composePersonalLifeBlueprint(stages = {}) {
   const chapterRows = (currentPeriod.chapter_table || []).map(item => [
     item.level,
     item.planet,
-    item.start,
-    item.end,
+    formatDateValue(item.start),
+    formatDateValue(item.end),
     item.instruction,
     item.confidence
   ]);
@@ -115,14 +151,15 @@ function composePersonalLifeBlueprint(stages = {}) {
     item.limitation
   ]);
   const limitations = stage4.limitations || {};
+  const globalDataRequired = uniqueItems(verification.data_required);
 
   const sections = [
     `# ${text(cover.report_title) || 'Personal Life Blueprint'}`,
-    `**${text(cover.client_name)}**\n\n${text(cover.birth_data_line)}\n\nReport date: ${text(cover.report_date)}\n\n${text(cover.methodology_line)}`,
+    `**${text(cover.client_name)}**\n\n${text(cover.birth_data_line)}\n\nReport date: ${formatDateValue(cover.report_date)}\n\n${text(cover.methodology_line)}`,
     '## Chart verification',
-    `**Status: ${text(verification.status)}**\n\nAscendant: ${text(verification.ascendant_degree)}\n\nMoon nakshatra: ${text(verification.moon_nakshatra)}\n\nMoon nakshatra lord: ${text(verification.moon_nakshatra_lord)}\n\nCurrent Mahadasha: ${text(verification.current_mahadasha)}\n\nCurrent Antardasha: ${text(verification.current_antardasha)}\n\nCurrent Pratyantar: ${text(verification.current_pratyantar)}\n\nCurrent Sookshma: ${text(verification.current_sookshma)}\n\nCurrent Prana: ${text(verification.current_prana)}`,
-    verification.discrepancies?.length ? `### Discrepancies\n${lines(verification.discrepancies)}` : '',
-    verification.data_required?.length ? `### Data required\n${lines(verification.data_required)}` : '',
+    `**Status: ${text(verification.status)}**\n\nAscendant: ${text(verification.ascendant_degree)}\n\nMoon nakshatra: ${text(verification.moon_nakshatra)}\n\nMoon nakshatra lord: ${text(verification.moon_nakshatra_lord)}\n\nCurrent Mahadasha: ${humaniseEmbeddedDates(verification.current_mahadasha)}\n\nCurrent Antardasha: ${humaniseEmbeddedDates(verification.current_antardasha)}\n\nCurrent Pratyantar: ${humaniseEmbeddedDates(verification.current_pratyantar)}\n\nCurrent Sookshma: ${humaniseEmbeddedDates(verification.current_sookshma)}\n\nCurrent Prana: ${humaniseEmbeddedDates(verification.current_prana)}`,
+    verification.discrepancies?.length ? `### Discrepancies\n${lines(uniqueItems(verification.discrepancies))}` : '',
+    globalDataRequired.length ? `### Timing limitation\n${lines(globalDataRequired)}` : '',
     '## Before You Begin: How to Read This Report',
     text(howToRead.map_and_clock_explanation),
     text(howToRead.numerology_explanation),
@@ -137,7 +174,6 @@ function composePersonalLifeBlueprint(stages = {}) {
     markdownTable(['Level', 'Planet', 'Start', 'End', 'Instruction', 'Confidence'], chapterRows),
     text(currentPeriod.current_sub_period_summary),
     callout('What this period instructs', currentPeriod.practical_instruction),
-    currentPeriod.data_gaps?.length ? `### Data required\n${lines(currentPeriod.data_gaps)}` : '',
     lifeArea('1. Personal Nature', stage2.personal_nature, [
       stage2.personal_nature_weaknesses?.length ? `### Weaknesses to work with honestly\n${lines(stage2.personal_nature_weaknesses)}` : ''
     ]),
@@ -159,7 +195,8 @@ function composePersonalLifeBlueprint(stages = {}) {
     text(stage4.closing)
   ];
 
-  const markdown = sections.filter(Boolean).join('\n\n').trim();
+  const includedSections = sections.filter(Boolean);
+  const markdown = includedSections.join('\n\n').trim();
   const plainText = markdown
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^>\s?/gm, '')
@@ -175,6 +212,9 @@ function composePersonalLifeBlueprint(stages = {}) {
     markdown,
     plain_text: plainText,
     character_count: plainText.length,
+    word_count: plainText.split(/\s+/).filter(Boolean).length,
+    section_count: includedSections.length,
+    technical_audit_retained_in_structured_data: true,
     generated_at: new Date().toISOString()
   };
 }
@@ -182,9 +222,14 @@ function composePersonalLifeBlueprint(stages = {}) {
 module.exports = {
   callout,
   composePersonalLifeBlueprint,
+  formatDateValue,
+  humaniseEmbeddedDates,
+  isGlobalTransitGap,
   lifeArea,
   lines,
   markdownTable,
   paragraphs,
-  text
+  sectionDataGaps,
+  text,
+  uniqueItems
 };

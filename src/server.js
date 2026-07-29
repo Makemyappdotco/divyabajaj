@@ -11,6 +11,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
+const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
   getKpHouseCusps,
@@ -247,6 +248,7 @@ app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
   });
 });
 
+app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
 app.use('/api', adminAuth, routes);
 

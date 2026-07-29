@@ -1,6 +1,11 @@
 const express = require('express');
 const { preparePersonalLifeBlueprintSource } = require('./services/personalLifeBlueprintSource');
 const { generateStage } = require('./services/personalLifeBlueprintGenerator');
+const {
+  advancePersonalLifeBlueprint,
+  getPersonalLifeBlueprintStatus,
+  startPersonalLifeBlueprint
+} = require('./services/personalLifeBlueprintWorkflow');
 
 const router = express.Router();
 
@@ -31,8 +36,50 @@ function diagnosticInput() {
     timezone_id: 'Asia/Kolkata',
     country_code: 'IN',
     current_residence: 'Delhi, India',
-    question: 'Career and money direction'
+    question: 'Career and money direction',
+    source: 'personal_blueprint_diagnostic'
   };
+}
+
+function normaliseInput(body = {}) {
+  const pob = String(body.pob || body.place || '').trim();
+  return {
+    name: String(body.name || '').trim(),
+    phone: String(body.phone || '').trim(),
+    email: String(body.email || '').trim(),
+    gender: String(body.gender || '').trim().toLowerCase(),
+    dob: String(body.dob || '').trim(),
+    tob: String(body.tob || '').trim(),
+    birth_time_accuracy: String(body.birth_time_accuracy || '').trim(),
+    pob,
+    place: pob,
+    latitude: Number(body.latitude),
+    longitude: Number(body.longitude),
+    timezone: Number(body.timezone),
+    timezone_id: String(body.timezone_id || '').trim(),
+    country_code: String(body.country_code || '').trim().toUpperCase(),
+    current_residence: String(body.current_residence || '').trim(),
+    question: String(body.question || '').trim(),
+    source: String(body.source || 'personal_life_blueprint_v2_preview').trim()
+  };
+}
+
+function validateInput(input) {
+  const errors = {};
+  if (!/^[A-Za-zÀ-ž][A-Za-zÀ-ž .'’-]{1,79}$/.test(input.name)) errors.name = 'Enter a valid full name.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(input.email)) errors.email = 'Enter a valid email address.';
+  const phoneLength = input.phone.replace(/\D/g, '').length;
+  if (phoneLength < 10 || phoneLength > 15) errors.phone = 'Enter a valid WhatsApp number.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dob)) errors.dob = 'Date of birth must use YYYY-MM-DD.';
+  if (!/^\d{2}:\d{2}$/.test(input.tob)) errors.tob = 'Time of birth must use HH:MM.';
+  if (!['male', 'female'].includes(input.gender)) errors.gender = 'Select male or female.';
+  if (!['exact_record', 'family_confirmed', 'approximate'].includes(input.birth_time_accuracy)) errors.birth_time_accuracy = 'Select birth-time accuracy.';
+  if (!input.pob) errors.pob = 'Birth place is required.';
+  if (!Number.isFinite(input.latitude) || input.latitude < -90 || input.latitude > 90) errors.latitude = 'Latitude is invalid.';
+  if (!Number.isFinite(input.longitude) || input.longitude < -180 || input.longitude > 180) errors.longitude = 'Longitude is invalid.';
+  if (!Number.isFinite(input.timezone) || input.timezone < -14 || input.timezone > 14) errors.timezone = 'Timezone is invalid.';
+  if (input.question.length < 5) errors.question = 'Add the main concern in a few words.';
+  return errors;
 }
 
 function sourceSummary(source) {
@@ -112,5 +159,62 @@ router.get('/reports/personal-life-blueprint-v2/stage1-test', previewOnly, async
     });
   }
 });
+
+router.post('/reports/personal-life-blueprint-v2/start', previewOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  try {
+    const input = normaliseInput(req.body);
+    const errors = validateInput(input);
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ success: false, error: 'Please correct the submitted information.', fields: errors });
+    }
+    const started = await startPersonalLifeBlueprint(input, { reportDate: new Date() });
+    return res.status(202).json({
+      success: true,
+      test_mode: true,
+      ...started,
+      status_url: `/api/reports/personal-life-blueprint-v2/${started.report_id}/status`,
+      advance_url: `/api/reports/personal-life-blueprint-v2/${started.report_id}/advance`
+    });
+  } catch (error) {
+    console.error('[Personal Blueprint start error]', error);
+    return res.status(error.status || 500).json({
+      success: false,
+      error: error.message || 'Personal Life Blueprint could not be started',
+      verification: error.verification || null,
+      openai_request_id: error.openai_request_id || '',
+      client_request_id: error.client_request_id || ''
+    });
+  }
+});
+
+router.get('/reports/personal-life-blueprint-v2/:reportId/status', previewOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  try {
+    const status = await getPersonalLifeBlueprintStatus(String(req.params.reportId || ''));
+    return res.json({ success: true, ...status });
+  } catch (error) {
+    return res.status(error.status || 500).json({ success: false, error: error.message || 'Could not read report status' });
+  }
+});
+
+async function advanceHandler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  try {
+    const result = await advancePersonalLifeBlueprint(String(req.params.reportId || ''));
+    return res.json({ success: result.status !== 'failed', ...result });
+  } catch (error) {
+    console.error('[Personal Blueprint advance error]', error);
+    return res.status(error.status || 500).json({
+      success: false,
+      error: error.message || 'Could not advance report generation',
+      openai_request_id: error.openai_request_id || '',
+      client_request_id: error.client_request_id || ''
+    });
+  }
+}
+
+router.post('/reports/personal-life-blueprint-v2/:reportId/advance', previewOnly, advanceHandler);
+router.get('/reports/personal-life-blueprint-v2/:reportId/advance', previewOnly, advanceHandler);
 
 module.exports = router;

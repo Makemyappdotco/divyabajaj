@@ -58,7 +58,11 @@ function compareCurrentDasha(currentData, allData, reportDate) {
     const selected = selectedPeriodFromAll(allData, level, reportDate);
     const directPlanet = String(direct?.planet || '').trim();
     const selectedPlanet = String(selected?.planet || '').trim();
-    const agrees = Boolean(directPlanet && selectedPlanet && directPlanet === selectedPlanet);
+    const agrees = Boolean(
+      directPlanet &&
+      selectedPlanet &&
+      normalisePlanetName(directPlanet) === normalisePlanetName(selectedPlanet)
+    );
 
     comparisons[level] = {
       direct_planet: directPlanet || null,
@@ -103,26 +107,56 @@ function findNestedNumber(source, candidateKeys) {
 function compareNumerology(deterministic, bundle) {
   const indian = okData(bundle?.numero_table) || {};
   const western = okData(bundle?.numerological_numbers) || {};
+
   const apiValues = {
-    psychic_number: findNestedNumber(indian, ['radical_number', 'radical_num', 'psychic_number', 'driver_number']),
-    destiny_number: findNestedNumber(indian, ['destiny_number', 'conductor_number']) ?? findNestedNumber(western, ['lifepath_number', 'life_path_number']),
-    name_number: findNestedNumber(indian, ['name_number']) ?? findNestedNumber(western, ['expression_number'])
+    psychic_number: {
+      value: findNestedNumber(indian, ['radical_number', 'radical_num', 'psychic_number', 'driver_number']),
+      method: 'Indian radical number'
+    },
+    destiny_number: {
+      value: findNestedNumber(indian, ['destiny_number', 'conductor_number']) ?? findNestedNumber(western, ['lifepath_number', 'life_path_number']),
+      method: 'Digit-sum destiny/life-path number'
+    },
+    name_number: {
+      value: findNestedNumber(western, ['expression_number']),
+      method: 'Pythagorean expression number'
+    }
   };
 
+  const indianNameNumber = findNestedNumber(indian, ['name_number']);
   const comparison = {};
   const discrepancies = [];
+  const observations = [];
+
   ['psychic_number', 'destiny_number', 'name_number'].forEach(key => {
     const backend = numberValue(deterministic?.[key]);
-    const api = apiValues[key];
+    const api = apiValues[key].value;
     const comparable = backend !== null && api !== null;
     const agrees = comparable ? backend === api : null;
-    comparison[key] = { backend, astrologyapi: api, comparable, agrees };
+    comparison[key] = {
+      backend,
+      astrologyapi: api,
+      astrologyapi_method: apiValues[key].method,
+      comparable,
+      agrees
+    };
     if (comparable && !agrees) {
-      discrepancies.push(`NUMEROLOGY VERIFICATION REQUIRED: backend ${key} is ${backend}, while AstrologyAPI returns ${api}.`);
+      discrepancies.push(`NUMEROLOGY VERIFICATION REQUIRED: backend ${key} is ${backend}, while the compatible AstrologyAPI ${apiValues[key].method} returns ${api}.`);
     }
   });
 
-  return { comparison, discrepancies };
+  if (indianNameNumber !== null) {
+    comparison.indian_name_number_reference = {
+      astrologyapi: indianNameNumber,
+      method: 'Indian numerology name number',
+      used_for_client_formula_check: false
+    };
+    if (numberValue(deterministic?.name_number) !== indianNameNumber) {
+      observations.push(`AstrologyAPI Indian name number is ${indianNameNumber}; it is not used as a blocker because the client specified the Pythagorean name-number formula.`);
+    }
+  }
+
+  return { comparison, discrepancies, observations };
 }
 
 function verifySourceBundle(bundle, deterministicNumerology, { reportDate = new Date() } = {}) {
@@ -193,6 +227,7 @@ function verifySourceBundle(bundle, deterministicNumerology, { reportDate = new 
 
   const numerologyVerification = compareNumerology(deterministicNumerology, bundle);
   blockingIssues.push(...numerologyVerification.discrepancies);
+  warnings.push(...numerologyVerification.observations);
 
   const facts = {
     report_date: date.toISOString(),

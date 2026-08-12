@@ -15,8 +15,12 @@ const { doubleConfirmation, scoreDominantPlanets } = require('./dominantPlanetSc
 const { verifySourceBundle } = require('./reportVerification');
 const { createStructuredResponse, getResponse } = require('./openAiResponses');
 
-const CONTRACT_VERSION = 'client-master-blueprint-live-v2-background';
+const CONTRACT_VERSION = 'client-master-blueprint-live-v3-guarded';
 const CONFIDENCE = ['Very High', 'High', 'Medium', 'Not claimed'];
+const HEALTH_SAFETY_LINE = 'This section is not medical advice. Use this as a prompt to book the check-up, never as a reason to skip one.';
+const CHILDREN_MEDICAL_LINE = 'This report does not state whether you will or will not have children and does not comment on fertility. Conception and pregnancy questions belong to qualified medical professionals.';
+const PAST_LIFE_DISCLAIMER = 'This section is symbolic only. It describes repeating tendencies and learning patterns, not factual events from a historical past life.';
+const GEMSTONE_LIMITATION = 'No gemstone is recommended in this report. Gemstones require a separate individual planetary-strength assessment because strengthening a planet without checking its complete role can be inappropriate. Any gemstone assessment must therefore be handled separately and individually.';
 
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
@@ -53,20 +57,38 @@ function lifeAreaSchema() {
 const ROOT_PROPERTIES = {
   chart_verification: obj({
     status: { type: 'string', enum: ['verified', 'verification_required'] },
-    ascendant: str(), moon_nakshatra: str(), moon_nakshatra_lord: str(),
-    current_mahadasha: str(), current_antardasha: str(), current_pratyantar: str(),
-    current_sookshma: str(), current_prana: str(), discrepancies: strArray(), timing_limitation: str()
+    ascendant: str(),
+    moon_nakshatra: str(),
+    moon_nakshatra_lord: str(),
+    current_mahadasha: str(),
+    current_antardasha: str(),
+    current_pratyantar: str(),
+    current_sookshma: str(),
+    current_prana: str(),
+    discrepancies: strArray(),
+    timing_limitation: str()
   }),
-  cover: obj({ report_title: str(), client_name: str(), birth_details: str(), report_date: str(), methodology: str() }),
+  cover: obj({
+    report_title: str(),
+    client_name: str(),
+    birth_details: str(),
+    report_date: str(),
+    methodology: str()
+  }),
   before_you_begin: obj({
-    map_and_clock: str(), numerology_role: str(), honest_confidence_promise: str(),
-    no_fear_promise: str(), professional_advice_limit: str()
+    map_and_clock: str(),
+    numerology_role: str(),
+    honest_confidence_promise: str(),
+    no_fear_promise: str(),
+    professional_advice_limit: str()
   }),
   numbers_at_a_glance: {
     type: 'array', minItems: 4, maxItems: 4,
     items: obj({
       label: { type: 'string', enum: ['Psychic Number', 'Destiny Number', 'Name Number', 'Personal Year'] },
-      number: { type: 'integer', minimum: 1, maximum: 9 }, planet: str(), meaning: str()
+      number: { type: 'integer', minimum: 1, maximum: 9 },
+      planet: str(),
+      meaning: str()
     })
   },
   big_picture: obj({
@@ -77,7 +99,10 @@ const ROOT_PROPERTIES = {
     double_confirmation: obj({
       score: { type: 'integer', minimum: 0, maximum: 3 },
       label: { type: 'string', enum: ['Triple Confirmation', 'Strong Agreement', 'Partial Agreement', 'Divergent Design'] },
-      matched_planets: strArray(), outlier_planets: strArray(), explanation: str(), central_instruction: str()
+      matched_planets: strArray(),
+      outlier_planets: strArray(),
+      explanation: str(),
+      central_instruction: str()
     })
   }),
   current_period: obj({
@@ -88,14 +113,25 @@ const ROOT_PROPERTIES = {
         planet: str(), start: str(), end: str(), instruction: str(), confidence: confidence()
       })
     },
-    summary: str(), practical_instruction: str()
+    summary: str(),
+    practical_instruction: str()
   }),
-  personal_nature: obj({ area: lifeAreaSchema(), weaknesses: strArray('At least two specific genuine weaknesses.', 2, 4) }),
+  personal_nature: obj({
+    area: lifeAreaSchema(),
+    weaknesses: strArray('At least two specific genuine weaknesses.', 2, 4)
+  }),
   past_life_karma: obj({ area: lifeAreaSchema(), symbolic_disclaimer: str() }),
   finances: obj({
-    area: lifeAreaSchema(), earning_2_10_11: str(), accumulation_2_11: str(), drains_6_8_12: str(), dominant_financial_pattern: str()
+    area: lifeAreaSchema(),
+    earning_2_10_11: str(),
+    accumulation_2_11: str(),
+    drains_6_8_12: str(),
+    dominant_financial_pattern: str()
   }),
-  marriage: obj({ area: lifeAreaSchema(), event_distinctions: obj({ finalisation: str(), engagement: str(), marriage: str() }) }),
+  marriage: obj({
+    area: lifeAreaSchema(),
+    event_distinctions: obj({ finalisation: str(), engagement: str(), marriage: str() })
+  }),
   health: obj({ area: lifeAreaSchema(), loaded_6_8_12_check: str(), safety_line: str() }),
   children: obj({ area: lifeAreaSchema(), obstruction_1_4_10_check: str(), medical_line: str() }),
   property: obj({ area: lifeAreaSchema(), leading_planet_buying_style: str() }),
@@ -103,8 +139,11 @@ const ROOT_PROPERTIES = {
     items: {
       type: 'array', minItems: 4, maxItems: 6,
       items: obj({
-        priority: { type: 'integer', minimum: 1, maximum: 6 }, planet_or_pattern: str(),
-        specific_issue: str(), what_to_do: str(), how_often: str()
+        priority: { type: 'integer', minimum: 1, maximum: 6 },
+        planet_or_pattern: str(),
+        specific_issue: str(),
+        what_to_do: str(),
+        how_often: str()
       })
     },
     one_thing: str()
@@ -114,8 +153,11 @@ const ROOT_PROPERTIES = {
     items: obj({ finding: str(), confidence: confidence(), basis: str(), limitation: str() })
   },
   closing: obj({
-    finer_timing_precision: str(), next_mahadasha_change: str(), gemstones_and_individual_prescriptions: str(),
-    final_highest_leverage_action: str(), closing_note: str()
+    finer_timing_precision: str(),
+    next_mahadasha_change: str(),
+    gemstones_and_individual_prescriptions: str(),
+    final_highest_leverage_action: str(),
+    closing_note: str()
   })
 };
 
@@ -142,7 +184,7 @@ function responseFormatFor(stage) {
   stage.keys.forEach(key => { properties[key] = ROOT_PROPERTIES[key]; });
   return {
     type: 'json_schema',
-    name: `divya_blueprint_${stage.id}_v2`,
+    name: `divya_blueprint_${stage.id}_v3`,
     strict: true,
     schema: obj(properties)
   };
@@ -179,7 +221,9 @@ async function buildLeanSourceBundle(input) {
     current_vdasha_all: settledResult(jobs[i++]),
     numerological_numbers: settledResult(jobs[i++]),
     numero_table: settledResult(jobs[i++]),
-    charts: {}, chart_images: {}, pdfs: {}
+    charts: {},
+    chart_images: {},
+    pdfs: {}
   };
 }
 
@@ -189,11 +233,17 @@ function compactResult(result) {
 
 function compactKpPlanet(row = {}) {
   return {
-    planet_name: row.planet_name || row.name || '', sign: row.sign || '', house: row.house ?? null,
-    degree: row.degree ?? null, norm_degree: row.norm_degree ?? row.normDegree ?? null,
-    formatted_degree: row.formatted_degree || '', sign_lord: row.sign_lord || '',
-    nakshatra: row.nakshatra || '', nakshatra_lord: row.nakshatra_lord || row.nakshatraLord || '',
-    sub_lord: row.sub_lord || '', sub_sub_lord: row.sub_sub_lord || ''
+    planet_name: row.planet_name || row.name || '',
+    sign: row.sign || '',
+    house: row.house ?? null,
+    degree: row.degree ?? null,
+    norm_degree: row.norm_degree ?? row.normDegree ?? null,
+    formatted_degree: row.formatted_degree || '',
+    sign_lord: row.sign_lord || '',
+    nakshatra: row.nakshatra || '',
+    nakshatra_lord: row.nakshatra_lord || row.nakshatraLord || '',
+    sub_lord: row.sub_lord || '',
+    sub_sub_lord: row.sub_sub_lord || ''
   };
 }
 
@@ -267,7 +317,13 @@ Children must never state whether the client will or will not have children and 
 Past-life material is symbolic only. No death, criminal, violence or scandal prediction. No gemstone recommendation, paid ritual or product. This report does not replace medical, legal, financial or psychological advice.
 
 REMEDIES AND CLOSING
-Give 4 to 6 priority remedies only, each tied to a problem already established, with planet/pattern, issue, exact action and frequency. Include 'If you do only one thing from this report'. Closing must honestly explain finer timing limits, next verified Mahadasha transition, and why gemstone/individual prescriptions require separate assessment. Consultation must arise naturally from real limits, never fear or scarcity.`;
+Give 4 to 6 priority remedies only, each tied to a problem already established, with planet/pattern, issue, exact action and frequency. Include 'If you do only one thing from this report'. Do not include gemstones among remedies. Closing must honestly explain finer timing limits, next verified Mahadasha transition, and why gemstone assessment requires separate individual evaluation. Do not tell the client to wear, use, buy or choose any gemstone.
+
+CONFIDENCE AUDIT
+The confidence audit must include at least one row with confidence exactly 'Not claimed'. That row must cover exact external event dates because verified current-residence transit confirmation is unavailable.
+
+LENGTH
+The three parallel stages together must carry the substance of a 20 to 28 A4-page report. Never pad. Every paragraph must add a conclusion, evidence, example, limitation or action.`;
 }
 
 function stagePrompt(input, source, stage) {
@@ -321,12 +377,18 @@ function paragraphs(items) {
 function areaText(number, name, wrapper, extras = []) {
   const area = wrapper?.area || wrapper || {};
   return [
-    `${number}. ${name}`, area.subtitle || '', area.intro || '',
-    'What your birth chart says', paragraphs(area.chart_reading),
+    `${number}. ${name}`,
+    area.subtitle || '',
+    area.intro || '',
+    'What your birth chart says',
+    paragraphs(area.chart_reading),
     area.planet_roles?.length ? `How the relevant planets behave here\n${lines(area.planet_roles)}` : '',
     ...extras.filter(Boolean),
-    'What your numbers say', paragraphs(area.numerology_reading),
-    'Where the two agree', area.synthesis || '', `Confidence: ${area.confidence || 'Not claimed'}`,
+    'What your numbers say',
+    paragraphs(area.numerology_reading),
+    'Where the two agree',
+    area.synthesis || '',
+    `Confidence: ${area.confidence || 'Not claimed'}`,
     area.double_confirmation_callout
       ? `DOUBLE CONFIRMATION / REAL TENSION\n${area.double_confirmation_callout.title}\n${area.double_confirmation_callout.explanation}`
       : '',
@@ -376,6 +438,20 @@ function expectedDashaPlanet(verification, level) {
   return verification?.verified_facts?.dasha?.[level]?.direct_planet || verification?.verified_facts?.dasha?.[level]?.date_selected_planet || '';
 }
 
+function ensureNotClaimedAudit(report) {
+  const row = {
+    finding: 'Exact external event dates for career outcomes, marriage, engagement, health events, children-related outcomes and property completion',
+    confidence: 'Not claimed',
+    basis: 'Verified chart promise and Dasha activation are available, but verified current-residence transit confirmation is not connected.',
+    limitation: 'The report can support strategic planning and period-level interpretation, but it cannot honestly claim transit-confirmed exact external dates.'
+  };
+  if (!Array.isArray(report.confidence_audit)) report.confidence_audit = [];
+  if (!report.confidence_audit.some(item => item?.confidence === 'Not claimed')) {
+    if (report.confidence_audit.length >= 9) report.confidence_audit[report.confidence_audit.length - 1] = row;
+    else report.confidence_audit.push(row);
+  }
+}
+
 function applyDeterministicFacts(report, state) {
   const deterministic = state.deterministic_numerology;
   const confirmation = state.double_confirmation;
@@ -383,16 +459,19 @@ function applyDeterministicFacts(report, state) {
   const verification = state.verification;
   const facts = verification?.verified_facts || {};
 
-  const numberMap = {
-    'Psychic Number': [deterministic.psychic_number, deterministic.number_planets.psychic],
-    'Destiny Number': [deterministic.destiny_number, deterministic.number_planets.destiny],
-    'Name Number': [deterministic.name_number, deterministic.number_planets.name],
-    'Personal Year': [deterministic.personal_year, deterministic.number_planets.personal_year]
-  };
-  report.numbers_at_a_glance = (report.numbers_at_a_glance || []).map(item => {
-    const expected = numberMap[item.label];
-    return expected ? { ...item, number: expected[0], planet: expected[1] } : item;
-  });
+  const generatedNumbers = new Map((report.numbers_at_a_glance || []).map(item => [item.label, item]));
+  const numberRows = [
+    ['Psychic Number', deterministic.psychic_number, deterministic.number_planets.psychic],
+    ['Destiny Number', deterministic.destiny_number, deterministic.number_planets.destiny],
+    ['Name Number', deterministic.name_number, deterministic.number_planets.name],
+    ['Personal Year', deterministic.personal_year, deterministic.number_planets.personal_year]
+  ];
+  report.numbers_at_a_glance = numberRows.map(([label, number, planet]) => ({
+    label,
+    number,
+    planet,
+    meaning: generatedNumbers.get(label)?.meaning || `This number is ruled by ${planet} and is interpreted together with the verified KP chart.`
+  }));
 
   if (report.big_picture) {
     report.big_picture.dominant_planets = (dominant?.dominant_planets || []).map(item => ({
@@ -424,7 +503,11 @@ function applyDeterministicFacts(report, state) {
   }
 
   const levelMap = {
-    Mahadasha: 'major', Antardasha: 'minor', Pratyantar: 'sub_minor', Sookshma: 'sub_sub_minor', Prana: 'sub_sub_sub_minor'
+    Mahadasha: 'major',
+    Antardasha: 'minor',
+    Pratyantar: 'sub_minor',
+    Sookshma: 'sub_sub_minor',
+    Prana: 'sub_sub_sub_minor'
   };
   if (Array.isArray(report.current_period?.periods)) {
     report.current_period.periods = report.current_period.periods.map(period => {
@@ -438,11 +521,28 @@ function applyDeterministicFacts(report, state) {
       };
     });
   }
+
   if (report.cover) {
     report.cover.client_name = state.input.name;
     report.cover.report_date = String(state.report_date || '').slice(0, 10);
   }
+
+  if (report.past_life_karma) report.past_life_karma.symbolic_disclaimer = PAST_LIFE_DISCLAIMER;
+  if (report.health) report.health.safety_line = HEALTH_SAFETY_LINE;
+  if (report.children) report.children.medical_line = CHILDREN_MEDICAL_LINE;
+  if (!report.closing) report.closing = {};
+  report.closing.gemstones_and_individual_prescriptions = GEMSTONE_LIMITATION;
+  ensureNotClaimedAudit(report);
   return report;
+}
+
+function affirmativeGemstoneRecommendation(reportText) {
+  const gemstone = /\b(gemstone|ruby|emerald|sapphire|diamond|pearl|coral)\b/i;
+  const action = /\b(recommend|recommended|wear|use|choose|buy|purchase|keep|prescribe|prescribed)\b/i;
+  const negation = /\b(no|not|never|do not|don't|does not|cannot|can't|without|avoid)\b/i;
+  return String(reportText || '')
+    .split(/(?<=[.!?])\s+/)
+    .some(sentence => gemstone.test(sentence) && action.test(sentence) && !negation.test(sentence));
 }
 
 function assertQa(report, reportText, state) {
@@ -466,15 +566,19 @@ function assertQa(report, reportText, state) {
   if ((report.remedies?.items || []).length < 4 || (report.remedies?.items || []).length > 6) failures.push('Remedy count must be 4 to 6');
   if (!(report.confidence_audit || []).some(item => item.confidence === 'Not claimed')) failures.push('Confidence audit needs at least one Not claimed row');
   if (report.big_picture?.double_confirmation?.score !== state.double_confirmation.score) failures.push('Double Confirmation score changed from deterministic calculation');
-  if (/recommend(?:ed|ing)?\s+(?:a\s+)?(?:gemstone|ruby|emerald|sapphire|diamond|pearl|coral)/i.test(reportText)) failures.push('Gemstone recommendation detected');
+  if (affirmativeGemstoneRecommendation(reportText)) failures.push('Gemstone recommendation detected');
   if (/guaranteed marriage|guaranteed money|you will have children|you will not have children/i.test(reportText)) failures.push('Unsupported guarantee detected');
   if (reportText.includes('—')) failures.push('Em dash detected');
+
+  const wordCount = reportText.split(/\s+/).filter(Boolean).length;
+  if (wordCount < 7000) failures.push(`Report depth is too short: ${wordCount} words`);
+
   if (failures.length) throw new Error(`Paid Full Blueprint failed client-master QA: ${failures.join(' | ')}`);
   return {
     passed: true,
-    checks: 14,
+    checks: 15,
     failures: [],
-    word_count: reportText.split(/\s+/).filter(Boolean).length
+    word_count: wordCount
   };
 }
 
@@ -499,7 +603,7 @@ async function startPaidReportV2(input) {
     model: getPaidModel(),
     prompt: stagePrompt(input, prepared.context, stage),
     responseFormat: responseFormatFor(stage),
-    maxOutputTokens: 7000,
+    maxOutputTokens: 8000,
     reasoningEffort: 'none',
     background: true,
     metadata: {

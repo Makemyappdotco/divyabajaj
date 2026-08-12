@@ -13,7 +13,6 @@ function getToken({ pdf = false } = {}) {
     if (!sandboxToken) throw new Error('ASTROLOGYAPI_PDF_SANDBOX_TOKEN is missing');
     return sandboxToken;
   }
-
   const token = process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN;
   if (!token) throw new Error('ASTROLOGYAPI_V2_ACCESS_TOKEN is missing');
   return token;
@@ -51,7 +50,6 @@ function normaliseBirthInput(input = {}) {
   const time = parseTime(input.tob);
   const place = String(input.place || input.pob || '').trim();
   if (!place) throw new Error('Place of birth is required');
-
   return {
     name: String(input.name || '').trim(),
     gender: normaliseGender(input.gender),
@@ -82,7 +80,6 @@ async function post(path, payload, { pdf = false, timeoutMs = 60000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const baseUrl = pdf ? PDF_BASE_URL : JSON_BASE_URL;
-
   try {
     const response = await fetch(`${baseUrl}/${path}`, {
       method: 'POST',
@@ -94,20 +91,14 @@ async function post(path, payload, { pdf = false, timeoutMs = 60000 } = {}) {
       },
       body: JSON.stringify(payload)
     });
-
     const raw = await response.text();
     let data;
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch (error) {
-      data = { raw };
-    }
-
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch (error) { data = { raw }; }
     if (!response.ok) {
       const message = data?.message || data?.error || data?.raw || `HTTP ${response.status}`;
       throw new Error(`AstrologyAPI ${path} failed: ${message}`);
     }
-
     return data;
   } catch (error) {
     if (error.name === 'AbortError') throw new Error(`AstrologyAPI ${path} timed out after ${timeoutMs} ms`);
@@ -127,44 +118,91 @@ function normaliseLocationText(value) {
     .replace(/\s+/g, ' ');
 }
 
+function locationQueryVariants(value) {
+  const query = String(value || '').trim();
+  const variants = new Set([query]);
+  const compact = query.replace(/\s+/g, '');
+  if (compact && compact !== query) variants.add(compact);
+  if (query.length >= 5) variants.add(query.slice(0, -1));
+  if (/nagar$/i.test(query) && !/\snagar$/i.test(query)) variants.add(query.replace(/nagar$/i, ' Nagar'));
+  if (/town$/i.test(query) && query.includes(' ')) variants.add(query.slice(0, -1));
+  return [...variants].filter(item => item.length >= 2).slice(0, 4);
+}
+
 function locationScore(location, query) {
   const name = normaliseLocationText(location.place_name);
+  const display = normaliseLocationText(location.display_name);
   const wanted = normaliseLocationText(query);
   let score = 0;
-
   if (name === wanted) score += 1000;
-  else if (name.startsWith(wanted)) score += 300;
+  else if (name.startsWith(wanted)) score += 500;
+  else if (display.includes(wanted)) score += 250;
   else if (name.includes(wanted)) score += 100;
-
-  // Divya's primary audience is India, but international birth locations remain available.
-  if (location.country_code === 'IN') score += 80;
-  if (location.timezone_id === 'Asia/Kolkata') score += 20;
-
   return score;
 }
 
-async function searchLocations(place, maxRows = 7) {
+function locationRegion(row) {
+  return String(
+    row.state_name || row.state || row.admin_name1 || row.admin1 || row.region || row.province || row.district || row.county || ''
+  ).trim();
+}
+
+function locationCountryName(row) {
+  return String(row.country_name || row.country || '').trim();
+}
+
+function mapLocation(row, query, index) {
+  const placeName = String(row.place_name || row.name || '').trim();
+  const latitude = Number(row.latitude ?? row.lat);
+  const longitude = Number(row.longitude ?? row.lon);
+  const region = locationRegion(row);
+  const countryCode = String(row.country_code || '').trim().toUpperCase();
+  const countryName = locationCountryName(row);
+  const contextParts = [region, countryName || countryCode].filter(Boolean);
+  const coordinateHint = Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? `${Math.abs(latitude).toFixed(2)}°${latitude >= 0 ? 'N' : 'S'}, ${Math.abs(longitude).toFixed(2)}°${longitude >= 0 ? 'E' : 'W'}`
+    : '';
+  return {
+    id: `${placeName || query}-${latitude}-${longitude}-${index}`,
+    place_name: placeName,
+    display_name: [placeName, ...contextParts].filter(Boolean).join(', '),
+    region,
+    country_name: countryName,
+    country_code: countryCode,
+    latitude,
+    longitude,
+    timezone_id: String(row.timezone_id || '').trim(),
+    context: contextParts.length ? contextParts.join(' · ') : [countryCode, coordinateHint].filter(Boolean).join(' · '),
+    coordinate_hint: coordinateHint
+  };
+}
+
+async function searchLocations(place, maxRows = 12) {
   const query = String(place || '').trim();
   if (query.length < 2) return [];
-
-  const requestedRows = Math.min(Math.max(Number(maxRows) || 7, 1), 10);
-  const result = await post('geo_details', { place: query, maxRows: '10' });
-  const rows = Array.isArray(result?.geonames) ? result.geonames : [];
-
-  return rows
-    .map((row, index) => ({
-      id: `${row.place_name || query}-${row.latitude}-${row.longitude}-${index}`,
-      place_name: String(row.place_name || '').trim(),
-      latitude: Number(row.latitude),
-      longitude: Number(row.longitude),
-      timezone_id: String(row.timezone_id || '').trim(),
-      country_code: String(row.country_code || '').trim().toUpperCase()
-    }))
-    .filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude))
+  const requestedRows = Math.min(Math.max(Number(maxRows) || 12, 1), 12);
+  const variants = locationQueryVariants(query);
+  const settled = await Promise.allSettled(
+    variants.map(variant => post('geo_details', { place: variant, maxRows: 25 }, { timeoutMs: 20000 }))
+  );
+  const merged = [];
+  settled.forEach(result => {
+    if (result.status !== 'fulfilled') return;
+    const rows = Array.isArray(result.value?.geonames) ? result.value.geonames : [];
+    merged.push(...rows);
+  });
+  const unique = new Map();
+  merged.forEach((row, index) => {
+    const mapped = mapLocation(row, query, index);
+    if (!mapped.place_name || !Number.isFinite(mapped.latitude) || !Number.isFinite(mapped.longitude)) return;
+    const key = `${mapped.latitude.toFixed(5)}:${mapped.longitude.toFixed(5)}`;
+    if (!unique.has(key)) unique.set(key, mapped);
+  });
+  return [...unique.values()]
     .sort((a, b) => {
-      const scoreDifference = locationScore(b, query) - locationScore(a, query);
-      if (scoreDifference) return scoreDifference;
-      return a.place_name.localeCompare(b.place_name);
+      const difference = locationScore(b, query) - locationScore(a, query);
+      if (difference) return difference;
+      return a.display_name.localeCompare(b.display_name);
     })
     .slice(0, requestedRows);
 }
@@ -205,74 +243,46 @@ async function generateProHoroscopePdf(input) {
   if (!result?.status || !result?.pdf_url) throw new Error('Professional Horoscope PDF response did not contain a PDF URL');
   return result;
 }
-
 async function generateProNumerologyPdf(input) {
   const result = await post('pro_numerology_report', buildPdfPayload(input), { pdf: true, timeoutMs: 120000 });
   if (!result?.status || !result?.pdf_url) throw new Error('Pro Numerology PDF response did not contain a PDF URL');
   return result;
 }
-
-async function getPlanets(input) {
-  return post('planets', birthPayload(input));
-}
-
-async function getCurrentVdasha(input) {
-  return post('current_vdasha', birthPayload(input));
-}
-
-async function getCurrentVdashaAll(input) {
-  return post('current_vdasha_all', birthPayload(input));
-}
-
+async function getPlanets(input) { return post('planets', birthPayload(input)); }
+async function getKpPlanets(input) { return post('kp_planets', birthPayload(input)); }
+async function getKpHouseCusps(input) { return post('kp_house_cusps', birthPayload(input)); }
+async function getKpPlanetSignificators(input) { return post('kp_planet_significator', birthPayload(input)); }
+async function getKpHouseSignificators(input) { return post('kp_house_significator', birthPayload(input)); }
+async function getCurrentVdasha(input) { return post('current_vdasha', birthPayload(input)); }
+async function getCurrentVdashaAll(input) { return post('current_vdasha_all', birthPayload(input)); }
 async function getChartData(input, chartId = 'D1') {
-  return post(`horo_chart/${encodeURIComponent(chartId)}`, {
-    ...birthPayload(input),
-    chartType: 'north',
-    image_type: 'png'
-  });
+  return post(`horo_chart/${encodeURIComponent(chartId)}`, { ...birthPayload(input), chartType: 'north', image_type: 'png' });
 }
-
 async function getChartImage(input, chartId = 'D1') {
   return post(`horo_chart_image/${encodeURIComponent(chartId)}`, {
-    ...birthPayload(input),
-    planetColor: '#171319',
-    signColor: '#8B6A2E',
-    lineColor: '#B8924F',
-    chartType: 'north',
-    image_type: 'svg'
+    ...birthPayload(input), planetColor: '#171319', signColor: '#8B6A2E', lineColor: '#B8924F', chartType: 'north', image_type: 'svg'
   });
 }
-
 async function getNumerologicalNumbers(input) {
   const { year, month, day } = parseDate(input.dob);
-  return post('numerological_numbers', {
-    date: day,
-    month,
-    year,
-    full_name: String(input.name || '').trim()
-  });
+  return post('numerological_numbers', { date: day, month, year, full_name: String(input.name || '').trim() });
 }
-
 async function getNumeroTable(input) {
   const { year, month, day } = parseDate(input.dob);
-  return post('numero_table', {
-    day,
-    month,
-    year,
-    name: String(input.name || '').trim()
-  });
+  return post('numero_table', { day, month, year, name: String(input.name || '').trim() });
 }
-
 function resultOf(settled) {
-  return settled.status === 'fulfilled'
-    ? { ok: true, data: settled.value }
-    : { ok: false, error: settled.reason?.message || 'Unknown AstrologyAPI error' };
+  return settled.status === 'fulfilled' ? { ok: true, data: settled.value } : { ok: false, error: settled.reason?.message || 'Unknown AstrologyAPI error' };
 }
 
 async function generateSourceBundle(input, { includePdfs = false } = {}) {
   const chartIds = ['D1', 'D9', 'D10'];
   const jobs = [
     getPlanets(input),
+    getKpPlanets(input),
+    getKpHouseCusps(input),
+    getKpPlanetSignificators(input),
+    getKpHouseSignificators(input),
     getCurrentVdasha(input),
     getCurrentVdashaAll(input),
     getNumerologicalNumbers(input),
@@ -280,15 +290,17 @@ async function generateSourceBundle(input, { includePdfs = false } = {}) {
     ...chartIds.map(id => getChartData(input, id)),
     ...chartIds.map(id => getChartImage(input, id))
   ];
-
   if (includePdfs) jobs.push(generateProHoroscopePdf(input), generateProNumerologyPdf(input));
-
   const settled = await Promise.allSettled(jobs);
   let index = 0;
   const bundle = {
     mode: getMode(),
     generated_at: new Date().toISOString(),
     planets: resultOf(settled[index++]),
+    kp_planets: resultOf(settled[index++]),
+    kp_house_cusps: resultOf(settled[index++]),
+    kp_planet_significators: resultOf(settled[index++]),
+    kp_house_significators: resultOf(settled[index++]),
     current_vdasha: resultOf(settled[index++]),
     current_vdasha_all: resultOf(settled[index++]),
     numerological_numbers: resultOf(settled[index++]),
@@ -297,15 +309,12 @@ async function generateSourceBundle(input, { includePdfs = false } = {}) {
     chart_images: {},
     pdfs: {}
   };
-
   chartIds.forEach(id => { bundle.charts[id] = resultOf(settled[index++]); });
   chartIds.forEach(id => { bundle.chart_images[id] = resultOf(settled[index++]); });
-
   if (includePdfs) {
     bundle.pdfs.pro_horoscope = resultOf(settled[index++]);
     bundle.pdfs.pro_numerology = resultOf(settled[index++]);
   }
-
   return bundle;
 }
 
@@ -319,6 +328,10 @@ module.exports = {
   getChartImage,
   getCurrentVdasha,
   getCurrentVdashaAll,
+  getKpHouseCusps,
+  getKpHouseSignificators,
+  getKpPlanetSignificators,
+  getKpPlanets,
   getMode,
   getNumeroTable,
   getNumerologicalNumbers,

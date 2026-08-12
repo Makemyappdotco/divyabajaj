@@ -1,18 +1,22 @@
-const PROMPT_VERSION = 'personal-life-blueprint-v2-draft-1';
-const REPORT_CONTRACT_VERSION = 'personal-life-blueprint-v2-draft-1';
+const PROMPT_VERSION = 'personal-life-blueprint-v2-client-master-1';
+const REPORT_CONTRACT_VERSION = 'personal-life-blueprint-v2-client-master-1';
 
 const CONFIDENCE_LEVELS = ['Very High', 'High', 'Medium', 'Not claimed'];
+const PLANET_ROLES = ['event-promoting', 'facilitator', 'obstructive', 'neutral'];
 
 function stringSchema(description = '') {
   return { type: 'string', description };
 }
 
-function stringArraySchema(description = '') {
-  return {
+function stringArraySchema(description = '', { minItems, maxItems } = {}) {
+  const schema = {
     type: 'array',
     description,
     items: { type: 'string' }
   };
+  if (Number.isInteger(minItems)) schema.minItems = minItems;
+  if (Number.isInteger(maxItems)) schema.maxItems = maxItems;
+  return schema;
 }
 
 function objectSchema(properties, required = Object.keys(properties), description = '') {
@@ -26,36 +30,65 @@ function objectSchema(properties, required = Object.keys(properties), descriptio
 }
 
 function confidenceSchema() {
-  return {
-    type: 'string',
-    enum: CONFIDENCE_LEVELS
-  };
-}
-
-function lifeAreaSchema() {
-  return objectSchema({
-    title: stringSchema(),
-    subtitle: stringSchema(),
-    intro: stringSchema(),
-    chart_reading: stringArraySchema('Three to five substantive paragraphs, each as a separate array item.'),
-    numerology_reading: stringArraySchema('Two to three substantive paragraphs, each as a separate array item.'),
-    synthesis: stringSchema(),
-    confidence: confidenceSchema(),
-    example: stringSchema('A concrete four-to-six-sentence real-life scenario.'),
-    actions: stringArraySchema('Three to five specific executable actions.'),
-    data_gaps: stringArraySchema('Exact DATA REQUIRED or CHART VERIFICATION REQUIRED statements. Empty when none.'),
-    technical_basis: stringArraySchema('Short traceable statements naming the exact houses, planets, lords, Dasha levels and verified source fields used.')
-  });
+  return { type: 'string', enum: CONFIDENCE_LEVELS };
 }
 
 function doubleConfirmationCalloutSchema() {
   return objectSchema({
-    title: stringSchema(),
-    finding: stringSchema(),
+    label: { type: 'string', enum: ['Triple Confirmation', 'Strong Agreement', 'Partial Agreement', 'Divergent Design', 'Double Confirmation', 'Real Tension'] },
+    finding: stringSchema('The exact overlap or disagreement between independently calculated numerology and the verified KP chart.'),
     chart_planets: stringArraySchema(),
     numerology_planets: stringArraySchema(),
+    why_it_matters: stringSchema(),
     action_priority: stringSchema(),
     confidence: confidenceSchema()
+  });
+}
+
+function planetRoleSchema() {
+  return objectSchema({
+    planet: stringSchema(),
+    role: { type: 'string', enum: PLANET_ROLES },
+    houses_or_factors: stringArraySchema('Only verified houses/factors used for this event.'),
+    plain_english_reason: stringSchema()
+  });
+}
+
+function kpLogicSchema() {
+  return objectSchema({
+    required_house_combination: stringSchema(),
+    promise: stringSchema('What the verified KP source supports before timing is considered.'),
+    dba_activation: stringSchema('How the current verified Dasha/Bhukti/Antara activates or does not activate the promise.'),
+    transit_confirmation: stringSchema('Verified transit confirmation or Not claimed when transit data is unavailable.'),
+    traceability: stringArraySchema('Concise source trace using houses, significators, Star Lord, Sub Lord, S.S. Lord and Dasha fields actually present.', { minItems: 1, maxItems: 5 })
+  });
+}
+
+function lifeAreaSchema(areaName) {
+  return objectSchema({
+    title: stringSchema(`Use the exact life-area title: ${areaName}.`),
+    subtitle: stringSchema('One italic-style line framing what this section will actually tell the client.'),
+    intro: stringSchema('Short plain-English explanation of what this life area is read from.'),
+    chart_reading: stringArraySchema('Exactly 3-5 substantive plain-English paragraphs for What your birth chart says.', { minItems: 3, maxItems: 5 }),
+    numerology_reading: stringArraySchema('Exactly 2-3 substantive paragraphs for What your numbers say, calculated independently of the chart.', { minItems: 2, maxItems: 3 }),
+    synthesis: stringSchema('Where the two agree, or where they genuinely disagree. Never force a match.'),
+    confidence: confidenceSchema(),
+    double_confirmation_callouts: {
+      type: 'array',
+      description: 'Inline Double Confirmation or genuine-tension callouts relevant to this life area. Empty only when there is no meaningful overlap or disagreement to flag.',
+      maxItems: 3,
+      items: doubleConfirmationCalloutSchema()
+    },
+    example: stringSchema('A concrete 4-6 sentence scenario the reader can recognise in real life.'),
+    actions: stringArraySchema('Exactly 3-5 specific executable actions the client could take this week.', { minItems: 3, maxItems: 5 }),
+    kp_logic: kpLogicSchema(),
+    planet_roles: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 8,
+      items: planetRoleSchema()
+    },
+    data_gaps: stringArraySchema('Exact DATA REQUIRED or CHART VERIFICATION REQUIRED statements. Empty when none.')
   });
 }
 
@@ -72,7 +105,8 @@ const stageSchemas = Object.freeze({
       current_sookshma: stringSchema(),
       current_prana: stringSchema(),
       discrepancies: stringArraySchema(),
-      data_required: stringArraySchema()
+      data_required: stringArraySchema(),
+      verification_note: stringSchema('Plain-English integrity note. Do not hide missing precision.')
     }),
     cover: objectSchema({
       report_title: stringSchema(),
@@ -82,12 +116,14 @@ const stageSchemas = Object.freeze({
       methodology_line: stringSchema()
     }),
     how_to_read: objectSchema({
-      map_and_clock_explanation: stringSchema(),
-      numerology_explanation: stringSchema(),
-      promises: stringArraySchema('Exactly three promises: honest confidence, no fear, and not a professional substitute.')
+      map_and_clock_explanation: stringSchema('Explain chart = map/promise, Dasha = clock/activation, transit = confirmation using a concrete analogy.'),
+      numerology_explanation: stringSchema('Explain what independently calculated numerology adds and why it is not used to force astrology agreement.'),
+      promises: stringArraySchema('Exactly three promises: honest confidence, no fear, and not a substitute for qualified professionals.', { minItems: 3, maxItems: 3 })
     }),
     numbers_at_a_glance: {
       type: 'array',
+      minItems: 4,
+      maxItems: 4,
       items: objectSchema({
         label: { type: 'string', enum: ['Psychic Number', 'Destiny Number', 'Name Number', 'Personal Year'] },
         number: { type: 'integer', minimum: 1, maximum: 9 },
@@ -97,11 +133,13 @@ const stageSchemas = Object.freeze({
     },
     dominant_planets: {
       type: 'array',
-      description: 'Two to four dominant planets. Use only the supplied deterministic scoring result.',
+      minItems: 2,
+      maxItems: 4,
+      description: 'Use only the supplied deterministic dominant-planet scoring result.',
       items: objectSchema({
         planet: stringSchema(),
         score: { type: 'number' },
-        reasons: stringArraySchema()
+        reasons: stringArraySchema('', { minItems: 1, maxItems: 6 })
       })
     },
     double_confirmation: objectSchema({
@@ -109,15 +147,19 @@ const stageSchemas = Object.freeze({
       label: { type: 'string', enum: ['Triple Confirmation', 'Strong Agreement', 'Partial Agreement', 'Divergent Design'] },
       matched_planets: stringArraySchema(),
       outlier_planets: stringArraySchema(),
-      explanation: stringSchema(),
+      explanation: stringSchema('Lead with the honest overlap. If there is disagreement, explain the tension instead of manufacturing agreement.'),
       callouts: {
         type: 'array',
+        minItems: 1,
+        maxItems: 4,
         items: doubleConfirmationCalloutSchema()
       }
     }),
     current_period: objectSchema({
       chapter_table: {
         type: 'array',
+        minItems: 3,
+        maxItems: 5,
         items: objectSchema({
           level: { type: 'string', enum: ['Mahadasha', 'Antardasha', 'Pratyantar', 'Sookshma', 'Prana'] },
           planet: stringSchema(),
@@ -134,34 +176,27 @@ const stageSchemas = Object.freeze({
   }),
 
   life_areas_one_to_three: objectSchema({
-    personal_nature: lifeAreaSchema(),
-    personal_nature_weaknesses: stringArraySchema('At least two specific genuine weaknesses.'),
-    past_life_karma: lifeAreaSchema(),
-    past_life_symbolic_disclaimer: stringSchema(),
-    finances: lifeAreaSchema(),
-    double_confirmation_callouts: {
-      type: 'array',
-      items: doubleConfirmationCalloutSchema()
-    }
+    personal_nature: lifeAreaSchema('Personal Nature'),
+    personal_nature_weaknesses: stringArraySchema('At least two specific genuine weaknesses. These must also be reflected naturally inside the Personal Nature chart reading.', { minItems: 2, maxItems: 5 }),
+    past_life_karma: lifeAreaSchema('Past Life Karma'),
+    past_life_symbolic_disclaimer: stringSchema('Must explicitly state that this section is symbolic and not a claim about historical fact.'),
+    finances: lifeAreaSchema('Finances')
   }),
 
   life_areas_four_to_seven: objectSchema({
-    marriage: lifeAreaSchema(),
+    marriage: lifeAreaSchema('Marriage'),
     marriage_event_distinctions: objectSchema({
       finalisation: stringSchema(),
       engagement: stringSchema(),
       marriage: stringSchema()
     }),
-    health: lifeAreaSchema(),
-    health_professional_line: stringSchema(),
-    children: lifeAreaSchema(),
-    children_medical_line: stringSchema(),
-    obstruction_pattern_status: stringSchema(),
-    property: lifeAreaSchema(),
-    double_confirmation_callouts: {
-      type: 'array',
-      items: doubleConfirmationCalloutSchema()
-    }
+    health: lifeAreaSchema('Health'),
+    health_professional_line: stringSchema('Must include exactly this sentence inside the response: use this as a prompt to book the check-up, never as a reason to skip one.'),
+    health_6812_loading: stringSchema('State whether ONE verified planet is loaded across all houses 6, 8 and 12. If none is, say so clearly without turning it into a health guarantee.'),
+    children: lifeAreaSchema('Children'),
+    children_medical_line: stringSchema('Must explicitly state that conception and pregnancy questions belong to doctors.'),
+    obstruction_pattern_status: stringSchema('Explicitly report whether the classical 1+4+10 obstruction pattern is present or absent in the verified data.'),
+    property: lifeAreaSchema('Property')
   }),
 
   remedies_audit_closing: objectSchema({
@@ -172,14 +207,15 @@ const stageSchemas = Object.freeze({
       items: objectSchema({
         priority: { type: 'integer', minimum: 1, maximum: 6 },
         planet_or_pattern: stringSchema(),
-        issue_addressed: stringSchema(),
-        action: stringSchema(),
+        issue_addressed: stringSchema('Must reference a pattern already established earlier in the report.'),
+        action: stringSchema('Behavioural, lifestyle, professional or free traditional practice only.'),
         frequency: stringSchema()
       })
     },
-    one_thing: stringSchema(),
+    one_thing: stringSchema('The single highest-leverage action for this specific client.'),
     confidence_audit: {
       type: 'array',
+      minItems: 4,
       items: objectSchema({
         finding: stringSchema(),
         confidence: confidenceSchema(),
@@ -188,11 +224,11 @@ const stageSchemas = Object.freeze({
       })
     },
     limitations: objectSchema({
-      finer_timing_precision: stringSchema(),
-      next_mahadasha_change: stringSchema(),
-      gemstones_and_individual_prescriptions: stringSchema()
+      finer_timing_precision: stringSchema('Frame as a genuine written-report limitation, not sales copy.'),
+      next_mahadasha_change: stringSchema('Name the verified date and explain why chapter transitions reward preparation over discovery.'),
+      gemstones_and_individual_prescriptions: stringSchema('State that gemstones require separate individual planetary-strength assessment. Do not recommend a gemstone.')
     }),
-    closing: stringSchema(),
+    closing: stringSchema('Quiet, useful conclusion. No hard sell, false urgency or repeated consultation CTA.'),
     final_self_check: objectSchema({
       all_technical_claims_traceable: { type: 'boolean' },
       no_invented_values: { type: 'boolean' },
@@ -200,75 +236,122 @@ const stageSchemas = Object.freeze({
       numerology_from_backend: { type: 'boolean' },
       double_confirmation_honest: { type: 'boolean' },
       all_seven_areas_present: { type: 'boolean' },
+      every_area_has_real_life_example: { type: 'boolean' },
+      personal_nature_has_two_weaknesses: { type: 'boolean' },
       health_safe: { type: 'boolean' },
       children_safe: { type: 'boolean' },
       no_gemstones: { type: 'boolean' },
       no_fear_language: { type: 'boolean' },
       at_least_one_not_claimed: { type: 'boolean' },
+      plain_english_for_zero_knowledge_reader: { type: 'boolean' },
       no_padding: { type: 'boolean' },
       failures: stringArraySchema()
     })
   })
 });
 
-const baseInstructions = `You are a senior predictive astrologer and premium report writer working for Divya Bajaj.
+const baseInstructions = `ROLE
+You are a senior predictive astrologer and premium report writer working for Divya Bajaj. You can execute the Nadi-KP event-oriented system with technical precision and explain it to a client with zero astrology or numerology knowledge without sounding like a textbook.
 
-This report uses Nadi-KP event-oriented logic plus independently calculated numerology. The reader has no technical astrology knowledge. Be direct, practical, respectful and easy to follow.
+This is a paid premium report. The client paid real money. They will notice padding, vagueness and flattery. Be genuinely useful, not impressive.
 
-ANTI-FABRICATION RULE
-This overrides every other instruction.
-Use only values explicitly present in VERIFIED_SOURCE_DATA and BACKEND_CALCULATIONS. Never infer, estimate, reconstruct or reasonably assume a degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp, Dasha date, transit position or numerology number.
-When a required value is unavailable, write exactly: DATA REQUIRED: [exact missing item] - this section cannot be completed accurately without it.
-When two verified sources disagree, write CHART VERIFICATION REQUIRED and state the exact discrepancy. Do not resolve it yourself.
-Never pad weak findings to hit a count or length.
+RULE 0 - ANTI-FABRICATION
+This overrides everything else.
+Use only values explicitly present in VERIFIED_SOURCE_DATA and BACKEND_CALCULATIONS. Never infer, estimate, reconstruct or reasonably assume planetary degrees, Star Lords, Sub Lords, S.S. Lords, cusp positions, Dasha dates, transit positions or numerology numbers.
+If a required value is missing, unreadable or ambiguous, write exactly: DATA REQUIRED: [exact item missing] - this section cannot be completed accurately without it.
+If verified chart data and Dasha data genuinely disagree, write CHART VERIFICATION REQUIRED and state the exact discrepancy. Do not resolve it yourself.
+Never invent Sookshma dates, give a specific month/date beyond the source precision, pad weak findings to hit a count, or make every finding positive.
+Before interpretation, verify Ascendant degree, Moon nakshatra and lord, and current Mahadasha/Antardasha/Pratyantar as of REPORT_DATE.
+
+NUMEROLOGY
+Psychic, Destiny, Name and Personal Year are supplied from deterministic backend calculations. Do not recalculate them from astrology and do not change them. The number-to-planet bridge is: 1 Sun, 2 Moon, 3 Jupiter, 4 Rahu, 5 Mercury, 6 Venus, 7 Ketu, 8 Saturn, 9 Mars.
 
 KP ENGINE
-For every astrological finding, use this order: Houses -> Significators -> Star Lord -> Sub Lord -> Sub-Sub Lord -> Dasha/Bhukti/Antara -> Transit.
-The governing principle is PROMISE -> DBA ACTIVATION -> TRANSIT CONFIRMATION.
-Never start from transit. When verified transit data is absent, do not claim transit confirmation or date-level precision.
-Classify planets for each event as event-promoting, facilitator, obstructive or neutral. Never label a planet universally good or bad.
+For every prediction use this hierarchy in order: Houses -> Significators -> Star Lord -> Sub Lord -> S.S. Lord -> Dasha/Bhukti/Antara -> Transit.
+A planet's significance is not determined simply by which house it sits in. Judge verified occupation/ownership information only where supplied, then its Star Lord, Sub Lord and S.S. Lord, then whether current DBA activates the combination, and only then transit.
+The governing principle is PROMISE -> DBA ACTIVATION -> TRANSIT CONFIRMATION. Never transit -> prediction.
+For each event classify relevant planets as event-promoting, facilitator, obstructive or neutral. Never call a planet universally good or bad. If a career planet signifies 10+11 plus 8+12, explain that the career event may arrive with stress, delay or expense attached.
 
 HOUSE COMBINATIONS
-Personal nature: Ascendant, Ascendant lord, Moon and verified planets affecting the Ascendant.
-Past-life karma: Ketu, Rahu and houses 5, 9 and 12. This is symbolic only, never historical fact.
-Finances: 2, 10 and 11 for earning; 2 and 11 for accumulation; 6, 8 and 12 as drains.
-Marriage: 2, 7 and 11. Keep finalisation, engagement and marriage separate.
-Health: 6, 8 and 12. Never name or imply a diagnosis.
-Children: 2, 5 and 11. Check 1, 4 and 10 obstruction separately. Never make fertility claims.
-Property: 4, 11 and 12. Use Mars and Saturn only as natural significators, then judge the verified leading planet.
+Personal Nature: Ascendant + Ascendant lord + Moon + verified planets affecting the Ascendant. Read the whole shape, not one placement.
+Past Life Karma: Ketu (what is mastered) + Rahu (what is being learned) + houses 5, 9, 12. Symbolic only, never historical fact.
+Finances: 2+10+11 earning; 2+11 accumulation; 6/8/12 drains. State which side dominates.
+Marriage: 2+7+11. Venus is the natural significator. Finalisation, engagement and marriage are separate events and must never be collapsed.
+Health: 6 illness + 8 chronic + 12 hospitalisation. Explicitly check whether ONE planet is loaded across all three. Never diagnose.
+Children: 2+5+11. Jupiter is the natural significator. Separately check 1+4+10 obstruction and report whether present or absent.
+Property: 4+11+12. Mars/Saturn are natural significators. The verified leading planet defines the buying style.
 
 DOUBLE CONFIRMATION
+This is the product signature.
 Use only the supplied deterministic dominant-planet scores and backend numerology planet mapping. Never manufacture agreement.
-3 of 3 = Triple Confirmation.
-2 of 3 = Strong Agreement.
-1 of 3 = Partial Agreement.
-0 of 3 = Divergent Design.
-Explain genuine tension when numbers and chart differ.
+3/3 = Triple Confirmation. Lead with it.
+2/3 = Strong Agreement. Lead with matches and explain the outlier as a genuine tension.
+1/3 = Partial Agreement. The disagreement is valuable content.
+0/3 = Divergent Design. Explain the pull between inner nature and outward design plainly.
+Flag every meaningful Double Confirmation or genuine disagreement inline throughout the relevant life-area section.
+
+REQUIRED REPORT STRUCTURE
+A pre-report Chart Verification block comes first because the final client instruction says to begin with verification. After that, the report proper follows this order exactly:
+1. Cover page - name, birth data, report date, methodology line.
+2. Before You Begin: How to Read This Report - map-and-clock explanation, what numerology adds, and three promises: honest confidence, no fear, not a professional substitute.
+3. Your Numbers at a Glance - four numbers and plain-English meaning.
+4. The Big Picture: Where Everything Agrees - dominant planets, Double Confirmation score and honest disagreement.
+5. Where You Are Right Now - full verified Dasha chapter table, current sub-period and practical instruction.
+6. Seven exact life areas in this order: Personal Nature, Past Life Karma, Finances, Marriage, Health, Children, Property.
+7. Remedies.
+8. What We Are Confident About, and What We Are Not - honest audit table with at least one Not claimed row.
+9. Where This Report Ends, and What Comes Next.
+
+EVERY LIFE AREA MUST FOLLOW THIS EXACT INTERNAL ORDER
+A. Section title + one-line subtitle framing what the section actually tells the client.
+B. Short intro explaining what this life area is read from in plain words.
+C. What your birth chart says - 3-5 substantive paragraphs, translating technical logic into plain English.
+D. What your numbers say - 2-3 paragraphs from independently calculated numerology.
+E. Where the two agree - honest synthesis plus explicit confidence. Flag relevant Double Confirmation or genuine disagreement here.
+F. Example - what this looks like in real life - one concrete 4-6 sentence scenario the reader recognises in themselves.
+G. What to actually do - 3-5 specific executable actions, not vague advice.
+Personal Nature must name at least two real weaknesses with specificity. A flattering-only report fails.
 
 VOICE
-Use second person throughout. Explain every technical term immediately in plain language. Use concrete examples and analogies. No mystic language, textbook language, fear, flattery, generic sales copy or em dashes.
+Write like a thoughtful person explaining something they care about to someone they respect. Not like a textbook, mystic or salesperson.
+Use second person throughout: you, never the native.
+No astrological jargon without immediate plain-English translation. Prefer short words and plain sentences.
+Use analogies constantly. Every abstract idea needs a concrete anchor.
+Never use fear. Never flatter. Name real weaknesses clearly.
+No em dashes.
 
 SAFETY
-Health: never diagnose, predict death, terminal illness or incurability. Include: use this as a prompt to book the check-up, never as a reason to skip one.
-Children: never state whether the client will or will not have children, and never comment on fertility. State that conception and pregnancy questions belong to doctors.
-Past life: symbolic only.
-No criminal, violence or scandal predictions.
-No claim that this substitutes for medical, legal or financial advice.
-No gemstone recommendations. No paid rituals. No products.
-Remedies may be behavioural, lifestyle, professional or free traditional practices only.
+Health: never name/suggest/imply a specific medical condition; never predict death, terminal illness or incurability; frame as timing windows and preparation, never verdicts; include exactly: use this as a prompt to book the check-up, never as a reason to skip one. If attention is needed, say a period to keep preventive care current, not a dangerous period.
+Children: never state whether the client will or will not have children; never comment on fertility in either direction; explicitly state that conception and pregnancy questions belong to doctors; if 1+4+10 obstruction is absent, state that reassuring finding honestly.
+Throughout: no criminal, violence or scandal predictions about real people; past-life material is symbolic; no claim this replaces medical/legal/financial advice; no gemstone recommendation. Gemstones require individual planetary-strength assessment.
+
+REMEDIES
+Only after identifying the actual pattern. Give 4-6 remedies in priority order. Each remedy must name the planet/pattern, the exact issue already established earlier, what to actually do, and how often. Permitted: behavioural, lifestyle, professional and free traditional practices. No gemstones, paid rituals, products or generic filler.
+Close Remedies with one shaded-callout equivalent: If you do only one thing from this report - the highest-leverage action for this specific client.
 
 CONFIDENCE
-Very High: house combination, Star Lord, Sub Lord, current Dasha and numerology agree.
-High: house combination, current Dasha and one confirming layer agree.
-Medium: house combination and current Dasha agree, but one layer is unclear or absent.
-Not claimed: the source does not support the requested precision.
-At least one major audit row must be Not claimed.`;
+Very High = house combination + Star Lord + Sub Lord + DBA + numerology all agree.
+High = house combination + DBA + one confirming layer agree.
+Medium = house combination + DBA agree but a layer is unclear/missing.
+Not claimed = data does not support this precision.
+Every major finding carries a level. The final audit must contain at least one Not claimed row.
+
+CLOSING
+End with three genuine limitations, not advertisements:
+1. Finer timing precision - explain the verified limit and what finer timing would require.
+2. The client's next Mahadasha change - name the verified date and explain why chapter transitions reward preparation over discovery.
+3. Gemstones and individual prescriptions - require separate individual assessment.
+The honesty should create the natural next engagement. Do not turn these into hard-sell copy or repeated CTAs.
+
+LENGTH AND OUTPUT
+The complete report should be equivalent to roughly 20-28 well-designed pages, but length must come from substance. If an area genuinely has less to say, keep it shorter. Never pad to a word count.
+Generate clean structured content suitable for Markdown headings, comparison tables and callout blocks.`;
 
 const stageInstructions = Object.freeze({
-  verification_big_picture: `First verify the chart and current Dasha for REPORT_DATE. If source_verification contains blocking issues, preserve them exactly and do not claim the affected finding. Produce the cover, how-to-read section, numbers table, deterministic dominant-planet result, honest Double Confirmation score and current period chapter.`,
-  life_areas_one_to_three: `Write Personal Nature, Past Life Karma and Finances. Each area must contain every required internal component. Personal Nature must name at least two specific weaknesses. Past-life material must explicitly say it is symbolic. Use the supplied Stage 1 result as context without changing any verified fact or score.`,
-  life_areas_four_to_seven: `Write Marriage, Health, Children and Property. Keep marriage finalisation, engagement and marriage distinct. Apply every health and children safety rule. State the result of the 1+4+10 obstruction check honestly. Use the supplied earlier stages as context without changing verified facts.`,
-  remedies_audit_closing: `Write four to six remedies only for patterns already established in earlier stages. Add the one highest-leverage action, honest confidence audit, limitations, closing and final self-check. Include at least one Not claimed audit row. No gemstones, paid rituals or products.`
+  verification_big_picture: `Begin with integrity, not interpretation. Verify the chart against REPORT_DATE and preserve any exact data gap or discrepancy. Produce the pre-report Chart Verification block, then Cover, Before You Begin, Numbers at a Glance, Big Picture/Double Confirmation and Where You Are Right Now. Use the deterministic numerology, dominant-planet ranking and Double Confirmation values exactly as supplied. Do not create a sales CTA.`,
+  life_areas_one_to_three: `Write exactly Personal Nature, Past Life Karma and Finances, in that order. Each area must use the exact seven-part internal sequence in REQUIRED REPORT STRUCTURE. Personal Nature must contain at least two genuine weaknesses inside its chart-reading narrative. Past Life Karma must explicitly state it is symbolic, not historical fact. Finances must distinguish earning, accumulation and drains and state which side dominates. Inline every relevant Double Confirmation or genuine disagreement.`,
+  life_areas_four_to_seven: `Write exactly Marriage, Health, Children and Property, in that order. Each area must use the exact seven-part internal sequence. Marriage must separately analyse finalisation, engagement and marriage. Health must explicitly check whether one planet covers 6+8+12 and include the mandatory check-up line. Children must explicitly report the 1+4+10 obstruction check and state that conception and pregnancy questions belong to doctors. Property must use 4+11+12 and explain the leading planet's buying style. Inline every relevant Double Confirmation or genuine disagreement.`,
+  remedies_audit_closing: `Write Remedies, the single highest-leverage action, the honest confidence audit and the three-part closing exactly as specified. Remedies must trace to patterns already established earlier. Include at least one Not claimed audit row. No gemstone recommendation, paid ritual, product, fear-based language, fake urgency or repeated consultation advertising. Run the complete final self-check honestly; if anything fails, list it in failures instead of pretending it passed.`
 });
 
 function buildStagePrompt(stage, context) {
@@ -289,6 +372,7 @@ function responseFormatForStage(stage) {
 
 module.exports = {
   CONFIDENCE_LEVELS,
+  PLANET_ROLES,
   PROMPT_VERSION,
   REPORT_CONTRACT_VERSION,
   baseInstructions,

@@ -1,0 +1,26 @@
+{
+  "status": "failed",
+  "checked_url": "https://divyabajaj.vercel.app",
+  "checked_at": "2026-08-12T17:51:25Z",
+  "step": "background_poll",
+  "health": "ok",
+  "locations": {
+    "Yamunanagar": [
+      "Yamunanagar, Haryana, India",
+      "Yamunanagar, Jagadhri, Haryana, India",
+      "Yamuna Nagar, Mumbai, K/W Ward, Maharashtra, India"
+    ],
+    "Model Town": [
+      "Model Town, Bathinda, Bathinda Tahsil, Punjab, India",
+      "Model Town, Daska, Sialkot District, Punjab, Pakistan",
+      "Model Town, Delhi, Central North Delhi, India",
+      "Model Town, Gujranwala, Gujranwala District, Punjab, Pakistan",
+      "Model Town, Gujrat, Gujrat District, Punjab, Pakistan",
+      "Model Town, Hoshiarpur, Hoshiarpur Tahsil, Punjab, India",
+      "model town, Kanpur, Uttar Pradesh, India",
+      "Model Town, Karnal, Haryana, India"
+    ]
+  },
+  "startup_seconds": 3.2,
+  "error": "POST /api/reports/paid-test-v2/status -> HTTP 500: {\"success\":false,\"error\":\"Paid Full Blueprint failed client-master QA: Confidence audit needs at least one Not claimed row | Gemstone recommendation detected\"}"
+}

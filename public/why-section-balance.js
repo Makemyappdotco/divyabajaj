@@ -1,8 +1,53 @@
 (function () {
   'use strict';
 
-  if (window.__divyaWhySectionBalanceV1) return;
-  window.__divyaWhySectionBalanceV1 = true;
+  if (window.__divyaWhySectionBalanceV2) return;
+  window.__divyaWhySectionBalanceV2 = true;
+
+  function installLocationSuggestionContext() {
+    if (window.__divyaLocationSuggestionContextV1 || typeof window.fetch !== 'function') return;
+    window.__divyaLocationSuggestionContextV1 = true;
+    var nativeFetch = window.fetch.bind(window);
+
+    window.fetch = function (input, init) {
+      var url = typeof input === 'string' ? input : String((input && input.url) || '');
+      return nativeFetch(input, init).then(function (response) {
+        if (url.indexOf('/api/locations/search') === -1 || !response.ok) return response;
+
+        return response.clone().json().then(function (data) {
+          if (!data || !Array.isArray(data.locations)) return response;
+          var counts = {};
+          data.locations.forEach(function (location) {
+            var base = String(location.place_name || '').trim().toLowerCase();
+            if (base) counts[base] = (counts[base] || 0) + 1;
+          });
+
+          data.locations = data.locations.map(function (location) {
+            var originalName = String(location.place_name || '').trim();
+            var displayName = String(location.display_name || '').trim() || originalName;
+            var duplicate = (counts[originalName.toLowerCase()] || 0) > 1;
+            if (duplicate && displayName === originalName && location.coordinate_hint) {
+              displayName += ' · ' + location.coordinate_hint;
+            }
+            return Object.assign({}, location, {
+              original_place_name: originalName,
+              place_name: displayName
+            });
+          });
+
+          var headers = new Headers(response.headers);
+          headers.set('Content-Type', 'application/json; charset=utf-8');
+          return new Response(JSON.stringify(data), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: headers
+          });
+        }).catch(function () {
+          return response;
+        });
+      });
+    };
+  }
 
   function addFourthPoint() {
     var cards = Array.prototype.slice.call(document.querySelectorAll('.why-card'));
@@ -28,6 +73,8 @@
 
     grid.appendChild(card);
   }
+
+  installLocationSuggestionContext();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', addFourthPoint, { once: true });

@@ -22,6 +22,31 @@ function usingSupabase() {
   return Boolean(supabase);
 }
 
+function storageMode() {
+  return supabase ? 'supabase' : 'local_fallback';
+}
+
+function storageHealth() {
+  const production = String(process.env.VERCEL_ENV || process.env.NODE_ENV || '').toLowerCase() === 'production';
+  return {
+    mode: storageMode(),
+    persistent: Boolean(supabase),
+    production,
+    supabase_url_configured: Boolean(SUPABASE_URL),
+    supabase_service_role_configured: Boolean(SUPABASE_KEY),
+    safe_for_historical_data: Boolean(supabase),
+    warning: supabase
+      ? ''
+      : production
+        ? 'Production persistent storage is not configured. Local Vercel storage is ephemeral and must not be treated as historical data.'
+        : 'Using local development storage.'
+  };
+}
+
+function getSupabaseClient() {
+  return supabase;
+}
+
 function cleanEventData(data = {}) {
   const clone = { ...data };
   delete clone.ai_report;
@@ -61,7 +86,8 @@ async function getLeads(filters = {}) {
   let rows = await throwIfError(result, 'Fetch leads failed');
   if (filters.search) {
     const q = String(filters.search).toLowerCase();
-    rows = rows.filter(row => [row.name, row.phone, row.email].some(v => String(v || '').toLowerCase().includes(q)));
+    rows = rows.filter(row => [row.name, row.phone, row.email, row.pob, row.question]
+      .some(v => String(v || '').toLowerCase().includes(q)));
   }
   return rows;
 }
@@ -114,8 +140,25 @@ async function getReports(filters = {}) {
   if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
   if (filters.type) query = query.eq('type', filters.type);
   if (filters.status) query = query.eq('status', filters.status);
+  if (filters.from) query = query.gte('created_at', filters.from);
+  if (filters.to) query = query.lte('created_at', filters.to);
   const result = await query;
-  return throwIfError(result, 'Fetch reports failed');
+  let rows = await throwIfError(result, 'Fetch reports failed');
+  if (filters.search) {
+    const q = String(filters.search).toLowerCase();
+    rows = rows.filter(row => [row.id, row.type, row.status, row.generated_by]
+      .some(v => String(v || '').toLowerCase().includes(q)));
+  }
+  return rows;
+}
+
+async function getReport(reportId) {
+  if (!supabase) {
+    const reports = await localDb.getReports({});
+    return reports.find(report => report.id === reportId) || null;
+  }
+  const result = await supabase.from('reports').select('*').eq('id', reportId).maybeSingle();
+  return throwIfError(result, 'Fetch report failed');
 }
 
 async function createReport(data) {
@@ -149,12 +192,49 @@ async function updateReport(reportId, updates) {
   return updated;
 }
 
+async function getGeneratedDocuments(filters = {}) {
+  if (!supabase) return [];
+  let query = supabase.from('generated_documents').select('*').order('created_at', { ascending: false });
+  if (filters.report_id) query = query.eq('report_id', filters.report_id);
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.document_type) query = query.eq('document_type', filters.document_type);
+  const result = await query;
+  if (result.error) {
+    const missingTable = /does not exist|schema cache/i.test(result.error.message || '');
+    if (missingTable) return [];
+    throw new Error(`Fetch generated documents failed: ${result.error.message}`);
+  }
+  return result.data || [];
+}
+
+async function createGeneratedDocument(data) {
+  if (!supabase) return null;
+  const row = {
+    id: data.id || id('doc'),
+    report_id: data.report_id,
+    report_version_id: data.report_version_id || null,
+    document_type: data.document_type || 'pdf',
+    template_version: data.template_version || '',
+    storage_bucket: data.storage_bucket || '',
+    storage_path: data.storage_path || '',
+    checksum_sha256: data.checksum_sha256 || '',
+    byte_size: Number(data.byte_size) || 0,
+    status: data.status || 'active',
+    created_at: data.created_at || now(),
+    superseded_at: data.superseded_at || null
+  };
+  const result = await supabase.from('generated_documents').insert(row).select().single();
+  return throwIfError(result, 'Create generated document failed');
+}
+
 async function getPayments(filters = {}) {
   if (!supabase) return localDb.getPayments(filters);
   let query = supabase.from('payments').select('*').order('created_at', { ascending: false });
   if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.tier) query = query.eq('tier', filters.tier);
+  if (filters.from) query = query.gte('created_at', filters.from);
+  if (filters.to) query = query.lte('created_at', filters.to);
   const result = await query;
   return throwIfError(result, 'Fetch payments failed');
 }
@@ -192,6 +272,8 @@ async function getBookings(filters = {}) {
   if (filters.lead_id) query = query.eq('lead_id', filters.lead_id);
   if (filters.status) query = query.eq('status', filters.status);
   if (filters.date) query = query.eq('date', filters.date);
+  if (filters.from) query = query.gte('created_at', filters.from);
+  if (filters.to) query = query.lte('created_at', filters.to);
   const result = await query;
   return throwIfError(result, 'Fetch bookings failed');
 }
@@ -219,7 +301,7 @@ async function updateBooking(bookingId, updates) {
 
 async function getEvents(limit = 100) {
   if (!supabase) return localDb.getEvents(limit);
-  const result = await supabase.from('events').select('*').order('created_at', { ascending: false }).limit(limit);
+  const result = await supabase.from('events').select('*').order('created_at', { ascending: false }).limit(Math.min(Number(limit) || 100, 10000));
   return throwIfError(result, 'Fetch events failed');
 }
 
@@ -249,8 +331,12 @@ async function getStats() {
 
 module.exports = {
   usingSupabase,
+  storageMode,
+  storageHealth,
+  getSupabaseClient,
   getLeads, createLead, getLead, updateLead,
-  getReports, createReport, updateReport,
+  getReports, getReport, createReport, updateReport,
+  getGeneratedDocuments, createGeneratedDocument,
   getPayments, createPayment, updatePayment,
   getBookings, createBooking, updateBooking,
   getEvents, getStats, logEvent

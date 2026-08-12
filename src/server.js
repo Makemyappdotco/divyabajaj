@@ -11,6 +11,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 
 const routes = require('./routes');
 const adminRoutes = require('./adminRoutes');
+const adminDocumentRoutes = require('./adminDocumentRoutes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
 
@@ -21,7 +22,6 @@ const browserScripts = ['paid-live-flow.js', 'paid-async-hotfix.js', 'landing-li
 
 function validateBrowserScriptsSafely() {
   let allValid = true;
-
   browserScripts.forEach(file => {
     try {
       const filePath = path.join(publicDir, file);
@@ -32,7 +32,6 @@ function validateBrowserScriptsSafely() {
       console.error(`[UI script validation] ${file}: ${error.message}`);
     }
   });
-
   return allValid;
 }
 
@@ -41,7 +40,6 @@ const browserScriptsValid = validateBrowserScriptsSafely();
 function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
-
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-3"></script>';
   const paidAsyncScript = '<script src="/paid-async-hotfix.js?v=paid-async-bg-2"></script>';
@@ -72,23 +70,10 @@ function sendLandingWithPatches(res) {
   return res.send(html);
 }
 
-function cleanDigits(value) {
-  return String(value || '').replace(/\D/g, '');
-}
-
-function isValidName(value) {
-  return /^[A-Za-zÀ-ž][A-Za-zÀ-ž .'’-]{1,79}$/.test(String(value || '').trim());
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
-}
-
-function isValidPhone(value) {
-  const length = cleanDigits(value).length;
-  return length >= 10 && length <= 15;
-}
-
+function cleanDigits(value) { return String(value || '').replace(/\D/g, ''); }
+function isValidName(value) { return /^[A-Za-zÀ-ž][A-Za-zÀ-ž .'’-]{1,79}$/.test(String(value || '').trim()); }
+function isValidEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim()); }
+function isValidPhone(value) { const length = cleanDigits(value).length; return length >= 10 && length <= 15; }
 function isValidIsoDate(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return false;
@@ -98,7 +83,6 @@ function isValidIsoDate(value) {
   const date = new Date(Date.UTC(year, month - 1, day));
   return year >= 1900 && date <= new Date() && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
-
 function isValidTime(value) {
   const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
   return Boolean(match) && Number(match[1]) <= 23 && Number(match[2]) <= 59;
@@ -108,14 +92,12 @@ function validateReportInput(req, res, next) {
   const isFree = req.path === '/reports/free';
   const isPaid = req.method === 'POST' && (req.path === '/reports/paid-test-v2' || req.path === '/reports/paid-test-v2/start');
   if (!isFree && !isPaid) return next();
-
   const body = req.body || {};
   const errors = {};
   if (!isValidName(body.name)) errors.name = 'Enter a valid full name.';
   if (!isValidEmail(body.email)) errors.email = 'Enter a valid email address.';
   if (!isValidPhone(body.phone)) errors.phone = 'Enter a valid WhatsApp number with 10 to 15 digits.';
   if (!isValidIsoDate(body.dob)) errors.dob = 'Enter a valid date of birth.';
-
   if (isPaid) {
     if (!['male', 'female'].includes(String(body.gender || '').toLowerCase())) errors.gender = 'Select a valid gender.';
     if (!isValidTime(body.tob)) errors.tob = 'Enter a valid time of birth.';
@@ -129,10 +111,7 @@ function validateReportInput(req, res, next) {
     if (!Number.isFinite(timezone) || timezone < -14 || timezone > 14) errors.timezone = 'Invalid birthplace timezone.';
     if (String(body.question || '').trim().length < 5) errors.question = 'Add your main concern in a few words.';
   }
-
-  if (Object.keys(errors).length) {
-    return res.status(400).json({ success: false, error: 'Please correct the submitted information.', fields: errors });
-  }
+  if (Object.keys(errors).length) return res.status(400).json({ success: false, error: 'Please correct the submitted information.', fields: errors });
   return next();
 }
 
@@ -146,6 +125,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', publicPaidRoutes);
+app.use('/api/admin/documents', adminAuth, adminDocumentRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 
@@ -153,7 +133,6 @@ app.get('/admin', adminAuth, (req, res) => {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.sendFile(path.join(publicDir, 'admin.html'));
 });
-
 app.use('/admin', adminAuth, express.static(publicDir));
 app.get('/', (req, res) => sendLandingWithPatches(res));
 app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
@@ -166,20 +145,10 @@ app.use(express.static(publicDir));
 app.use((err, req, res, next) => {
   console.error('[Global server error]', err);
   if (res.headersSent) return next(err);
-
   const isApi = req.path.startsWith('/api');
-  if (isApi) {
-    return res.status(err.status || 500).json({
-      success: false,
-      error: err.message || 'Something went wrong while processing the request.'
-    });
-  }
-
+  if (isApi) return res.status(err.status || 500).json({ success: false, error: err.message || 'Something went wrong while processing the request.' });
   return res.status(err.status || 500).send('Something went wrong while loading the page.');
 });
 
-if (require.main === module) {
-  app.listen(PORT, () => console.log(`Divya Bajaj Backend System running on ${PORT}`));
-}
-
+if (require.main === module) app.listen(PORT, () => console.log(`Divya Bajaj Backend System running on ${PORT}`));
 module.exports = app;

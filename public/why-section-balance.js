@@ -1,12 +1,12 @@
 (function () {
   'use strict';
 
-  if (window.__divyaWhySectionBalanceV2) return;
-  window.__divyaWhySectionBalanceV2 = true;
+  if (window.__divyaWhySectionBalanceV3) return;
+  window.__divyaWhySectionBalanceV3 = true;
 
   function installLocationSuggestionContext() {
-    if (window.__divyaLocationSuggestionContextV1 || typeof window.fetch !== 'function') return;
-    window.__divyaLocationSuggestionContextV1 = true;
+    if (window.__divyaLocationSuggestionContextV2 || typeof window.fetch !== 'function') return;
+    window.__divyaLocationSuggestionContextV2 = true;
     var nativeFetch = window.fetch.bind(window);
 
     window.fetch = function (input, init) {
@@ -16,19 +16,26 @@
 
         return response.clone().json().then(function (data) {
           if (!data || !Array.isArray(data.locations)) return response;
-          var counts = {};
+          var baseCounts = {};
+          var displayCounts = {};
+
           data.locations.forEach(function (location) {
             var base = String(location.place_name || '').trim().toLowerCase();
-            if (base) counts[base] = (counts[base] || 0) + 1;
+            var display = String(location.display_name || location.place_name || '').trim().toLowerCase();
+            if (base) baseCounts[base] = (baseCounts[base] || 0) + 1;
+            if (display) displayCounts[display] = (displayCounts[display] || 0) + 1;
           });
 
           data.locations = data.locations.map(function (location) {
             var originalName = String(location.place_name || '').trim();
             var displayName = String(location.display_name || '').trim() || originalName;
-            var duplicate = (counts[originalName.toLowerCase()] || 0) > 1;
-            if (duplicate && displayName === originalName && location.coordinate_hint) {
+            var duplicateBase = (baseCounts[originalName.toLowerCase()] || 0) > 1;
+            var duplicateDisplay = (displayCounts[displayName.toLowerCase()] || 0) > 1;
+
+            if ((duplicateBase || duplicateDisplay) && location.coordinate_hint && displayName.indexOf(location.coordinate_hint) === -1) {
               displayName += ' · ' + location.coordinate_hint;
             }
+
             return Object.assign({}, location, {
               original_place_name: originalName,
               place_name: displayName

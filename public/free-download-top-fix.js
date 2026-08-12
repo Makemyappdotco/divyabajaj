@@ -1,19 +1,23 @@
 (function () {
   'use strict';
 
-  if (window.__divyaFreeDownloadTopFixV3) return;
-  window.__divyaFreeDownloadTopFixV3 = true;
+  if (window.__divyaFreeDownloadTopFixV4) return;
+  window.__divyaFreeDownloadTopFixV4 = true;
+
+  var observedBox = null;
+  var resultObserver = null;
+  var placing = false;
 
   function injectStyles() {
-    if (document.getElementById('dbFreeDownloadTopStylesV3')) return;
+    if (document.getElementById('dbFreeDownloadTopStylesV4')) return;
 
-    ['dbFreeDownloadTopStyles', 'dbFreeDownloadTopStylesV2'].forEach(function (id) {
+    ['dbFreeDownloadTopStyles', 'dbFreeDownloadTopStylesV2', 'dbFreeDownloadTopStylesV3'].forEach(function (id) {
       var oldStyle = document.getElementById(id);
       if (oldStyle) oldStyle.remove();
     });
 
     var style = document.createElement('style');
-    style.id = 'dbFreeDownloadTopStylesV3';
+    style.id = 'dbFreeDownloadTopStylesV4';
     style.textContent = `
       #generatedReportBox .db-free-download-slot{display:block!important;width:100%!important;margin:18px 0 22px!important;padding:0!important;position:relative!important}
       #generatedReportBox .db-free-download-slot>.pdf-download-btn,
@@ -29,52 +33,85 @@
     document.head.appendChild(style);
   }
 
-  function placeDownloadBelowConfirmation() {
-    injectStyles();
+  function placeDownloadAtReportStart() {
+    if (placing) return false;
+    placing = true;
+    try {
+      injectStyles();
 
-    var resultBox = document.getElementById('generatedReportBox');
-    if (!resultBox) return false;
+      var resultBox = document.getElementById('generatedReportBox');
+      if (!resultBox) return false;
 
-    var button = resultBox.querySelector('.pdf-download-btn');
-    var reportContent = resultBox.querySelector('.report-content');
-    if (!button || !reportContent || !reportContent.parentNode) return false;
+      var button = resultBox.querySelector('.pdf-download-btn');
+      var reportContent = resultBox.querySelector('.report-content');
+      if (!button || !reportContent || !reportContent.parentNode) return false;
 
-    var slot = resultBox.querySelector('.db-free-download-slot');
-    if (!slot) {
-      slot = document.createElement('div');
-      slot.className = 'db-free-download-slot';
-      slot.setAttribute('data-free-download-position', 'below-delivery-confirmation');
+      var slot = resultBox.querySelector('.db-free-download-slot');
+      if (!slot) {
+        slot = document.createElement('div');
+        slot.className = 'db-free-download-slot';
+        slot.setAttribute('data-free-download-position', 'report-start');
+      }
+
+      button.classList.remove('free-download-top');
+      button.classList.add('db-free-download-primary');
+
+      // The button must sit immediately before the report body. This keeps the
+      // result heading / delivery confirmation visible first, followed by the PDF CTA,
+      // and only then the long reading itself.
+      if (slot.parentNode !== resultBox || slot.nextSibling !== reportContent) {
+        resultBox.insertBefore(slot, reportContent);
+      }
+      if (button.parentNode !== slot) slot.appendChild(button);
+
+      return slot.nextSibling === reportContent && slot.contains(button);
+    } finally {
+      placing = false;
     }
-
-    button.classList.remove('free-download-top');
-    button.classList.add('db-free-download-primary');
-
-    if (slot.parentNode !== resultBox || slot.nextSibling !== reportContent) {
-      resultBox.insertBefore(slot, reportContent);
-    }
-    if (button.parentNode !== slot) slot.appendChild(button);
-
-    return slot.nextSibling === reportContent && slot.contains(button);
   }
 
-  function schedulePlacement() {
-    [50, 180, 450, 900, 1600, 3000, 5000].forEach(function (delay) {
-      window.setTimeout(placeDownloadBelowConfirmation, delay);
+  function attachResultObserver() {
+    var resultBox = document.getElementById('generatedReportBox');
+    if (!resultBox) return false;
+    if (observedBox === resultBox && resultObserver) {
+      placeDownloadAtReportStart();
+      return true;
+    }
+
+    if (resultObserver) resultObserver.disconnect();
+    observedBox = resultBox;
+    resultObserver = new MutationObserver(function () {
+      // Observe only the free-report result container. The report renderer can
+      // replace its children after the API returns, so placement must follow the
+      // actual render lifecycle instead of racing it with multi-second timers.
+      window.requestAnimationFrame(placeDownloadAtReportStart);
     });
+    resultObserver.observe(resultBox, { childList: true, subtree: true });
+    placeDownloadAtReportStart();
+    return true;
+  }
+
+  function hookResultBoxSoon() {
+    if (attachResultObserver()) return;
+    // The result container normally exists from page load. These two bounded checks
+    // only cover late modal mounting; there is no long polling loop.
+    window.setTimeout(attachResultObserver, 120);
+    window.setTimeout(attachResultObserver, 600);
   }
 
   document.addEventListener('click', function (event) {
     var submit = event.target && event.target.closest ? event.target.closest('#popupSubmitBtn') : null;
-    if (submit) schedulePlacement();
+    if (!submit) return;
+    hookResultBoxSoon();
   }, true);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () {
       injectStyles();
-      placeDownloadBelowConfirmation();
+      hookResultBoxSoon();
     }, { once: true });
   } else {
     injectStyles();
-    placeDownloadBelowConfirmation();
+    hookResultBoxSoon();
   }
 })();

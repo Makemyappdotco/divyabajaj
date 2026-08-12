@@ -1,8 +1,8 @@
 (function () {
   'use strict';
 
-  if (window.__divyaPaidAsyncHotfixV1) return;
-  window.__divyaPaidAsyncHotfixV1 = true;
+  if (window.__divyaPaidAsyncHotfixV2) return;
+  window.__divyaPaidAsyncHotfixV2 = true;
 
   var state = {
     generating: false,
@@ -38,6 +38,45 @@
     if (!button) return;
     button.disabled = value;
     button.textContent = value ? 'Preparing Your Full Blueprint...' : 'Generate My Full Blueprint';
+  }
+
+  function alignModalCopy() {
+    var overlay = qs('#dbpOverlay');
+    if (!overlay || overlay.getAttribute('data-client-master-copy') === '1') return;
+    var benefits = overlay.querySelectorAll('.dbp-benefit span');
+    var benefitCopy = [
+      'Verified KP birth chart and current Dasha',
+      'Independent numerology and Double Confirmation',
+      'Seven life areas with honest confidence levels',
+      'Practical remedies, examples and next actions'
+    ];
+    for (var i = 0; i < benefits.length && i < benefitCopy.length; i += 1) benefits[i].textContent = benefitCopy[i];
+
+    var asideCopy = overlay.querySelector('.dbp-aside-copy');
+    if (asideCopy) asideCopy.textContent = 'A deep personalised astrology and numerology blueprint built from your exact birth details, verified KP chart, current Dasha and independently calculated numbers.';
+
+    var resultLead = overlay.querySelector('.dbp-result-lead');
+    if (resultLead) resultLead.textContent = 'Download your complete personalised report. The written reading is also available below for quick review.';
+
+    var upsellParagraph = overlay.querySelector('.dbp-upsell p');
+    if (upsellParagraph) upsellParagraph.textContent = 'Use a private session when your real decision needs finer context, comparison between options or guidance beyond what a written report can responsibly claim.';
+
+    overlay.setAttribute('data-client-master-copy', '1');
+  }
+
+  function friendlyGenerationError(error) {
+    var text = String((error && error.message) || error || '').trim();
+    console.error('[Full Blueprint technical error]', error);
+    if (/source verification|chart verification/i.test(text)) {
+      return 'One chart verification check could not be completed. Please reselect the birthplace and try once more.';
+    }
+    if (/quota|rate.?limit|capacity|temporarily unavailable/i.test(text)) {
+      return 'The report service is temporarily busy. Please try again in a few minutes.';
+    }
+    if (/network|fetch|connection|timeout|timed out|abort/i.test(text)) {
+      return 'The connection was interrupted while your report was being prepared. Please try again.';
+    }
+    return 'We could not complete the Full Blueprint on this attempt. Please try again. Your submitted details remain safe.';
   }
 
   function parseDob(value) {
@@ -90,9 +129,7 @@
       return nativeFetch(input, init).then(function (response) {
         if (!isSearch && !isTimezone) return response;
         response.clone().json().then(function (data) {
-          if (isSearch && data && Array.isArray(data.locations)) {
-            state.lastLocations = data.locations;
-          }
+          if (isSearch && data && Array.isArray(data.locations)) state.lastLocations = data.locations;
           if (isTimezone && response.ok && data && data.success !== false && Number.isFinite(Number(data.timezone)) && timezoneBody) {
             state.location = Object.assign({}, state.pendingLocation || {}, {
               latitude: Number(timezoneBody.latitude),
@@ -155,6 +192,7 @@
   }
 
   function formPayload() {
+    alignModalCopy();
     var name = String((qs('#dbp-name') || {}).value || '').trim();
     var gender = String((qs('#dbp-gender') || {}).value || '').trim();
     var email = String((qs('#dbp-email') || {}).value || '').trim();
@@ -196,27 +234,39 @@
     };
   }
 
-  async function pollUntilComplete(job, payload) {
+  async function pollUntilComplete(job) {
     var started = Date.now();
-    var maxMs = 12 * 60 * 1000;
+    var maxMs = 10 * 60 * 1000;
+    var transientFailures = 0;
+
     while (Date.now() - started < maxMs) {
       await sleep(4200);
-      var data = await fetchJson('/api/reports/paid-test-v2/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ job_token: job.job_token, response_ids: job.response_ids })
-      }, 45000);
+      try {
+        var data = await fetchJson('/api/reports/paid-test-v2/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ job_token: job.job_token, response_ids: job.response_ids })
+        }, 45000);
 
-      if (data.completed) return data;
-      var completed = Number(data.completed_stages) || 0;
-      var messages = [
-        'Writing your verified report in three sections in parallel...',
-        'One report section is complete. The remaining sections are being checked...',
-        'Two report sections are complete. Finishing the final section and quality checks...'
-      ];
-      setStatus(messages[Math.min(completed, 2)], '');
+        transientFailures = 0;
+        if (data.completed) return data;
+        var completed = Number(data.completed_stages) || 0;
+        var messages = [
+          'Writing your verified report in three sections in parallel...',
+          'One report section is complete. The remaining sections are being checked...',
+          'Two report sections are complete. Finishing the final section and quality checks...'
+        ];
+        setStatus(messages[Math.min(completed, 2)], '');
+      } catch (error) {
+        transientFailures += 1;
+        if (transientFailures <= 3) {
+          setStatus('Your report is still processing. Reconnecting to the report service...', '');
+          continue;
+        }
+        throw error;
+      }
     }
-    throw new Error('The report is still processing longer than expected. Please try again in a moment.');
+    throw new Error('The report is taking longer than the normal processing window.');
   }
 
   async function handleSubmit(event) {
@@ -242,12 +292,12 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      }, 75000);
+      }, 90000);
       state.job = job;
       setStatus('Verified. Writing your Full Blueprint in three sections in parallel...', '');
 
-      var data = await pollUntilComplete(job, payload);
-      if (!data.report_text) throw new Error('The completed report did not contain report content.');
+      var data = await pollUntilComplete(job);
+      if (!data.report_text) throw new Error('Completed report content was unavailable.');
 
       state.pdfPayload = {
         lead: payload,
@@ -265,11 +315,7 @@
         if (result) result.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     } catch (error) {
-      console.error('[Full Blueprint background generation]', error);
-      var message = error && error.name === 'AbortError'
-        ? 'The connection took too long while starting the report. Please try once more.'
-        : (error.message || 'Could not prepare the report. Please try again.');
-      setStatus(message, 'error');
+      setStatus(friendlyGenerationError(error), 'error');
     } finally {
       setGenerating(false);
     }
@@ -309,7 +355,8 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
       setStatus('Your Full Blueprint PDF has been downloaded.', 'success');
     } catch (error) {
-      setStatus(error.message || 'Could not download the PDF.', 'error');
+      console.error('[Full Blueprint PDF technical error]', error);
+      setStatus('The PDF could not be prepared on this attempt. Your report remains available above; please try the download again.', 'error');
     } finally {
       target.disabled = false;
       target.textContent = old;
@@ -319,5 +366,8 @@
   installLocationCapture();
   installLocationEvents();
   document.addEventListener('submit', handleSubmit, true);
-  document.addEventListener('click', handleDownload, true);
+  document.addEventListener('click', function (event) {
+    handleDownload(event);
+    setTimeout(alignModalCopy, 0);
+  }, true);
 })();

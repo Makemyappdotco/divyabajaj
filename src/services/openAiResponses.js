@@ -20,7 +20,7 @@ function requestId(prefix = 'divya') {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-async function requestResponse(body, { timeoutMs = 285000, clientRequestId = requestId() } = {}) {
+async function requestResponse(body, { timeoutMs = 60000, clientRequestId = requestId() } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -48,7 +48,7 @@ async function requestResponse(body, { timeoutMs = 285000, clientRequestId = req
     return { data, openai_request_id: response.headers.get('x-request-id') || '', client_request_id: clientRequestId };
   } catch (error) {
     if (error.name === 'AbortError') {
-      const timeoutError = new Error(`OpenAI response timed out after ${timeoutMs} ms`);
+      const timeoutError = new Error(`OpenAI request setup timed out after ${timeoutMs} ms`);
       timeoutError.client_request_id = clientRequestId;
       throw timeoutError;
     }
@@ -58,7 +58,15 @@ async function requestResponse(body, { timeoutMs = 285000, clientRequestId = req
   }
 }
 
-async function createStructuredResponse({ model, prompt, responseFormat, maxOutputTokens = 18000, reasoningEffort = 'none', metadata = {} }) {
+async function createStructuredResponse({
+  model,
+  prompt,
+  responseFormat,
+  maxOutputTokens = 7000,
+  reasoningEffort = 'none',
+  metadata = {},
+  background = false
+}) {
   const body = {
     model,
     reasoning: { effort: reasoningEffort },
@@ -67,9 +75,20 @@ async function createStructuredResponse({ model, prompt, responseFormat, maxOutp
     max_output_tokens: maxOutputTokens,
     metadata,
     store: false,
-    background: false
+    background: Boolean(background)
   };
-  const result = await requestResponse(body, { timeoutMs: 285000 });
+  const result = await requestResponse(body, { timeoutMs: background ? 60000 : 240000 });
+
+  if (background) {
+    if (!result.data?.id) throw new Error('OpenAI did not return a background response ID');
+    return {
+      response_id: result.data.id,
+      status: result.data.status || 'queued',
+      openai_request_id: result.openai_request_id,
+      client_request_id: result.client_request_id
+    };
+  }
+
   const text = extractOutputText(result.data);
   if (!text) throw new Error('OpenAI returned no structured output text');
   let parsed;
@@ -89,4 +108,46 @@ async function createStructuredResponse({ model, prompt, responseFormat, maxOutp
   };
 }
 
-module.exports = { createStructuredResponse, extractOutputText, requestResponse };
+async function getResponse(responseId, { timeoutMs = 45000 } = {}) {
+  if (!responseId) throw new Error('OpenAI response ID is required');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`https://api.openai.com/v1/responses/${encodeURIComponent(responseId)}`, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${getApiKey()}`,
+        'X-Client-Request-Id': requestId('divya-poll')
+      }
+    });
+    const raw = await response.text();
+    let data;
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch (error) { data = { raw }; }
+    if (!response.ok) throw new Error(data?.error?.message || data?.raw || `OpenAI returned ${response.status}`);
+
+    const status = data?.status || 'unknown';
+    let output = null;
+    if (status === 'completed') {
+      const text = extractOutputText(data);
+      if (!text) throw new Error('Completed OpenAI response contains no output text');
+      output = JSON.parse(text);
+    }
+    return {
+      response_id: data?.id || responseId,
+      status,
+      output,
+      usage: data?.usage || null,
+      error: data?.error || null,
+      incomplete_details: data?.incomplete_details || null
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error(`OpenAI status check timed out after ${timeoutMs} ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { createStructuredResponse, extractOutputText, getResponse, requestResponse };

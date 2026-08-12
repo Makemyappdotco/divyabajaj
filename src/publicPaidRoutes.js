@@ -2,13 +2,13 @@ const express = require('express');
 const db = require('./database');
 const { generateReportPdf } = require('./services/pdf');
 const { generatePaidReport } = require('./services/paidReport');
-const { generatePaidReportV2 } = require('./services/paidReportV2');
+const { startPaidReportV2, pollPaidReportV2 } = require('./services/paidReportV2');
 const {
   generateSourceBundle,
   getMode,
-  getTimezoneForBirth,
-  searchLocations
+  getTimezoneForBirth
 } = require('./services/astrologyApiV2');
+const { searchLocations } = require('./services/locationSearch');
 
 const router = express.Router();
 
@@ -57,43 +57,48 @@ function normaliseV2Payload(body = {}) {
     timezone_id: String(body.timezone_id || '').trim(),
     country_code: String(body.country_code || '').trim(),
     question: String(body.question || '').trim(),
-    source: String(body.source || 'paid_blueprint_v2_preview').trim()
+    source: String(body.source || 'paid_blueprint_live').trim()
   };
 }
 
 function numbersFromV2(result = {}) {
+  const deterministic = result.numerology_data?.deterministic || result.deterministic_numerology || {};
+  if (deterministic.psychic_number) {
+    return {
+      ruling_number: deterministic.psychic_number,
+      destiny_number: deterministic.destiny_number || '',
+      name_number: deterministic.name_number || '',
+      personal_year: deterministic.personal_year || ''
+    };
+  }
   const western = result.numerology_data?.numerological_numbers?.data || {};
   const indian = result.numerology_data?.numero_table?.data || {};
   return {
     ruling_number: indian.radical_number || indian.radical_num || '',
     destiny_number: indian.destiny_number || western.lifepath_number || '',
-    name_number: indian.name_number || western.expression_number || '',
-    personal_year: '',
-    lifepath_number: western.lifepath_number || '',
-    personality_number: western.personality_number || '',
-    soul_urge_number: western.soul_urge_number || ''
+    name_number: western.expression_number || indian.name_number || '',
+    personal_year: ''
   };
 }
 
 async function saveGeneratedReportBestEffort({ payload, result, type = 'paid_blueprint_test' }) {
   try {
+    if (result.job_id) {
+      const existingReports = await db.getReports({ type });
+      const existingReport = existingReports.find(item => item.ai_insights?.job_id === result.job_id);
+      if (existingReport) return { lead_id: existingReport.lead_id, report_id: existingReport.id };
+    }
+
     const existing = await db.getLeads({ search: payload.phone });
     const leadData = {
       name: payload.name,
       phone: payload.phone,
       dob: payload.dob,
       email: payload.email,
-      gender: payload.gender,
       tob: payload.tob,
-      birth_time_accuracy: payload.birth_time_accuracy,
       pob: payload.pob,
-      latitude: payload.latitude,
-      longitude: payload.longitude,
-      timezone: payload.timezone,
-      timezone_id: payload.timezone_id,
-      country_code: payload.country_code,
       question: payload.question,
-      source: payload.source || 'paid_blueprint_public_test_form',
+      source: payload.source || 'paid_blueprint_live',
       status: 'paid_test_report_generated',
       tier: type
     };
@@ -111,13 +116,15 @@ async function saveGeneratedReportBestEffort({ payload, result, type = 'paid_blu
         payment_status: 'testing_without_payment_gateway'
       },
       horosoft_data: result.numbers || result.numerology_data || {},
-      astrology_data: result.astrology_data,
+      astrology_data: result.astrology_data || null,
       ai_report: result.report_text,
       ai_insights: {
         ...(result.insights || {}),
+        job_id: result.job_id || '',
+        report_contract_version: result.report_contract_version || '',
+        qa: result.qa || null,
         report_json: result.report_json || null,
         numerology_data: result.numerology_data || null,
-        source_pdfs: result.source_pdfs || null,
         generation_ms: result.generation_ms,
         delivery_ready: {
           email: payload.email,
@@ -150,7 +157,7 @@ router.get('/locations/search', previewOnly, async (req, res) => {
   try {
     const query = String(req.query.q || '').trim();
     if (query.length < 2) return res.json({ success: true, locations: [] });
-    const locations = await searchLocations(query, 7);
+    const locations = await searchLocations(query, 12);
     return res.json({ success: true, locations });
   } catch (error) {
     console.error('[Location search error]', error);
@@ -180,32 +187,13 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
     if (missing.length) {
       return res.status(400).json({ success: false, error: `Missing required fields: ${missing.join(', ')}` });
     }
-
     const bundle = await generateSourceBundle(payload, {
       includePdfs: req.body.include_source_pdfs === true
     });
-
-    const summary = {
-      planets: bundle.planets?.ok,
-      current_vdasha: bundle.current_vdasha?.ok,
-      current_vdasha_all: bundle.current_vdasha_all?.ok,
-      numerological_numbers: bundle.numerological_numbers?.ok,
-      numero_table: bundle.numero_table?.ok,
-      chart_d1: bundle.charts?.D1?.ok,
-      chart_d9: bundle.charts?.D9?.ok,
-      chart_d10: bundle.charts?.D10?.ok,
-      chart_image_d1: bundle.chart_images?.D1?.ok,
-      chart_image_d9: bundle.chart_images?.D9?.ok,
-      chart_image_d10: bundle.chart_images?.D10?.ok,
-      pro_horoscope_pdf: bundle.pdfs?.pro_horoscope?.ok,
-      pro_numerology_pdf: bundle.pdfs?.pro_numerology?.ok
-    };
-
     return res.json({
       success: true,
       mode: bundle.mode,
       generation_ms: Date.now() - startedAt,
-      summary,
       bundle
     });
   } catch (error) {
@@ -214,7 +202,7 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
+router.post('/reports/paid-test-v2/start', previewOnly, async (req, res) => {
   const startedAt = Date.now();
   try {
     const payload = normaliseV2Payload(req.body);
@@ -223,48 +211,87 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
       return res.status(400).json({ success: false, error: `Missing required fields: ${missing.join(', ')}` });
     }
 
-    const result = await generatePaidReportV2(payload, {
-      includePdfs: req.body.include_source_pdfs === true
+    const job = await startPaidReportV2(payload);
+    return res.status(202).json({
+      success: true,
+      async: true,
+      test_mode: true,
+      provider: 'AstrologyAPI + OpenAI background',
+      payment_required: false,
+      startup_ms: Date.now() - startedAt,
+      ...job
     });
-    result.numbers = numbersFromV2(result);
+  } catch (error) {
+    console.error('[Paid blueprint start error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Could not start Full Blueprint generation' });
+  }
+});
 
+router.post('/reports/paid-test-v2/status', previewOnly, async (req, res) => {
+  try {
+    const result = await pollPaidReportV2({
+      job_token: req.body.job_token,
+      response_ids: req.body.response_ids
+    });
+
+    if (!result.completed) {
+      return res.status(202).json({ success: true, ...result });
+    }
+
+    result.numbers = result.numbers || numbersFromV2(result);
     const saved = await saveGeneratedReportBestEffort({
-      payload,
+      payload: result.input,
       result,
       type: 'paid_blueprint_v2_preview'
     });
 
     return res.json({
       success: true,
+      completed: true,
+      status: 'completed',
       test_mode: true,
-      provider: 'AstrologyAPI',
       payment_required: false,
       lead_id: saved.lead_id,
       report_id: saved.report_id,
       generated_by: result.model,
-      generation_ms: result.generation_ms || (Date.now() - startedAt),
+      generation_ms: result.generation_ms,
       storage: db.usingSupabase() ? 'supabase' : 'local_fallback',
       numbers: result.numbers,
       astrology_data: result.astrology_data,
       numerology_data: result.numerology_data,
-      source_pdfs: result.source_pdfs,
       report_json: result.report_json,
       report_text: result.report_text,
+      qa: result.qa,
       pdf_url: '/api/reports/pdf-direct',
       delivery_ready: {
-        email: payload.email,
-        whatsapp: payload.phone
+        email: result.input.email,
+        whatsapp: result.input.phone
       }
     });
   } catch (error) {
-    console.error('[Paid blueprint V2 error]', error);
-    return res.status(500).json({ success: false, error: error.message || 'Paid report V2 generation failed' });
+    console.error('[Paid blueprint status error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Could not finish Full Blueprint generation' });
+  }
+});
+
+// Compatibility endpoint: never run a long blocking OpenAI request again.
+router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
+  try {
+    const payload = normaliseV2Payload(req.body);
+    const missing = missingPaidV2Fields(payload);
+    if (missing.length) {
+      return res.status(400).json({ success: false, error: `Missing required fields: ${missing.join(', ')}` });
+    }
+    const job = await startPaidReportV2(payload);
+    return res.status(202).json({ success: true, async: true, ...job });
+  } catch (error) {
+    console.error('[Paid blueprint compatibility start error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Could not start Full Blueprint generation' });
   }
 });
 
 router.post('/reports/paid-test', async (req, res) => {
   const startedAt = Date.now();
-
   try {
     const payload = {
       name: String(req.body.name || '').trim(),
@@ -276,18 +303,12 @@ router.post('/reports/paid-test', async (req, res) => {
       question: String(req.body.question || '').trim(),
       source: String(req.body.source || 'paid_blueprint_public_test_form').trim()
     };
-
     const missing = missingPaidFields(payload);
     if (missing.length) {
-      return res.status(400).json({
-        success: false,
-        error: `Missing required fields: ${missing.join(', ')}`
-      });
+      return res.status(400).json({ success: false, error: `Missing required fields: ${missing.join(', ')}` });
     }
-
     const result = await generatePaidReport(payload);
     const saved = await saveGeneratedReportBestEffort({ payload, result });
-
     return res.json({
       success: true,
       test_mode: true,
@@ -300,18 +321,11 @@ router.post('/reports/paid-test', async (req, res) => {
       numbers: result.numbers,
       astrology_data: result.astrology_data,
       report_text: result.report_text,
-      pdf_url: '/api/reports/pdf-direct',
-      delivery_ready: {
-        email: payload.email,
-        whatsapp: payload.phone
-      }
+      pdf_url: '/api/reports/pdf-direct'
     });
   } catch (error) {
     console.error('[Fast paid blueprint report error]', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Paid report generation failed'
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Paid report generation failed' });
   }
 });
 
@@ -324,14 +338,8 @@ router.post('/reports/pdf-direct', async (req, res) => {
       report_text: reportText = '',
       report_type: reportType = 'paid_blueprint_direct'
     } = req.body || {};
-
-    if (!String(lead.name || '').trim()) {
-      return res.status(400).json({ error: 'Client name is required for PDF generation' });
-    }
-
-    if (!String(reportText || '').trim()) {
-      return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
-    }
+    if (!String(lead.name || '').trim()) return res.status(400).json({ error: 'Client name is required for PDF generation' });
+    if (!String(reportText || '').trim()) return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
 
     const pdfBuffer = await generateReportPdf({
       lead,
@@ -340,7 +348,6 @@ router.post('/reports/pdf-direct', async (req, res) => {
       astrologyData,
       reportText
     });
-
     const filename = `${safeFileName(lead.name)}-Full-Blueprint.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -349,10 +356,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
     return res.end(pdfBuffer);
   } catch (error) {
     console.error('[Direct premium PDF error]', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Could not generate the premium PDF'
-    });
+    return res.status(500).json({ success: false, error: error.message || 'Could not generate the premium PDF' });
   }
 });
 

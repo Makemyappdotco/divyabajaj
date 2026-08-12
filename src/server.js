@@ -43,7 +43,7 @@ function sendLandingWithPatches(res) {
 
   let html = fs.readFileSync(landingPath, 'utf8');
   const paidScript = '<script src="/paid-live-flow.js?v=paid-live-ui-3"></script>';
-  const paidAsyncScript = '<script src="/paid-async-hotfix.js?v=paid-async-bg-1"></script>';
+  const paidAsyncScript = '<script src="/paid-async-hotfix.js?v=paid-async-bg-2"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-3"></script>';
   const whyBalanceScript = '<script src="/why-section-balance.js?v=why-balance-2"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-4"></script>';

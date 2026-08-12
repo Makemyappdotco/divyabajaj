@@ -20,6 +20,18 @@ function requestId(prefix = 'divya') {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function providerFailure(detail) {
+  const message = String(detail || 'OpenAI background response failed');
+  if (/no credits|credits remaining|billing|quota/i.test(message)) {
+    return new Error(`OPENAI_PROVIDER_CREDITS_UNAVAILABLE: ${message}`);
+  }
+  return new Error(`OPENAI_PROVIDER_UNAVAILABLE: ${message}`);
+}
+
 async function requestResponse(body, { timeoutMs = 60000, clientRequestId = requestId() } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -81,9 +93,25 @@ async function createStructuredResponse({
 
   if (background) {
     if (!result.data?.id) throw new Error('OpenAI did not return a background response ID');
+
+    if (['failed', 'cancelled', 'incomplete'].includes(result.data.status)) {
+      const detail = result.data?.error?.message || result.data?.incomplete_details?.reason || result.data.status;
+      throw providerFailure(detail);
+    }
+
+    // Background responses can be accepted first and rejected moments later when the
+    // provider account has no billing credits. One short status check makes that fail
+    // at form start instead of forcing the customer to wait through the polling loop.
+    await sleep(1400);
+    const early = await getResponse(result.data.id, { timeoutMs: 15000 });
+    if (['failed', 'cancelled', 'incomplete'].includes(early.status)) {
+      const detail = early.error?.message || early.incomplete_details?.reason || early.status;
+      throw providerFailure(detail);
+    }
+
     return {
       response_id: result.data.id,
-      status: result.data.status || 'queued',
+      status: early.status || result.data.status || 'queued',
       openai_request_id: result.openai_request_id,
       client_request_id: result.client_request_id
     };

@@ -1,71 +1,81 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Divya Bajaj Admin</title>
-  <style>
-    body{margin:0;background:#08070a;color:#f4efe7;font-family:Arial,sans-serif}
-    header{padding:24px;border-bottom:1px solid #2b251d;background:#111015}
-    h1{margin:0;font-size:24px} p{color:#b9afa2}
-    main{padding:24px;display:grid;gap:20px}
-    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
-    .card{background:#14131a;border:1px solid #2b251d;border-radius:12px;padding:18px}
-    .num{font-size:28px;color:#c9a96e;font-weight:700;margin-top:8px}
-    button,.export-btn{display:inline-flex;align-items:center;justify-content:center;background:#c9a96e;color:#08070a;border:0;border-radius:8px;padding:12px 16px;font-weight:700;cursor:pointer;text-decoration:none;font-size:14px}
-    .export-btn.secondary{background:transparent;color:#c9a96e;border:1px solid #6d5735}
-    .actions{display:flex;flex-wrap:wrap;gap:10px}
-    table{width:100%;border-collapse:collapse;background:#14131a;border:1px solid #2b251d;border-radius:12px;overflow:hidden}
-    th,td{padding:12px;border-bottom:1px solid #2b251d;text-align:left;font-size:14px;vertical-align:top}
-    th{color:#c9a96e;background:#111015}
-    pre{white-space:pre-wrap;background:#14131a;border:1px solid #2b251d;border-radius:12px;padding:16px;max-height:320px;overflow:auto}
-    .muted{color:#9b9287;font-size:13px}
-    .storage{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:7px 10px;border-radius:999px;background:#1a181f;border:1px solid #2b251d;font-size:12px;color:#c9a96e}
-    .dot{width:8px;height:8px;border-radius:50%;background:#3fd17c;box-shadow:0 0 10px rgba(63,209,124,.45)}
-    @media(max-width:700px){main{padding:16px}.actions{display:grid;grid-template-columns:1fr}.actions>*{width:100%;box-sizing:border-box}}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#09080b">
+  <title>Divya Bajaj Operations</title>
+  <link rel="stylesheet" href="/admin.css?v=admin-ops-1">
 </head>
 <body>
-  <header>
-    <h1>Divya Bajaj Admin Dashboard</h1>
-    <p>Leads, reports, revenue and system activity.</p>
-    <div class="storage"><span class="dot"></span><span id="storageMode">Checking storage...</span></div>
-  </header>
-  <main>
-    <section class="cards">
-      <div class="card"><div>Leads</div><div class="num" id="leadsCount">0</div></div>
-      <div class="card"><div>Reports</div><div class="num" id="reportsCount">0</div></div>
-      <div class="card"><div>Revenue</div><div class="num" id="revenue">₹0</div></div>
-      <div class="card"><div>Conversion</div><div class="num" id="conversion">0%</div></div>
-    </section>
-
-    <section class="card">
-      <div class="actions">
-        <button onclick="loadAll()">Refresh Dashboard</button>
-        <button onclick="testReport()">Create Test Free Report</button>
-        <a class="export-btn" href="/api/export/all.xlsx">Download All Excel</a>
-        <a class="export-btn secondary" href="/api/export/all.csv">Download All CSV</a>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">DB</div>
+        <h1>Divya Bajaj<br>Operations</h1>
+        <p>Private admin system</p>
       </div>
-      <p class="muted">Exports include leads, reports, payments, bookings and events.</p>
-    </section>
+      <nav class="nav">
+        <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span><span>Overview</span></button>
+        <button class="nav-btn" data-view="customers"><span class="nav-icon">◉</span><span>Customers</span></button>
+        <button class="nav-btn" data-view="reports"><span class="nav-icon">▤</span><span>Reports</span></button>
+        <button class="nav-btn" data-view="revenue"><span class="nav-icon">₹</span><span>Revenue</span></button>
+        <button class="nav-btn" data-view="bookings"><span class="nav-icon">◫</span><span>Bookings</span></button>
+        <button class="nav-btn" data-view="activity"><span class="nav-icon">⌁</span><span>Activity</span></button>
+        <button class="nav-btn" data-view="system"><span class="nav-icon">⚙</span><span>System</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        Historical customer and report operations.<br>
+        Persistent database required in production.
+      </div>
+    </aside>
 
-    <section>
-      <h2>Leads</h2>
-      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>DOB</th><th>Status</th><th>Created</th></tr></thead><tbody id="leadsBody"><tr><td colspan="6">Loading...</td></tr></tbody></table>
-    </section>
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenu" class="mobile-menu" aria-label="Open navigation">☰</button>
+          <div>
+            <div class="eyebrow" id="pageEyebrow">Business, customers and report health at a glance.</div>
+            <h1 class="page-title" id="pageTitle">Operations Overview</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <label class="range-label" for="rangeSelect" style="font-size:11px;color:#988f85">Range</label>
+          <select id="rangeSelect" class="select">
+            <option value="7">7 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">1 year</option>
+          </select>
+          <button id="refreshBtn" class="btn btn-secondary"><span>Refresh</span> ↻</button>
+        </div>
+      </header>
 
-    <section>
-      <h2>Reports</h2>
-      <table><thead><tr><th>ID</th><th>Lead</th><th>Type</th><th>Status</th><th>Generated By</th></tr></thead><tbody id="reportsBody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
-    </section>
+      <div class="content">
+        <div id="storageAlert" class="storage-alert">
+          <div><strong><span class="status-dot"></span>Checking persistent storage</strong><p>Verifying whether historical customer and report data is protected.</p></div>
+        </div>
 
-    <section><h2>Latest Response</h2><pre id="output">Ready.</pre></section>
-  </main>
-<script>
-async function api(path, options){const res=await fetch(path,options);const text=await res.text();try{return JSON.parse(text)}catch(e){return{raw:text}}}
-async function loadAll(){const stats=await api('/api/stats');const leads=await api('/api/leads');const reports=await api('/api/reports');document.getElementById('output').textContent=JSON.stringify({stats,leads,reports},null,2);const s=stats.stats||{};document.getElementById('leadsCount').textContent=s.leads||0;document.getElementById('reportsCount').textContent=s.reports||0;document.getElementById('revenue').textContent='₹'+(s.revenue||0);document.getElementById('conversion').textContent=(s.conversion_rate||0)+'%';const storage=stats.storage||leads.storage||reports.storage||'unknown';document.getElementById('storageMode').textContent=storage==='supabase'?'Supabase connected':'Local fallback storage';const leadRows=(leads.leads||[]).map(l=>`<tr><td>${l.name||''}</td><td>${l.email||''}</td><td>${l.phone||''}</td><td>${l.dob||''}</td><td>${l.status||''}</td><td>${(l.created_at||'').slice(0,10)}</td></tr>`).join('');document.getElementById('leadsBody').innerHTML=leadRows||'<tr><td colspan="6">No leads yet</td></tr>';const reportRows=(reports.reports||[]).map(r=>`<tr><td>${r.id}</td><td>${r.lead_id}</td><td>${r.type}</td><td>${r.status}</td><td>${r.generated_by||''}</td></tr>`).join('');document.getElementById('reportsBody').innerHTML=reportRows||'<tr><td colspan="5">No reports yet</td></tr>'}
-async function testReport(){const payload={name:'Test User',email:'test@example.com',phone:'9999999999',dob:'1994-08-23',question:'Career clarity'};const result=await api('/api/reports/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});document.getElementById('output').textContent=JSON.stringify(result,null,2);await loadAll()}
-loadAll();
-</script>
+        <section class="view active" id="view-overview"></section>
+        <section class="view" id="view-customers"></section>
+        <section class="view" id="view-reports"></section>
+        <section class="view" id="view-revenue"></section>
+        <section class="view" id="view-bookings"></section>
+        <section class="view" id="view-activity"></section>
+        <section class="view" id="view-system"></section>
+      </div>
+    </main>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-live="polite">
+    <div class="drawer-head">
+      <div><div id="drawerTitle"><h3>Details</h3></div><p id="drawerSubtitle"></p></div>
+      <button class="drawer-close" id="drawerClose" aria-label="Close">×</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+  <div class="toast" id="toast"></div>
+  <script src="/admin-app.js?v=admin-ops-1"></script>
 </body>
 </html>

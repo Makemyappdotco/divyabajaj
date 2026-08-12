@@ -1,0 +1,151 @@
+name: Production Full Blueprint Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/production-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Wait for production deployment
+        run: sleep 45
+
+      - name: Test live location, background report, QA and PDF
+        env:
+          BASE_URL: https://divyabajaj.vercel.app
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys, time
+          from urllib import request, parse, error
+
+          BASE = os.environ['BASE_URL'].rstrip('/')
+
+          def http_json(path, method='GET', payload=None, timeout=70):
+              data = None
+              headers = {'Accept': 'application/json', 'User-Agent': 'DivyaBajajProductionSmoke/1.0'}
+              if payload is not None:
+                  data = json.dumps(payload).encode('utf-8')
+                  headers['Content-Type'] = 'application/json'
+              req = request.Request(BASE + path, data=data, headers=headers, method=method)
+              try:
+                  with request.urlopen(req, timeout=timeout) as resp:
+                      raw = resp.read().decode('utf-8')
+                      return resp.status, json.loads(raw or '{}')
+              except error.HTTPError as exc:
+                  raw = exc.read().decode('utf-8', 'replace')
+                  raise RuntimeError(f'{method} {path} -> HTTP {exc.code}: {raw[:1200]}')
+
+          status, health = http_json('/health')
+          assert status == 200 and health.get('status') == 'ok', health
+          assert health.get('ui_scripts_valid') is True, health
+          print('Health OK')
+
+          for query in ['Yamunanagar', 'Model Town']:
+              status, result = http_json('/api/locations/search?q=' + parse.quote(query))
+              locations = result.get('locations') or []
+              print(query, 'results:', [x.get('place_name') for x in locations])
+              assert status == 200 and result.get('success') is True
+              assert len(locations) >= 2, f'{query}: expected multiple disambiguated suggestions, got {len(locations)}'
+              for location in locations:
+                  label = str(location.get('place_name') or '')
+                  assert label, f'{query}: blank label'
+                  assert '°' not in label, f'{query}: coordinate leaked into visible label: {label}'
+                  assert not re.search(r'\b\d{1,3}\.\d+\s*[NS]\b', label, re.I), f'{query}: coordinate leaked: {label}'
+
+          payload = {
+              'name': 'Production Smoke Test',
+              'gender': 'male',
+              'email': 'smoke-test@example.com',
+              'phone': '9999999999',
+              'dob': '1994-08-23',
+              'tob': '07:35',
+              'birth_time_accuracy': 'family_confirmed',
+              'pob': 'Delhi, Delhi, India',
+              'latitude': 28.6139,
+              'longitude': 77.2090,
+              'timezone': 5.5,
+              'timezone_id': 'Asia/Kolkata',
+              'country_code': 'IN',
+              'question': 'Business, money, relationship and marriage clarity',
+              'source': 'production_smoke_test'
+          }
+
+          started = time.time()
+          status, job = http_json('/api/reports/paid-test-v2/start', 'POST', payload, timeout=90)
+          assert status == 202 and job.get('success') is True and job.get('job_token'), job
+          ids = job.get('response_ids') or {}
+          assert set(ids) == {'foundation', 'core_life_areas', 'completion'}, ids
+          print('Background job started in', round(time.time() - started, 1), 'seconds')
+
+          final = None
+          for attempt in range(45):
+              time.sleep(12)
+              status, poll = http_json('/api/reports/paid-test-v2/status', 'POST', {
+                  'job_token': job['job_token'],
+                  'response_ids': ids
+              }, timeout=70)
+              if poll.get('completed'):
+                  final = poll
+                  break
+              print('Poll', attempt + 1, poll.get('completed_stages'), '/', poll.get('total_stages'), poll.get('statuses'))
+
+          assert final is not None, 'Report did not complete within 9 minutes'
+          report = final.get('report_text') or ''
+          assert final.get('qa', {}).get('passed') is True, final.get('qa')
+          required = [
+              'CHART VERIFICATION',
+              'PERSONAL LIFE BLUEPRINT',
+              'YOUR NUMBERS AT A GLANCE',
+              'THE BIG PICTURE: WHERE EVERYTHING AGREES',
+              '1. PERSONAL NATURE',
+              '2. PAST LIFE KARMA',
+              '3. FINANCES',
+              '4. MARRIAGE',
+              '5. HEALTH',
+              '6. CHILDREN',
+              '7. PROPERTY',
+              'REMEDIES',
+              'WHAT WE ARE CONFIDENT ABOUT, AND WHAT WE ARE NOT',
+              'WHERE THIS REPORT ENDS, AND WHAT COMES NEXT'
+          ]
+          missing = [heading for heading in required if heading not in report]
+          assert not missing, f'Missing report headings: {missing}'
+          assert 'DOUBLE CONFIRMATION' in report
+          assert 'Use this as a prompt to book the check-up, never as a reason to skip one.' in report
+          assert 'qualified medical professionals' in report
+          assert '—' not in report
+          word_count = len(re.findall(r"\b[\w’'-]+\b", report))
+          print('Report words:', word_count, 'generation seconds:', round((final.get('generation_ms') or 0) / 1000, 1))
+          assert word_count >= 7000, f'Report too short for client-master contract: {word_count} words'
+
+          pdf_payload = {
+              'lead': payload,
+              'numbers': final.get('numbers') or job.get('numbers') or {},
+              'astrology_data': final.get('astrology_data'),
+              'report_text': report,
+              'report_type': 'paid_blueprint_live'
+          }
+          data = json.dumps(pdf_payload).encode('utf-8')
+          req = request.Request(BASE + '/api/reports/pdf-direct', data=data, headers={
+              'Content-Type': 'application/json',
+              'Accept': 'application/pdf',
+              'User-Agent': 'DivyaBajajProductionSmoke/1.0'
+          }, method='POST')
+          with request.urlopen(req, timeout=120) as resp:
+              pdf = resp.read()
+              ctype = resp.headers.get('Content-Type', '')
+              assert resp.status == 200 and 'application/pdf' in ctype
+              assert len(pdf) > 10000, f'PDF unexpectedly small: {len(pdf)} bytes'
+              assert pdf[:4] == b'%PDF', 'PDF signature missing'
+              print('PDF OK:', len(pdf), 'bytes')
+
+          print('PRODUCTION SMOKE PASSED')
+          PY

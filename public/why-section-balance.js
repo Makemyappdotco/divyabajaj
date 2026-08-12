@@ -1,60 +1,8 @@
 (function () {
   'use strict';
 
-  if (window.__divyaWhySectionBalanceV3) return;
-  window.__divyaWhySectionBalanceV3 = true;
-
-  function installLocationSuggestionContext() {
-    if (window.__divyaLocationSuggestionContextV2 || typeof window.fetch !== 'function') return;
-    window.__divyaLocationSuggestionContextV2 = true;
-    var nativeFetch = window.fetch.bind(window);
-
-    window.fetch = function (input, init) {
-      var url = typeof input === 'string' ? input : String((input && input.url) || '');
-      return nativeFetch(input, init).then(function (response) {
-        if (url.indexOf('/api/locations/search') === -1 || !response.ok) return response;
-
-        return response.clone().json().then(function (data) {
-          if (!data || !Array.isArray(data.locations)) return response;
-          var baseCounts = {};
-          var displayCounts = {};
-
-          data.locations.forEach(function (location) {
-            var base = String(location.place_name || '').trim().toLowerCase();
-            var display = String(location.display_name || location.place_name || '').trim().toLowerCase();
-            if (base) baseCounts[base] = (baseCounts[base] || 0) + 1;
-            if (display) displayCounts[display] = (displayCounts[display] || 0) + 1;
-          });
-
-          data.locations = data.locations.map(function (location) {
-            var originalName = String(location.place_name || '').trim();
-            var displayName = String(location.display_name || '').trim() || originalName;
-            var duplicateBase = (baseCounts[originalName.toLowerCase()] || 0) > 1;
-            var duplicateDisplay = (displayCounts[displayName.toLowerCase()] || 0) > 1;
-
-            if ((duplicateBase || duplicateDisplay) && location.coordinate_hint && displayName.indexOf(location.coordinate_hint) === -1) {
-              displayName += ' · ' + location.coordinate_hint;
-            }
-
-            return Object.assign({}, location, {
-              original_place_name: originalName,
-              place_name: displayName
-            });
-          });
-
-          var headers = new Headers(response.headers);
-          headers.set('Content-Type', 'application/json; charset=utf-8');
-          return new Response(JSON.stringify(data), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: headers
-          });
-        }).catch(function () {
-          return response;
-        });
-      });
-    };
-  }
+  if (window.__divyaWhySectionBalanceV1) return;
+  window.__divyaWhySectionBalanceV1 = true;
 
   function addFourthPoint() {
     var cards = Array.prototype.slice.call(document.querySelectorAll('.why-card'));
@@ -80,8 +28,6 @@
 
     grid.appendChild(card);
   }
-
-  installLocationSuggestionContext();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', addFourthPoint, { once: true });

@@ -1,8 +1,8 @@
 {
-  "status": "passed",
+  "status": "failed",
   "checked_url": "https://divyabajaj.vercel.app",
-  "checked_at": "2026-08-12T18:03:40Z",
-  "step": "complete",
+  "checked_at": "2026-08-12T19:33:58Z",
+  "step": "background_poll",
   "health": "ok",
   "locations": {
     "Yamunanagar": [
@@ -21,14 +21,6 @@
       "Model Town, Karnal, Haryana, India"
     ]
   },
-  "startup_seconds": 3.7,
-  "report_word_count": 12858,
-  "generation_seconds": 160.1,
-  "qa": {
-    "passed": true,
-    "checks": 15,
-    "failures": [],
-    "word_count": 12904
-  },
-  "pdf_bytes": 109250
+  "startup_seconds": 1.6,
+  "error": "POST /api/reports/paid-test-v2/status -> HTTP 500: {\"success\":false,\"error\":\"Report writing stage failed: You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\"}"
 }

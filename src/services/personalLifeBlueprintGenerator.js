@@ -7,20 +7,20 @@ const {
 const { createStructuredResponse } = require('./openAiResponses');
 const { preparePersonalLifeBlueprintSource } = require('./personalLifeBlueprintSource');
 
-const QUALITY_PATCH_VERSION = 'personal-life-blueprint-quality-pass-2';
+const QUALITY_PATCH_VERSION = 'client-master-fidelity-1';
 
 const QUALITY_RULES = `REPORT QUALITY PASS
-These rules refine the master prompt and override any conflicting presentation habit.
+These rules protect source fidelity and readability. They must never change the client's required report structure.
 
-1. This is a KP report. Treat KP planets, KP house cusps and KP significators as the authoritative house system. Never call a regular Vedic-house placement versus KP-house placement a chart discrepancy. Different house systems may place a planet differently.
+1. This is a KP report. Treat KP planets, KP house cusps and KP significators as the authoritative house system. Never call a regular Vedic-house placement versus KP-house placement a chart discrepancy.
 2. Use display_position for customer-facing degrees. Never print absolute zodiac longitude such as 147:04:51. Write a sign-relative position such as Leo 27°04′51″.
-3. Do not repeat the same global transit-data limitation inside every life area. State it in chart verification and the final confidence/limitations section. Within a life area, use Not claimed for exact timing without repeating the full DATA REQUIRED sentence.
-4. Keep technical_basis concise and traceable, with no more than four items per life area. Do not repeat the complete Dasha stack or full numerology list in every section.
-5. Avoid padding and repeated explanations. Each paragraph must add a new conclusion, example, caution or action.
-6. Health must explicitly state whether one verified planet is loaded across all 6, 8 and 12. If no single planet covers all three, say that this specific severe-loading pattern is not present. Do not turn that into a health guarantee.
-7. Use clean human-readable dates. Do not copy provider spacing or raw machine timestamps into narrative prose.
-8. Keep the report premium and readable. The complete report should generally land between 10,000 and 13,000 words unless a genuine data issue requires more explanation.
-9. No em dashes. No fear language. No gemstones. No unsupported exact dates.
+3. Do not repeat the same global transit-data limitation inside every paragraph. State the source limitation in chart verification and again where precision is explicitly being audited. Inside a life area, use Not claimed for unsupported exact timing.
+4. Never replace or merge the seven required life areas. They are Personal Nature, Past Life Karma, Finances, Marriage, Health, Children and Property.
+5. Never replace the exact internal life-area sequence with dashboards, summaries or 90-day-plan chapters. Visual design comes later; generation must preserve substance first.
+6. Do not create extra sales chapters or repeated consultation CTAs. The closing limitations should create the natural next engagement through honesty.
+7. Avoid repetition and padding. Every paragraph must add a new conclusion, explanation, concrete example, caution or action.
+8. Keep dates human-readable and preserve source precision. Do not turn a multi-month or unavailable transit window into a precise date.
+9. No em dashes, fear language, gemstone recommendations or unsupported exact predictions.
 10. Earlier stage facts, deterministic scores and confidence labels are locked and must not be rewritten.`;
 
 const STAGES = Object.freeze([
@@ -53,6 +53,11 @@ function generationMetadata({ stage, sourceContext, earlierStages }) {
 function contextForStage(stage, sourceContext, earlierStages = {}) {
   return {
     VERIFIED_SOURCE_DATA: sourceContext,
+    BACKEND_CALCULATIONS: {
+      deterministic_numerology: sourceContext?.deterministic_numerology || null,
+      dominant_planet_scoring: sourceContext?.dominant_planet_scoring || null,
+      double_confirmation: sourceContext?.double_confirmation || null
+    },
     LOCKED_EARLIER_STAGE_OUTPUTS: earlierStages,
     STAGE_RULE: `Generate only ${stage}. Do not rewrite or contradict locked earlier stage outputs.`
   };
@@ -60,7 +65,7 @@ function contextForStage(stage, sourceContext, earlierStages = {}) {
 
 async function generateStage(stage, sourceContext, earlierStages = {}, {
   background = false,
-  maxOutputTokens = 14000,
+  maxOutputTokens = 16000,
   reasoningEffort = 'none'
 } = {}) {
   if (!STAGES.includes(stage)) throw new Error(`Unknown Personal Life Blueprint stage: ${stage}`);

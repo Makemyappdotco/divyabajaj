@@ -74,7 +74,7 @@ async function createStructuredResponse({
     text: { format: responseFormat, verbosity: 'high' },
     max_output_tokens: maxOutputTokens,
     metadata,
-    store: false,
+    store: Boolean(background),
     background: Boolean(background)
   };
   const result = await requestResponse(body, { timeoutMs: background ? 60000 : 240000 });

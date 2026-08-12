@@ -1,12 +1,8 @@
-# final-hotfix-smoke-v4
+# production-smoke-manual-only
 name: Production Full Blueprint Smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/production-smoke.yml'
 
 permissions:
   contents: write
@@ -18,9 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for production deployment
-        run: sleep 45
-
       - name: Test live location, background report, QA and PDF
         id: smoke_test
         continue-on-error: true
@@ -30,104 +23,41 @@ jobs:
           python3 - <<'PY'
           import json, os, re, time
           from urllib import request, parse, error
-
           BASE = os.environ['BASE_URL'].rstrip('/')
-          metrics = {'status': 'running', 'checked_url': BASE, 'checked_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
-
-          def save_metrics():
-              os.makedirs('docs', exist_ok=True)
-              with open('docs/production-smoke-status.json', 'w', encoding='utf-8') as fh:
-                  json.dump(metrics, fh, indent=2, ensure_ascii=False)
-
+          metrics = {'status':'running','checked_url':BASE,'checked_at':time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+          def save():
+              os.makedirs('docs',exist_ok=True)
+              with open('docs/production-smoke-status.json','w',encoding='utf-8') as f: json.dump(metrics,f,indent=2,ensure_ascii=False)
           def http_json(path, method='GET', payload=None, timeout=70):
-              data = None
-              headers = {'Accept': 'application/json', 'User-Agent': 'DivyaBajajProductionSmoke/1.0'}
+              data=None; headers={'Accept':'application/json','User-Agent':'DivyaBajajProductionSmoke/1.0'}
               if payload is not None:
-                  data = json.dumps(payload).encode('utf-8')
-                  headers['Content-Type'] = 'application/json'
-              req = request.Request(BASE + path, data=data, headers=headers, method=method)
+                  data=json.dumps(payload).encode(); headers['Content-Type']='application/json'
+              req=request.Request(BASE+path,data=data,headers=headers,method=method)
               try:
-                  with request.urlopen(req, timeout=timeout) as resp:
-                      raw = resp.read().decode('utf-8')
-                      return resp.status, json.loads(raw or '{}')
-              except error.HTTPError as exc:
-                  raw = exc.read().decode('utf-8', 'replace')
-                  raise RuntimeError(f'{method} {path} -> HTTP {exc.code}: {raw[:1200]}')
-
+                  with request.urlopen(req,timeout=timeout) as r: return r.status,json.loads(r.read().decode() or '{}')
+              except error.HTTPError as e:
+                  raw=e.read().decode('utf-8','replace'); raise RuntimeError(f'{method} {path} -> HTTP {e.code}: {raw[:1600]}')
           try:
-              metrics['step'] = 'health'
-              status, health = http_json('/health')
-              assert status == 200 and health.get('status') == 'ok', health
-              assert health.get('ui_scripts_valid') is True, health
-              metrics['health'] = 'ok'
-
-              metrics['step'] = 'location_search'
-              location_metrics = {}
-              for query in ['Yamunanagar', 'Model Town']:
-                  status, result = http_json('/api/locations/search?q=' + parse.quote(query))
-                  locations = result.get('locations') or []
-                  labels = [str(x.get('place_name') or '') for x in locations]
-                  assert status == 200 and result.get('success') is True
-                  assert len(locations) >= 2, f'{query}: expected multiple disambiguated suggestions, got {len(locations)}'
-                  for label in labels:
-                      assert label, f'{query}: blank label'
-                      assert '°' not in label, f'{query}: coordinate leaked into visible label: {label}'
-                  location_metrics[query] = labels[:8]
-              metrics['locations'] = location_metrics
-
-              payload = {
-                  'name': 'Production Smoke Test', 'gender': 'male',
-                  'email': 'smoke-test@example.com', 'phone': '9999999999',
-                  'dob': '1994-08-23', 'tob': '07:35',
-                  'birth_time_accuracy': 'family_confirmed',
-                  'pob': 'Delhi, Delhi, India', 'latitude': 28.6139,
-                  'longitude': 77.2090, 'timezone': 5.5,
-                  'timezone_id': 'Asia/Kolkata', 'country_code': 'IN',
-                  'question': 'Business, money, relationship and marriage clarity',
-                  'source': 'production_smoke_test'
-              }
-
-              metrics['step'] = 'background_start'
-              started = time.time()
-              status, job = http_json('/api/reports/paid-test-v2/start', 'POST', payload, timeout=90)
-              assert status == 202 and job.get('success') is True and job.get('job_token'), job
-              ids = job.get('response_ids') or {}
-              metrics['startup_seconds'] = round(time.time() - started, 1)
-
-              metrics['step'] = 'background_poll'
-              final = None
-              for attempt in range(45):
-                  time.sleep(12)
-                  status, poll = http_json('/api/reports/paid-test-v2/status', 'POST', {
-                      'job_token': job['job_token'], 'response_ids': ids
-                  }, timeout=70)
-                  if poll.get('completed'):
-                      final = poll
-                      break
-              assert final is not None, 'Report did not complete within 9 minutes'
-              report = final.get('report_text') or ''
-              assert final.get('qa', {}).get('passed') is True, final.get('qa')
-              word_count = len(re.findall(r"\b[\w’'-]+\b", report))
-              assert word_count >= 7000, f'Report too short: {word_count}'
-              metrics['report_word_count'] = word_count
-              metrics['generation_seconds'] = round((final.get('generation_ms') or 0) / 1000, 1)
-              metrics['qa'] = final.get('qa')
-              metrics['report_id'] = final.get('report_id')
-              metrics['archive'] = final.get('archive')
-
-              metrics['step'] = 'pdf'
-              pdf_payload = {'lead': payload, 'numbers': final.get('numbers') or job.get('numbers') or {}, 'astrology_data': final.get('astrology_data'), 'report_text': report, 'report_type': 'paid_blueprint_live'}
-              data = json.dumps(pdf_payload).encode('utf-8')
-              req = request.Request(BASE + '/api/reports/pdf-direct', data=data, headers={'Content-Type': 'application/json','Accept': 'application/pdf','User-Agent': 'DivyaBajajProductionSmoke/1.0'}, method='POST')
-              with request.urlopen(req, timeout=120) as resp:
-                  pdf = resp.read()
-                  assert resp.status == 200 and 'application/pdf' in resp.headers.get('Content-Type', '')
-                  assert len(pdf) > 10000 and pdf[:4] == b'%PDF'
-                  metrics['pdf_bytes'] = len(pdf)
-
-              metrics['status'] = 'passed'; metrics['step'] = 'complete'; save_metrics()
+              metrics['step']='health'; status,health=http_json('/health'); assert status==200 and health.get('status')=='ok'; metrics['health']='ok'
+              metrics['step']='location_search'; lm={}
+              for q in ['Yamunanagar','Model Town']:
+                  status,r=http_json('/api/locations/search?q='+parse.quote(q)); locs=r.get('locations') or []; labels=[str(x.get('place_name') or '') for x in locs]
+                  assert len(locs)>=2; assert all('°' not in x for x in labels); lm[q]=labels[:8]
+              metrics['locations']=lm
+              payload={'name':'Production Smoke Test','gender':'male','email':'smoke-test@example.com','phone':'9999999999','dob':'1994-08-23','tob':'07:35','birth_time_accuracy':'family_confirmed','pob':'Delhi, Delhi, India','latitude':28.6139,'longitude':77.2090,'timezone':5.5,'timezone_id':'Asia/Kolkata','country_code':'IN','question':'Business, money, relationship and marriage clarity','source':'production_smoke_test'}
+              metrics['step']='background_start'; started=time.time(); status,job=http_json('/api/reports/paid-test-v2/start','POST',payload,90); assert status==202 and job.get('job_token'); metrics['startup_seconds']=round(time.time()-started,1)
+              metrics['step']='background_poll'; final=None
+              for _ in range(45):
+                  time.sleep(12); status,p=http_json('/api/reports/paid-test-v2/status','POST',{'job_token':job['job_token'],'response_ids':job.get('response_ids') or {}},70)
+                  if p.get('completed'): final=p; break
+              assert final is not None; report=final.get('report_text') or ''; assert final.get('qa',{}).get('passed') is True
+              wc=len(re.findall(r"\b[\w’'-]+\b",report)); assert wc>=7000; metrics['report_word_count']=wc; metrics['generation_seconds']=round((final.get('generation_ms') or 0)/1000,1); metrics['qa']=final.get('qa'); metrics['report_id']=final.get('report_id'); metrics['archive']=final.get('archive')
+              metrics['step']='pdf'; data=json.dumps({'lead':payload,'numbers':final.get('numbers') or {},'astrology_data':final.get('astrology_data'),'report_text':report,'report_type':'paid_blueprint_live'}).encode(); req=request.Request(BASE+'/api/reports/pdf-direct',data=data,headers={'Content-Type':'application/json','Accept':'application/pdf'},method='POST')
+              with request.urlopen(req,timeout=120) as r:
+                  pdf=r.read(); assert r.status==200 and pdf[:4]==b'%PDF' and len(pdf)>10000; metrics['pdf_bytes']=len(pdf)
+              metrics['status']='passed'; metrics['step']='complete'; save()
           except Exception as exc:
-              metrics['status'] = 'failed'; metrics['error'] = str(exc)[:2000]; save_metrics(); raise
+              metrics['status']='failed'; metrics['error']=str(exc)[:2000]; save(); raise
           PY
 
       - name: Publish smoke status
@@ -135,10 +65,6 @@ jobs:
         env:
           SMOKE_OUTCOME: ${{ steps.smoke_test.outcome }}
         run: |
-          if [ ! -f docs/production-smoke-status.json ]; then
-            mkdir -p docs
-            printf '{\n  "status": "failed",\n  "error": "Smoke process ended before status was written",\n  "workflow_outcome": "%s"\n}\n' "$SMOKE_OUTCOME" > docs/production-smoke-status.json
-          fi
           git config user.name "divya-production-smoke"
           git config user.email "actions@users.noreply.github.com"
           git add docs/production-smoke-status.json

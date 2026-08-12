@@ -10,6 +10,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 }
 
 const routes = require('./routes');
+const adminRoutes = require('./adminRoutes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
 
@@ -145,9 +146,11 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api', publicPaidRoutes);
+app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 
 app.get('/admin', adminAuth, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.sendFile(path.join(publicDir, 'admin.html'));
 });
 

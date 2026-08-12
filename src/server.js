@@ -11,6 +11,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 
 const routes = require('./routes');
 const adminRoutes = require('./adminRoutes');
+const adminCustomerTierRoutes = require('./adminCustomerTierRoutes');
 const adminDocumentRoutes = require('./adminDocumentRoutes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const { adminAuth } = require('./auth');
@@ -47,7 +48,7 @@ function sendLandingWithPatches(res) {
   const whyBalanceScript = '<script src="/why-section-balance.js?v=why-balance-2"></script>';
   const modalFixScript = '<script src="/paid-modal-scroll-photo.js?v=paid-modal-profile-4"></script>';
   const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-6"></script>';
-  const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-3"></script>';
+  const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-4"></script>';
   const revealFailsafeScript = '<script src="/reveal-failsafe.js?v=reveal-failsafe-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
@@ -126,6 +127,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api', publicPaidRoutes);
 app.use('/api/admin/documents', adminAuth, adminDocumentRoutes);
+app.use('/api/admin', adminAuth, adminCustomerTierRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 

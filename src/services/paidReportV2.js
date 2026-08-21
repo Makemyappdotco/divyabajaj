@@ -166,7 +166,7 @@ WRITING STYLE
 - Avoid robotic phrases and vague spiritual filler.
 - Every paragraph should add interpretation, evidence, limitation, action or useful synthesis.
 - Do not repeat the same observation in multiple sections unless the new section adds a genuinely different implication.
-- Target roughly 3,800 to 4,800 words. The client's sample is intentionally more detailed than the desired live report, so keep the same depth and structure but edit tightly.
+- Target roughly 4,800 to 5,500 words. The client's sample is intentionally more detailed than the desired live report, so keep the same depth and structure but edit tightly.
 
 Return ONLY valid JSON with exactly this shape:
 {

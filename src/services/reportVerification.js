@@ -108,7 +108,7 @@ function compareNumerology(deterministic, bundle) {
   const indian = okData(bundle?.numero_table) || {};
   const western = okData(bundle?.numerological_numbers) || {};
 
-  const apiValues = {
+  const compatibleApiValues = {
     psychic_number: {
       value: findNestedNumber(indian, ['radical_number', 'radical_num', 'psychic_number', 'driver_number']),
       method: 'Indian radical number'
@@ -118,42 +118,44 @@ function compareNumerology(deterministic, bundle) {
       method: 'Digit-sum destiny/life-path number'
     },
     name_number: {
-      value: findNestedNumber(western, ['expression_number']),
-      method: 'Pythagorean expression number'
+      value: findNestedNumber(indian, ['name_number']),
+      method: 'Indian/Chaldean name number'
     }
   };
 
-  const indianNameNumber = findNestedNumber(indian, ['name_number']);
+  const westernExpressionNumber = findNestedNumber(western, ['expression_number']);
   const comparison = {};
   const discrepancies = [];
   const observations = [];
 
   ['psychic_number', 'destiny_number', 'name_number'].forEach(key => {
     const backend = numberValue(deterministic?.[key]);
-    const api = apiValues[key].value;
+    const api = compatibleApiValues[key].value;
     const comparable = backend !== null && api !== null;
     const agrees = comparable ? backend === api : null;
     comparison[key] = {
       backend,
       astrologyapi: api,
-      astrologyapi_method: apiValues[key].method,
+      astrologyapi_method: compatibleApiValues[key].method,
       comparable,
       agrees
     };
     if (comparable && !agrees) {
-      discrepancies.push(`NUMEROLOGY VERIFICATION REQUIRED: backend ${key} is ${backend}, while the compatible AstrologyAPI ${apiValues[key].method} returns ${api}.`);
+      discrepancies.push(`NUMEROLOGY VERIFICATION REQUIRED: backend ${key} is ${backend}, while the compatible AstrologyAPI ${compatibleApiValues[key].method} returns ${api}.`);
     }
   });
 
-  if (indianNameNumber !== null) {
-    comparison.indian_name_number_reference = {
-      astrologyapi: indianNameNumber,
-      method: 'Indian numerology name number',
+  if (westernExpressionNumber !== null) {
+    comparison.western_expression_number_reference = {
+      astrologyapi: westernExpressionNumber,
+      method: 'Western Pythagorean expression number',
       used_for_client_formula_check: false
     };
-    if (numberValue(deterministic?.name_number) !== indianNameNumber) {
-      observations.push(`AstrologyAPI Indian name number is ${indianNameNumber}; it is not used as a blocker because the client specified the Pythagorean name-number formula.`);
-    }
+    observations.push(`AstrologyAPI Western expression number is ${westernExpressionNumber}; it uses a different Pythagorean method and is not compared with the client-approved Chaldean Name Number.`);
+  }
+
+  if (numberValue(deterministic?.name_number) !== null && compatibleApiValues.name_number.value === null) {
+    observations.push('AstrologyAPI did not return a compatible Indian/Chaldean name number, so the deterministic Chaldean calculation remains the source of truth for Name Number.');
   }
 
   return { comparison, discrepancies, observations };

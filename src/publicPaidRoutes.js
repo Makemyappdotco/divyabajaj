@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('./database');
 const { generateReportPdf } = require('./services/pdf');
 const { generatePaidReport } = require('./services/paidReport');
-const { startPaidReportV2, pollPaidReportV2 } = require('./services/paidReportV2');
+const { CONTRACT_VERSION, startPaidReportV2, pollPaidReportV2 } = require('./services/paidReportV2');
 const { archiveReportSnapshot } = require('./services/reportArchive');
 const {
   generateSourceBundle,
@@ -199,6 +199,7 @@ router.get('/astrology-v2/status', previewOnly, (req, res) => {
     access_token_configured: Boolean(process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN),
     pdf_sandbox_token_configured: Boolean(process.env.ASTROLOGYAPI_PDF_SANDBOX_TOKEN),
     openai_configured: Boolean(process.env.OPENAI_API_KEY),
+    report_contract_version: CONTRACT_VERSION,
     persistent_storage: db.storageHealth(),
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local'
   });
@@ -260,7 +261,7 @@ router.post('/reports/paid-test-v2/start', previewOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('[Paid blueprint start error]', error);
-    return res.status(500).json({ success: false, error: error.message || 'Could not start Full Blueprint generation' });
+    return res.status(500).json({ success: false, error: error.message || 'Could not start Integrated Life Report generation' });
   }
 });
 
@@ -295,7 +296,7 @@ router.post('/reports/paid-test-v2/status', previewOnly, async (req, res) => {
     });
   } catch (error) {
     console.error('[Paid blueprint status error]', error);
-    return res.status(500).json({ success: false, error: error.message || 'Could not finish Full Blueprint generation' });
+    return res.status(500).json({ success: false, error: error.message || 'Could not finish Integrated Life Report generation' });
   }
 });
 
@@ -310,7 +311,7 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
     return res.status(202).json({ success: true, async: true, storage: db.storageHealth(), ...job });
   } catch (error) {
     console.error('[Paid blueprint compatibility start error]', error);
-    return res.status(500).json({ success: false, error: error.message || 'Could not start Full Blueprint generation' });
+    return res.status(500).json({ success: false, error: error.message || 'Could not start Integrated Life Report generation' });
   }
 });
 

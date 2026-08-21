@@ -112,14 +112,14 @@
   <span class="dbp-brand-name">DIVYA BAJAJ</span>
   <span class="dbp-brand-title">ASTRO-NUMEROLOGIST</span>
 </div>
-            <div class="dbp-price-tag">The Full Blueprint · ₹999</div>
-            <h2>Your chart.<br>Your numbers.<br>One clear blueprint.</h2>
+            <div class="dbp-price-tag">The Integrated Life Report · ₹999</div>
+            <h2>Your chart.<br>Your numbers.<br>One clear report.</h2>
             <p class="dbp-aside-copy">A personalised astrology and numerology report created from your exact birth details, verified location, planetary chart and current Dasha.</p>
             <div class="dbp-benefits">
               <div class="dbp-benefit"><i>✓</i><span>Birth chart and key planetary patterns</span></div>
               <div class="dbp-benefit"><i>✓</i><span>Current Dasha and practical guidance</span></div>
-              <div class="dbp-benefit"><i>✓</i><span>Career, money and relationship insights</span></div>
-              <div class="dbp-benefit"><i>✓</i><span>30-day personalised action plan</span></div>
+              <div class="dbp-benefit"><i>✓</i><span>Seven life areas with honest confidence</span></div>
+              <div class="dbp-benefit"><i>✓</i><span>Timing map and prioritised remedies</span></div>
             </div>
             <div class="dbp-trust">Private and personalised. Your details are used only to prepare your report.</div>
           </aside>
@@ -151,15 +151,15 @@
                   <div class="dbp-error"></div>
                 </div>
                 <div class="dbp-actions">
-                  <button class="dbp-submit" id="dbpSubmit" type="submit">Generate My Full Blueprint</button>
+                  <button class="dbp-submit" id="dbpSubmit" type="submit">Generate My Integrated Report</button>
                   <div class="dbp-status" id="dbpStatus" role="status" aria-live="polite"></div>
                 </div>
               </div>
             </form>
             <section class="dbp-result" id="dbpResult">
-              <h4>Your Full Blueprint is ready</h4>
+              <h4>Your Integrated Life Report is ready</h4>
               <p class="dbp-result-lead">Download the PDF first. Your complete written reading is also available below.</p>
-              <button class="dbp-download" id="dbpDownload" type="button">Download Full Blueprint PDF</button>
+              <button class="dbp-download" id="dbpDownload" type="button">Download Integrated Report PDF</button>
               <div class="dbp-report" id="dbpReport"></div>
               <div class="dbp-upsell">
                 <div class="dbp-eyebrow">Need a deeper personal answer?</div>
@@ -431,7 +431,7 @@
     state.generating = value;
     var button = qs('#dbpSubmit', ensureModal());
     button.disabled = value;
-    button.textContent = value ? 'Preparing Your Full Blueprint...' : 'Generate My Full Blueprint';
+    button.textContent = value ? 'Preparing Your Integrated Report...' : 'Generate My Integrated Report';
   }
 
   function startProgress() {
@@ -488,7 +488,7 @@
       };
       qs('#dbpReport', overlay).textContent = data.report_text;
       qs('#dbpResult', overlay).classList.add('show');
-      setStatus('Your verified Full Blueprint is ready.', 'success');
+      setStatus('Your verified Integrated Life Report is ready.', 'success');
       setTimeout(function () { qs('#dbpResult', overlay).scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
     } catch (error) {
       setStatus(error && error.name === 'AbortError' ? 'The report took longer than expected. Please try again.' : (error.message || 'Could not generate the report.'), 'error');
@@ -520,10 +520,10 @@
       var link = document.createElement('a');
       var safeName = String(state.pdfPayload.lead.name || 'Divya-Bajaj').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'');
       link.href = url;
-      link.download = safeName + '-Full-Blueprint.pdf';
+      link.download = safeName + '-Integrated-Life-Report.pdf';
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
-      setStatus('Your Full Blueprint PDF has been downloaded.', 'success');
+      setStatus('Your Integrated Life Report PDF has been downloaded.', 'success');
     } catch (error) {
       setStatus(error.message || 'Could not download the PDF.', 'error');
     } finally {

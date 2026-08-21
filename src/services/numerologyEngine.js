@@ -63,6 +63,25 @@ function calculateNameNumber(name) {
   };
 }
 
+function calculatePersonalYear(day, month, year) {
+  const reducedDay = reduceToSingleDigit(day);
+  const reducedMonth = reduceToSingleDigit(month);
+  const reducedYear = reduceToSingleDigit(digitSum(year));
+  const total = reducedDay + reducedMonth + reducedYear;
+  const number = reduceToSingleDigit(total);
+  return {
+    year,
+    number,
+    planet: NUMBER_PLANETS[number],
+    working: {
+      reduced_day: reducedDay,
+      reduced_month: reducedMonth,
+      reduced_year: reducedYear,
+      total
+    }
+  };
+}
+
 function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
   const { year, month, day } = parseDob(dob);
   const calculationDate = reportDate instanceof Date ? reportDate : new Date(reportDate);
@@ -72,20 +91,19 @@ function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
   const destinyDigits = `${String(day).padStart(2, '0')}${String(month).padStart(2, '0')}${year}`;
   const destinyRaw = digitSum(destinyDigits);
   const nameResult = calculateNameNumber(name);
-  const reducedDay = reduceToSingleDigit(day);
-  const reducedMonth = reduceToSingleDigit(month);
-  const reducedYear = reduceToSingleDigit(digitSum(currentYear));
-  const personalYearRaw = reducedDay + reducedMonth + reducedYear;
+  const personalYearResult = calculatePersonalYear(day, month, currentYear);
 
   const psychicNumber = reduceToSingleDigit(day);
   const destinyNumber = reduceToSingleDigit(destinyRaw);
-  const personalYear = reduceToSingleDigit(personalYearRaw);
+  const personalYear = personalYearResult.number;
+  const personalYearTimeline = Array.from({ length: 5 }, (_, index) => calculatePersonalYear(day, month, currentYear + index));
 
   return {
     psychic_number: psychicNumber,
     destiny_number: destinyNumber,
     name_number: nameResult.number,
     personal_year: personalYear,
+    personal_year_timeline: personalYearTimeline,
     number_planets: {
       psychic: NUMBER_PLANETS[psychicNumber],
       destiny: NUMBER_PLANETS[destinyNumber],
@@ -98,11 +116,11 @@ function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
       destiny: { digits: destinyDigits.split('').map(Number), total: destinyRaw, reduced: destinyNumber },
       name: { letters: nameResult.letters, values: nameResult.values, total: nameResult.total, reduced: nameResult.number },
       personal_year: {
-        reduced_day: reducedDay,
-        reduced_month: reducedMonth,
+        reduced_day: personalYearResult.working.reduced_day,
+        reduced_month: personalYearResult.working.reduced_month,
         current_year: currentYear,
-        reduced_current_year: reducedYear,
-        total: personalYearRaw,
+        reduced_current_year: personalYearResult.working.reduced_year,
+        total: personalYearResult.working.total,
         reduced: personalYear
       }
     }
@@ -114,6 +132,7 @@ module.exports = {
   PYTHAGOREAN_VALUES,
   calculateNameNumber,
   calculateNumerology,
+  calculatePersonalYear,
   digitSum,
   reduceToSingleDigit
 };

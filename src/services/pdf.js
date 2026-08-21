@@ -75,7 +75,7 @@ function paintContentBackground(doc) {
   doc.fillColor(COLORS.gold).font('Helvetica-Bold').fontSize(8.2)
     .text('DIVYA BAJAJ', PAGE.left, 33, { characterSpacing: 1.8 });
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(7.8)
-    .text('THE FULL BLUEPRINT', doc.page.width - PAGE.right - 150, 33, { width: 150, align: 'right', characterSpacing: 1.2 });
+    .text('INTEGRATED LIFE REPORT', doc.page.width - PAGE.right - 170, 33, { width: 170, align: 'right', characterSpacing: 1.2 });
   doc.restore();
   doc.x = PAGE.left;
   doc.y = PAGE.top;
@@ -120,9 +120,9 @@ function drawCover(doc, { lead, numbers, paid }) {
     .text('ASTRO - NUMEROLOGIST', 54, 177, { width: doc.page.width - 108, align: 'center', characterSpacing: 2.1 });
 
   doc.fillColor(COLORS.white).font('Times-Bold').fontSize(paid ? 34 : 31)
-    .text(paid ? 'The Full Blueprint' : 'Your Numerology Report', 62, 226, { width: doc.page.width - 124, align: 'center' });
+    .text(paid ? 'The Integrated Life Report' : 'Your Numerology Report', 62, 226, { width: doc.page.width - 124, align: 'center' });
   doc.fillColor(COLORS.goldLight).font('Times-Italic').fontSize(15)
-    .text(paid ? 'Astrology + Numerology Personal Report' : 'A personal numerology awareness report', 62, 275, { width: doc.page.width - 124, align: 'center' });
+    .text(paid ? 'KP Astrology + Numerology' : 'A personal numerology awareness report', 62, 275, { width: doc.page.width - 124, align: 'center' });
 
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.2)
     .text('PREPARED PERSONALLY FOR', 62, 344, { width: doc.page.width - 124, align: 'center', characterSpacing: 2.2 });
@@ -185,20 +185,22 @@ function parseSections(reportText) {
       return;
     }
 
-    const numbered = line.match(/^(\d{1,2})[.)]\s+(.{3,120})$/);
-    const strongHeading = line.match(/^(?:section\s+)?([A-Z][A-Za-z0-9 &'()+\-/]{3,90})$/);
-    const looksLikeHeading = numbered || (
-      line.length <= 78 &&
-      !/[.!?]$/.test(line) &&
-      !/^[-*•]/.test(line) &&
-      strongHeading &&
-      /(?:Summary|Opening|Overview|Reading|Pattern|Direction|Guidance|Numbers|Lessons|Strengths|Career|Money|Relationship|Marriage|Family|Health|Current|Months|Years|Correction|Business|Mobile|House|Gemstone|Remedy|Action|Consultation|Step|Blueprint|Nature|Triggers|Professions)/i.test(line)
-    );
+    const numbered = line.match(/^([1-7])[.)]\s+(PERSONAL NATURE|PAST LIFE KARMA|FINANCES|MARRIAGE|HEALTH|CHILDREN|PROPERTY)$/i);
+    const topLevel = new Set([
+      'THE INTEGRATED LIFE REPORT',
+      'HOW TO READ THIS REPORT',
+      'YOUR CHART AND NUMBERS AT A GLANCE',
+      'REMEDIES',
+      'YOUR TIMING MAP',
+      'CLOSING SUMMARY',
+      'SCOPE AND LIMITATIONS'
+    ]);
+    const looksLikeHeading = numbered || topLevel.has(line.toUpperCase());
 
     if (looksLikeHeading) {
       pushCurrent();
       current = {
-        title: numbered ? numbered[2] : line,
+        title: numbered ? numbered[2].toUpperCase() : line,
         number: numbered ? numbered[1] : '',
         lines: []
       };
@@ -218,11 +220,11 @@ function drawIntroPage(doc, { lead, numbers, reportText, paid }) {
     .text('YOUR REPORT AT A GLANCE', { characterSpacing: 1.7 });
   doc.moveDown(0.55);
   doc.fillColor(COLORS.ink).font('Times-Bold').fontSize(28)
-    .text(`Hello ${safeText(lead.name).split(' ')[0] || 'there'}, this is your personal blueprint.`);
+    .text(`Hello ${safeText(lead.name).split(' ')[0] || 'there'}, this is your integrated life report.`);
   doc.moveDown(0.55);
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10.5).lineGap(4)
     .text(paid
-      ? 'This report brings your numerology patterns and birth-detail based astrology guidance into one clear, practical reading. It is designed to help you understand your natural strengths, repeated challenges, current phase and the decisions that deserve your attention.'
+      ? 'This report brings your verified KP astrology and numerology patterns into one clear, practical reading. It shows where the two systems agree, where they differ, and what action deserves your attention.'
       : 'This report gives you a clear first view of your numerology patterns, natural strengths and current phase.');
 
   doc.moveDown(1.25);
@@ -275,7 +277,7 @@ function drawContentsPage(doc, sections) {
   doc.fillColor(COLORS.ink).font('Times-Bold').fontSize(28).text('What you will discover');
   doc.moveDown(0.7);
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10).lineGap(3)
-    .text('This is a long report, but it is intentionally broken into focused sections. You can read it from start to finish or return directly to the area you need.');
+    .text('The report follows one consistent structure. Read it from start to finish, or return directly to the life area you need.');
   doc.moveDown(1);
 
   sections.slice(0, 30).forEach((section, index) => {
@@ -344,6 +346,32 @@ function drawCallout(doc, title, body) {
 function renderSectionBody(doc, body) {
   const lines = safeText(body).split('\n');
   let paragraph = [];
+  const labelledSubheadings = new Set([
+    'The two systems used',
+    'Houses and planets',
+    'Dasha and the chain of command',
+    'Convergence, tension and silence',
+    'What this report will not do',
+    'Chart verification',
+    'Your numbers',
+    'Headline convergence finding',
+    'Your current period',
+    'What this period instructs',
+    'What your birth chart shows',
+    'What your numbers show',
+    'Where the two systems agree',
+    'Where they pull against each other',
+    'Timing, where supported',
+    'What to actually do',
+    'Behavioural',
+    'Professional and structural',
+    'Traditional observance',
+    'If you do only one thing from this report',
+    'Finer timing precision',
+    'Next verified Mahadasha change',
+    'Highest-leverage action',
+    'Gemstones and individual prescriptions'
+  ]);
 
   function flushParagraph() {
     const text = paragraph.join(' ').replace(/\s+/g, ' ').trim();
@@ -372,6 +400,15 @@ function renderSectionBody(doc, body) {
     if (/^[-*•]\s+/.test(cleaned)) {
       flushParagraph();
       drawBullet(doc, cleaned.replace(/^[-*•]\s+/, ''));
+      return;
+    }
+
+    if (labelledSubheadings.has(cleaned)) {
+      flushParagraph();
+      ensureSpace(doc, 42);
+      doc.fillColor(COLORS.gold).font('Helvetica-Bold').fontSize(9.4)
+        .text(cleaned.toUpperCase(), { characterSpacing: 0.65 });
+      doc.moveDown(0.32);
       return;
     }
 
@@ -434,9 +471,9 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, astrologyData
         margins: PAGE,
         bufferPages: true,
         info: {
-          Title: paid ? 'Divya Bajaj - The Full Blueprint' : 'Divya Bajaj - Numerology Report',
+          Title: paid ? 'Divya Bajaj - The Integrated Life Report' : 'Divya Bajaj - Numerology Report',
           Author: 'Divya Bajaj',
-          Subject: paid ? 'Astrology and Numerology Full Blueprint' : 'Numerology Awareness Report'
+          Subject: paid ? 'KP Astrology and Numerology Integrated Life Report' : 'Numerology Awareness Report'
         }
       });
       const chunks = [];

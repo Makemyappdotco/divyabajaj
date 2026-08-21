@@ -762,7 +762,7 @@ async function startPaidReportV2(input) {
     model: getPaidModel(),
     prompt: stagePrompt(input, prepared.context, stage),
     responseFormat: responseFormatFor(stage),
-    maxOutputTokens: 4000,
+    maxOutputTokens: 8000,
     reasoningEffort: 'none',
     background: true,
     metadata: {

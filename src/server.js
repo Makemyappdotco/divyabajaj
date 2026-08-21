@@ -42,7 +42,7 @@ function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
   let html = fs.readFileSync(landingPath, 'utf8');
-  const paidScript = '<script src="/paid-live-flow.js?v=integrated-report-ui-5"></script>';
+  const paidScript = '<script src="/paid-live-flow.js?v=integrated-report-ui-6"></script>';
   const paidAsyncScript = '<script src="/paid-async-hotfix.js?v=integrated-report-bg-5"></script>';
   const polishScript = '<script src="/landing-live-polish.js?v=landing-polish-3"></script>';
   const whyBalanceScript = '<script src="/why-section-balance.js?v=why-balance-2"></script>';

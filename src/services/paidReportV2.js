@@ -1,7 +1,6 @@
 const { generateSourceBundle } = require('./astrologyApiV2');
 const { calculateNumerology } = require('./numerologyEngine');
 const { verifySourceBundle } = require('./reportVerification');
-const brand = require('../config/divyaBrand');
 
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
@@ -95,7 +94,7 @@ function compactSource(bundle, deterministicNumerology, verification) {
 }
 
 function buildPrompt(input, source) {
-  return `You are preparing a paid Astrology + Numerology Full Blueprint for Divya Bajaj.
+  return `You are preparing The Integrated Life Report for Divya Bajaj.
 
 CLIENT
 Name: ${input.name}
@@ -109,84 +108,169 @@ Main concern: ${input.question || 'Complete life clarity'}
 VERIFIED ASTROLOGYAPI SOURCE DATA AND BACKEND NUMEROLOGY
 ${JSON.stringify(source, null, 2)}
 
-IMPORTANT ACCURACY RULES
-- Use only facts supported by the source data.
-- Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp or numerology number.
-- Treat deterministic_numerology as the primary source for Psychic, Destiny, Name and Personal Year numbers.
-- AstrologyAPI numerology fields are an independent cross-check. Never silently replace deterministic values with them.
+REPORT CONTRACT
+Follow this exact customer-facing structure and logic:
+1. How To Read This Report
+2. Your Chart And Numbers At A Glance
+3. Personal Nature: Strengths And Weaknesses
+4. Past Life Karma
+5. Finances
+6. Marriage And Partnership
+7. Health And Constitution
+8. Children
+9. Property Purchase
+10. Remedies
+11. Your Timing Map
+12. Closing Summary
+13. Scope And Limitations
+
+The seven life areas are Personal Nature, Past Life Karma, Finances, Marriage, Health, Children and Property. For every life area use the same reading rhythm:
+- a short introduction
+- What your birth chart shows
+- What your numbers show
+- Where the two systems agree
+- Where they genuinely pull against each other, or clearly say that one system is silent
+- Timing only when supported
+- What to actually do about it
+- Confidence, with a short reason for that confidence
+
+METHOD
+- KP Astrology is the primary analytical map.
+- Numerology is an independent second opinion, not a replacement for astrology.
+- Treat deterministic_numerology as the primary numerology source.
+- The deterministic Name Number is Chaldean. Do not call it Pythagorean.
+- Use the five deterministic Personal Year values in personal_years for the timing map.
+- The report may describe convergence, tension and silence. Never force the systems to agree.
+- Do not claim that a separate Nadi calculation was performed. Divya may practise Nadi Astrology, but this automated report currently has verified KP Astrology plus Numerology source data only.
+
+ACCURACY RULES
+- Use only facts supported by the supplied source data.
+- Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp, significator or numerology number.
 - Read source_verification before writing. Never override a blocking issue or discrepancy.
 - Use KP planets, cusps and significator maps only when the corresponding kp_source_status value is true and the actual data is present.
-- When a required field is missing, write DATA REQUIRED followed by the exact missing item instead of guessing.
-- Do not predict guaranteed events, medical diagnoses, exact marriage dates or guaranteed money outcomes.
-- Keep the language very simple, natural Indian English.
-- Sound warm, direct and practical, like Divya personally explaining the report.
-- Do not use em dashes.
-- Avoid AI phrases such as unlock, profound, tapestry, transformative journey, navigate, multifaceted and embrace.
-- Give complete value. The consultation recommendation must be based on areas that genuinely require personal context, timing or comparison.
-- Make the consultation reasons specific to this person. Do not use a generic sales pitch.
+- When evidence is insufficient, say so plainly. Do not fill the gap with a generic prediction.
+- Do not create exact event dates unless the verified dasha source genuinely supports that precision.
+- Past Life Karma must be presented as symbolic traditional interpretation, not documented historical fact.
+- Health: no diagnosis, disease prediction, medication advice or treatment advice. Encourage qualified medical guidance for real symptoms or concerns.
+- Children: no fertility guarantees and no claim that someone definitely can or cannot conceive.
+- Finances: no guaranteed income, returns or investment outcomes.
+- Marriage: no guaranteed marriage date or guaranteed relationship outcome.
+- Remedies: behavioural first, professional or structural second, optional traditional observance last.
+- Do not recommend a gemstone in this report. State that gemstone assessment requires a separate dedicated evaluation.
+- No fear-based language, curses, threats or remedy sales tactics.
+
+WRITING STYLE
+- Plain, natural English that a normal customer can understand.
+- Warm, direct and practical, as if Divya is explaining the report personally.
+- No em dashes.
+- Avoid robotic phrases and vague spiritual filler.
+- Every paragraph should add interpretation, evidence, limitation, action or useful synthesis.
+- Do not repeat the same observation in multiple sections unless the new section adds a genuinely different implication.
+- Target roughly 3,800 to 4,800 words. The client's sample is intentionally more detailed than the desired live report, so keep the same depth and structure but edit tightly.
 
 Return ONLY valid JSON with exactly this shape:
 {
-  "executive_summary": {
-    "core_nature": "",
-    "strongest_advantage": "",
-    "main_challenge": "",
-    "current_focus": ""
+  "primer": {
+    "purpose": "",
+    "systems": "",
+    "kp_plain_language": "",
+    "numerology_plain_language": "",
+    "convergence_method": "",
+    "limits": ["", ""]
   },
-  "astrology_foundation": {
-    "ascendant": "",
-    "moon_sign": "",
-    "sun_sign": "",
-    "nakshatra": "",
-    "summary": ""
+  "glance": {
+    "astrology": [
+      {"element":"", "position":"", "plain_meaning":""}
+    ],
+    "numerology": [
+      {"label":"", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""}
+    ],
+    "headline_finding": ""
   },
-  "chart_insights": [
-    {"title":"", "explanation":"", "practical_effect":""}
+  "life_areas": {
+    "personal_nature": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "past_life_karma": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "finances": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "marriage": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "health": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "children": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    },
+    "property": {
+      "intro":"",
+      "birth_chart":"",
+      "numbers":"",
+      "convergence":"",
+      "tension_or_silence":"",
+      "timing":[""],
+      "actions":[""],
+      "confidence":""
+    }
+  },
+  "remedies": {
+    "intro":"",
+    "behavioural":[{"pattern":"", "practice":"", "rhythm":"", "purpose":""}],
+    "professional_structural":[""],
+    "traditional_observance":[{"planet":"", "why":"", "observance":""}],
+    "gemstone_note":""
+  },
+  "timing_map": [
+    {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""}
   ],
-  "dasha": {
-    "major": "",
-    "minor": "",
-    "period": "",
-    "theme": "",
-    "opportunities": [""],
-    "cautions": [""]
-  },
-  "numerology": {
-    "core_numbers": [{"label":"", "number":"", "meaning":""}],
-    "synthesis": ""
-  },
-  "career_money": {
-    "summary": "",
-    "strengths": [""],
-    "risks": [""],
-    "actions": [""]
-  },
-  "relationships": {
-    "summary": "",
-    "needs": [""],
-    "triggers": [""],
-    "actions": [""]
-  },
-  "next_12_months": [
-    {"phase":"Phase 1", "focus":"", "opportunity":"", "caution":"", "action":""},
-    {"phase":"Phase 2", "focus":"", "opportunity":"", "caution":"", "action":""},
-    {"phase":"Phase 3", "focus":"", "opportunity":"", "caution":"", "action":""},
-    {"phase":"Phase 4", "focus":"", "opportunity":"", "caution":"", "action":""}
-  ],
-  "guidance": [
-    {"title":"", "reason":"", "action":""}
-  ],
-  "action_plan": [
-    {"week":"Week 1", "actions":[""]},
-    {"week":"Week 2", "actions":[""]},
-    {"week":"Week 3", "actions":[""]},
-    {"week":"Week 4", "actions":[""]}
-  ],
-  "consultation": {
-    "headline": "",
-    "reasons": [""],
-    "closing": ""
-  }
+  "closing_summary":["", "", "", "", ""],
+  "scope_limitations":["", "", "", ""]
 }`;
 }
 
@@ -195,7 +279,7 @@ async function callOpenAI(prompt) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 180000);
+  const timer = setTimeout(() => controller.abort(), 240000);
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -209,7 +293,7 @@ async function callOpenAI(prompt) {
         model: getPaidModel(),
         reasoning: { effort: 'none' },
         input: prompt,
-        max_output_tokens: 7500
+        max_output_tokens: 10000
       })
     });
 
@@ -223,7 +307,7 @@ async function callOpenAI(prompt) {
     if (!text) throw new Error('OpenAI returned an empty report');
     return text;
   } catch (error) {
-    if (error.name === 'AbortError') throw new Error('Structured report generation took too long');
+    if (error.name === 'AbortError') throw new Error('Integrated Life Report generation took too long');
     throw error;
   } finally {
     clearTimeout(timer);
@@ -245,77 +329,73 @@ function list(items) {
   return (Array.isArray(items) ? items : []).filter(Boolean).map(item => `• ${item}`).join('\n');
 }
 
-function section(number, title, body) {
-  return `${number}. ${title}\n${String(body || '').trim()}`;
+function formatGlanceRows(rows, kind) {
+  return (Array.isArray(rows) ? rows : []).filter(Boolean).map(item => {
+    if (kind === 'numerology') {
+      return `• ${item.label}: ${item.value}${item.ruling_planet ? ` (${item.ruling_planet})` : ''}\n  Derived from: ${item.derived_from || 'Verified calculation'}\n  ${item.plain_meaning || ''}`.trim();
+    }
+    return `• ${item.element}: ${item.position}\n  ${item.plain_meaning || ''}`.trim();
+  }).join('\n\n');
 }
 
-function consultationOffer(input) {
-  const bookingUrl = `${brand.website}${brand.consultation.bookingPath}`;
-  return `Your report identifies the main patterns. A personal consultation helps apply them to your exact situation, timing and current choices.
-
-What the session can cover
-• The exact question you are facing right now
-• Timing and priorities within your present Dasha
-• Comparing two career, business, relationship or money choices
-• Personal remedies and actions that fit your real circumstances
-
-One-to-One Consultation with Divya Bajaj
-Fee: ₹${brand.consultation.priceInr.toLocaleString('en-IN')}
-Duration: ${brand.consultation.durationMinutes} minutes
-Mode: Phone call or video call
-Book here: ${bookingUrl}
-WhatsApp: ${brand.whatsapp}
-
-This is especially useful for your concern: ${input.question || 'overall life direction'}.`;
+function lifeAreaText(area = {}) {
+  const timing = list(area.timing);
+  const actions = list(area.actions);
+  return [
+    area.intro,
+    `What your birth chart shows:\n${area.birth_chart || 'The verified source does not support a stronger chart-level statement here.'}`,
+    `What your numbers show:\n${area.numbers || 'Numerology is silent on this point.'}`,
+    `Where the two systems agree:\n${area.convergence || 'There is no strong independent convergence to claim here.'}`,
+    `Where they pull against each other, or where one system is silent:\n${area.tension_or_silence || 'No meaningful tension is supported by the available data.'}`,
+    timing ? `Timing:\n${timing}` : 'Timing:\nNo timing claim is made because the verified data does not support one.',
+    `What to actually do about it:\n${actions || '• Use this section as reflection rather than a fixed prediction.'}`,
+    `Confidence:\n${area.confidence || 'Limited by the available verified data.'}`
+  ].filter(Boolean).join('\n\n');
 }
 
-function reportTextFromJson(report, input) {
-  const summary = report.executive_summary || {};
-  const astro = report.astrology_foundation || {};
-  const dasha = report.dasha || {};
-  const numerology = report.numerology || {};
-  const career = report.career_money || {};
-  const relationships = report.relationships || {};
-  const consultation = report.consultation || {};
-
-  const chartInsights = (report.chart_insights || []).map(item => {
-    const title = String(item.title || 'Chart insight').trim();
-    const explanation = String(item.explanation || '').trim();
-    const practicalEffect = String(item.practical_effect || '').trim();
-    return `• ${title}: ${explanation}${practicalEffect ? ` Practical effect: ${practicalEffect}` : ''}`;
-  }).join('\n');
-
-  const coreNumbers = (numerology.core_numbers || []).map(item =>
-    `${item.label}: ${item.number}\n${item.meaning}`
+function remediesText(remedies = {}) {
+  const behavioural = (Array.isArray(remedies.behavioural) ? remedies.behavioural : []).map(item =>
+    `• Pattern: ${item.pattern}\n  Practice: ${item.practice}\n  Rhythm: ${item.rhythm}\n  Purpose: ${item.purpose}`
   ).join('\n\n');
 
-  const phases = (report.next_12_months || []).map(item =>
-    `${item.phase}\nFocus: ${item.focus}\nOpportunity: ${item.opportunity}\nCaution: ${item.caution}\nBest action: ${item.action}`
-  ).join('\n\n');
-
-  const guidance = (report.guidance || []).map(item =>
-    `${item.title}\nWhy: ${item.reason}\nAction: ${item.action}`
-  ).join('\n\n');
-
-  const actionPlan = (report.action_plan || []).map(item =>
-    `${item.week}\n${list(item.actions)}`
+  const traditional = (Array.isArray(remedies.traditional_observance) ? remedies.traditional_observance : []).map(item =>
+    `• ${item.planet}: ${item.why}\n  Optional observance: ${item.observance}`
   ).join('\n\n');
 
   return [
-    section(1, 'Personal Opening From Divya', `${input.name}, this report combines your verified birth-chart calculations and numerology data into one practical reading. It focuses especially on ${input.question || 'your overall life direction'}.`),
-    section(2, 'Your Blueprint in 90 Seconds', `Core nature: ${summary.core_nature}\n\nStrongest advantage: ${summary.strongest_advantage}\n\nMain challenge: ${summary.main_challenge}\n\nCurrent focus: ${summary.current_focus}`),
-    section(3, 'Your Astrological Foundation', `Ascendant: ${astro.ascendant}\nMoon sign: ${astro.moon_sign}\nSun sign: ${astro.sun_sign}\nNakshatra: ${astro.nakshatra}\n\n${astro.summary}`),
-    section(4, 'Your Main Chart Insights', chartInsights || 'No chart insight was returned for this report.'),
-    section(5, 'Your Current Dasha', `Major period: ${dasha.major}\nMinor period: ${dasha.minor}\nPeriod: ${dasha.period}\n\n${dasha.theme}\n\nOpportunities\n${list(dasha.opportunities)}\n\nCautions\n${list(dasha.cautions)}`),
-    section(6, 'Your Core Numerology', `${coreNumbers}\n\nHow the numbers work together\n${numerology.synthesis}`),
-    section(7, 'Career, Business and Money', `${career.summary}\n\nStrengths\n${list(career.strengths)}\n\nRisks\n${list(career.risks)}\n\nActions\n${list(career.actions)}`),
-    section(8, 'Relationships and Emotional Pattern', `${relationships.summary}\n\nWhat you need\n${list(relationships.needs)}\n\nCommon triggers\n${list(relationships.triggers)}\n\nWhat will help\n${list(relationships.actions)}`),
-    section(9, 'Your Next 12 Months', phases),
-    section(10, 'Your Personal Guidance', guidance),
-    section(11, 'Your 30-Day Action Plan', actionPlan),
-    section(12, 'What Deserves a Personal Reading', `${consultation.headline}\n\n${list(consultation.reasons)}\n\n${consultation.closing}`),
-    section(13, 'Book a One-to-One Consultation', consultationOffer(input)),
-    section(14, 'Personal Closing From Divya', `${input.name}, use this report as a practical reference rather than a fixed prediction. Observe which patterns are already active in your real life and follow the actions consistently. When you need exact timing, comparison between choices or guidance around one important decision, book a personal consultation with Divya Bajaj at ${brand.website}${brand.consultation.bookingPath}.`)
+    remedies.intro,
+    `Priority one, behavioural:\n${behavioural || '• No additional behavioural remedy was supported.'}`,
+    `Priority two, professional and structural:\n${list(remedies.professional_structural) || '• No additional structural remedy was supported.'}`,
+    `Priority three, optional traditional observance:\n${traditional || '• No traditional observance is necessary to use the practical guidance in this report.'}`,
+    `Gemstones:\n${remedies.gemstone_note || 'No gemstone is recommended in this report. A gemstone prescription requires a separate dedicated planetary-strength assessment.'}`
+  ].filter(Boolean).join('\n\n');
+}
+
+function timingMapText(items) {
+  return (Array.isArray(items) ? items : []).filter(Boolean).map(item =>
+    `${item.period}\nAstrological chapter: ${item.astrology}\nNumerological year: ${item.numerology}\nCombined reading: ${item.combined_reading}\nConfidence: ${item.confidence}`
+  ).join('\n\n');
+}
+
+function reportTextFromJson(report) {
+  const primer = report.primer || {};
+  const glance = report.glance || {};
+  const areas = report.life_areas || {};
+
+  return [
+    `1. How To Read This Report\n${primer.purpose}\n\nThe two systems used here:\n${primer.systems}\n\nKP Astrology in plain language:\n${primer.kp_plain_language}\n\nNumerology in plain language:\n${primer.numerology_plain_language}\n\nThe convergence method:\n${primer.convergence_method}\n\nWhat this report will not do:\n${list(primer.limits)}`,
+    `2. Your Chart And Numbers At A Glance\nThe astrological layer:\n${formatGlanceRows(glance.astrology, 'astrology')}\n\nThe numerological layer:\n${formatGlanceRows(glance.numerology, 'numerology')}\n\nHeadline finding:\n${glance.headline_finding || ''}`,
+    `3. Personal Nature: Strengths And Weaknesses\n${lifeAreaText(areas.personal_nature)}`,
+    `4. Past Life Karma\n${lifeAreaText(areas.past_life_karma)}`,
+    `5. Finances\n${lifeAreaText(areas.finances)}`,
+    `6. Marriage And Partnership\n${lifeAreaText(areas.marriage)}`,
+    `7. Health And Constitution\n${lifeAreaText(areas.health)}`,
+    `8. Children\n${lifeAreaText(areas.children)}`,
+    `9. Property Purchase\n${lifeAreaText(areas.property)}`,
+    `10. Remedies\n${remediesText(report.remedies)}`,
+    `11. Your Timing Map\n${timingMapText(report.timing_map)}`,
+    `12. Closing Summary\n${list(report.closing_summary)}`,
+    `13. Scope And Limitations\n${list(report.scope_limitations)}`
   ].join('\n\n');
 }
 
@@ -337,17 +417,18 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   const compact = compactSource(sourceBundle, deterministicNumerology, verification);
   const raw = await callOpenAI(buildPrompt(input, compact));
   const reportJson = parseJson(raw);
-  const reportText = reportTextFromJson(reportJson, input);
+  const reportText = reportTextFromJson(reportJson);
 
   return {
     generated: true,
     model: getPaidModel(),
+    report_contract_version: 'integrated-life-report-v1',
     report_json: reportJson,
     report_text: reportText,
     verification,
     astrology_data: {
       provider: 'AstrologyAPI',
-      note: 'This report uses verified AstrologyAPI planetary positions, KP planets, KP house cusps, significator maps, chart calculations and Vimshottari Dasha data based on the submitted birth details.',
+      note: 'This Integrated Life Report uses verified AstrologyAPI planetary positions, KP planets, KP house cusps, significator maps, chart calculations and Vimshottari Dasha data based on the submitted birth details. It does not claim a separate automated Nadi calculation.',
       planets: sourceBundle.planets,
       kp_planets: sourceBundle.kp_planets,
       kp_house_cusps: sourceBundle.kp_house_cusps,
@@ -359,7 +440,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
       chart_images: sourceBundle.chart_images
     },
     numerology_data: {
-      provider: 'backend_deterministic_with_astrologyapi_cross_check',
+      provider: 'backend_deterministic_chaldean_with_astrologyapi_cross_check',
       deterministic: deterministicNumerology,
       numerological_numbers: sourceBundle.numerological_numbers,
       numero_table: sourceBundle.numero_table

@@ -2,6 +2,33 @@ const { generateSourceBundle } = require('./astrologyApiV2');
 const { calculateNumerology } = require('./numerologyEngine');
 const { verifySourceBundle } = require('./reportVerification');
 
+const LIFE_AREA_KEYS = [
+  'personal_nature',
+  'past_life_karma',
+  'finances',
+  'marriage',
+  'health',
+  'children',
+  'property'
+];
+
+const REQUIRED_ASTROLOGY_GLANCE_ROWS = [
+  'ascendant',
+  'ascendant lord',
+  'moon',
+  'strongest house',
+  'dominant planet',
+  'current period',
+  'next major shift'
+];
+
+const REQUIRED_NUMEROLOGY_GLANCE_ROWS = [
+  'birth number',
+  'destiny number',
+  'name number',
+  'personal year'
+];
+
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
 }
@@ -94,6 +121,8 @@ function compactSource(bundle, deterministicNumerology, verification) {
 }
 
 function buildPrompt(input, source) {
+  const reportYear = source?.deterministic_numerology?.calculation_date?.slice(0, 4) || new Date().getUTCFullYear();
+
   return `You are preparing The Integrated Life Report for Divya Bajaj.
 
 CLIENT
@@ -108,8 +137,11 @@ Main concern: ${input.question || 'Complete life clarity'}
 VERIFIED ASTROLOGYAPI SOURCE DATA AND BACKEND NUMEROLOGY
 ${JSON.stringify(source, null, 2)}
 
+SOURCE OF TRUTH
+The client-approved report format is the Integrated Life Report structure. Follow its order, teaching style, convergence method and seven life-area rhythm. Do not copy the sample client's conclusions. Every conclusion must be freshly derived from the verified source above for this customer.
+
 REPORT CONTRACT
-Follow this exact customer-facing structure and logic:
+The report must contain these sections in this exact order:
 1. How To Read This Report
 2. Your Chart And Numbers At A Glance
 3. Personal Nature: Strengths And Weaknesses
@@ -124,13 +156,41 @@ Follow this exact customer-facing structure and logic:
 12. Closing Summary
 13. Scope And Limitations
 
-The seven life areas are Personal Nature, Past Life Karma, Finances, Marriage, Health, Children and Property. For every life area use the same reading rhythm:
+SECTION 1 MUST TEACH THE METHOD IN THIS ORDER
+- Why the report shows its working.
+- The two systems used here.
+- Four plain-language ideas: Houses are life departments; Planets are the officers in charge; Dasha is whose turn it is; The chain of command explains sign lord, star lord and sub lord.
+- The convergence method: Convergence, Tension and Silence.
+- What the report will not do, including health, irreversible-event, guarantee and fear-based-prediction limits.
+- A short plain disclaimer that astrology and numerology are traditional interpretive systems and are not medical, legal or financial advice.
+
+SECTION 2 MUST USE THESE FIXED ROWS
+Astrological layer, exactly seven rows in this order:
+1. Ascendant
+2. Ascendant lord
+3. Moon
+4. Strongest house
+5. Dominant planet
+6. Current period
+7. Next major shift
+If a row cannot be supported from verified data, keep the row and say that the available source does not support a stronger conclusion. Never invent it.
+
+Numerological layer, exactly four rows in this order:
+1. Birth Number
+2. Destiny Number
+3. Name Number
+4. Personal Year ${reportYear}
+Use deterministic_numerology as primary. The Name Number is Chaldean. Show the derivation briefly and accurately.
+End this section with one headline finding that names the strongest genuine cross-system confirmation. If there is no strong convergence, say that plainly instead of manufacturing one.
+
+THE SEVEN LIFE AREAS
+The seven life areas are Personal Nature, Past Life Karma, Finances, Marriage, Health, Children and Property. For every life area use this same rhythm and these exact subheadings:
 - a short introduction
 - What your birth chart shows
 - What your numbers show
 - Where the two systems agree
-- Where they genuinely pull against each other, or clearly say that one system is silent
-- Timing only when supported
+- Where they pull against each other, or where one system is silent
+- Timing, only when supported
 - What to actually do about it
 - Confidence, with a short reason for that confidence
 
@@ -139,9 +199,23 @@ METHOD
 - Numerology is an independent second opinion, not a replacement for astrology.
 - Treat deterministic_numerology as the primary numerology source.
 - The deterministic Name Number is Chaldean. Do not call it Pythagorean.
-- Use the five deterministic Personal Year values in personal_years for the timing map.
-- The report may describe convergence, tension and silence. Never force the systems to agree.
+- Use the five deterministic values in personal_years for the core timing map.
+- The report may describe convergence, tension and silence. Never force agreement.
 - Do not claim that a separate Nadi calculation was performed. Divya may practise Nadi Astrology, but this automated report currently has verified KP Astrology plus Numerology source data only.
+
+TIMING MAP CONTRACT
+- Produce exactly five core timing rows, one for each deterministic personal_years entry, in chronological order.
+- For each row compare the verified astrological chapter with that Personal Year.
+- If astrology is silent for a year, say so.
+- Add an optional major_shift object only when the verified Dasha source clearly contains a meaningful major-period change outside those five rows.
+- Do not create dates or events that the verified source does not support.
+
+REMEDIES CONTRACT
+- Behavioural first.
+- Professional or structural second.
+- Optional traditional observance last.
+- No gemstone recommendation. State that gemstone prescription requires a separate dedicated planetary-strength assessment.
+- Explain the practical purpose of each remedy. Do not present a remedy as a mechanism that guarantees an external event.
 
 ACCURACY RULES
 - Use only facts supported by the supplied source data.
@@ -155,109 +229,62 @@ ACCURACY RULES
 - Children: no fertility guarantees and no claim that someone definitely can or cannot conceive.
 - Finances: no guaranteed income, returns or investment outcomes.
 - Marriage: no guaranteed marriage date or guaranteed relationship outcome.
-- Remedies: behavioural first, professional or structural second, optional traditional observance last.
-- Do not recommend a gemstone in this report. State that gemstone assessment requires a separate dedicated evaluation.
+- No prediction of death or a date for an irreversible event.
 - No fear-based language, curses, threats or remedy sales tactics.
 
-WRITING STYLE
+WRITING STYLE AND LENGTH
 - Plain, natural English that a normal customer can understand.
 - Warm, direct and practical, as if Divya is explaining the report personally.
 - No em dashes.
 - Avoid robotic phrases and vague spiritual filler.
 - Every paragraph should add interpretation, evidence, limitation, action or useful synthesis.
-- Do not repeat the same observation in multiple sections unless the new section adds a genuinely different implication.
-- Target roughly 4,800 to 5,500 words. The client's sample is intentionally more detailed than the desired live report, so keep the same depth and structure but edit tightly.
+- Do not repeat the same observation in multiple sections unless the new section adds a different implication.
+- Main target: 4,500 to 5,300 words for the rendered report.
+- Acceptable final range: 4,000 to 5,800 words. Do not exceed it.
+- Suggested balance: primer 450-550 words; glance 300-400; each life area 350-450; remedies 350-450; timing map 250-350; closing summary 200-300; limitations 180-260.
+- The client's sample is deliberately longer. Keep the same logic and depth, but edit tightly.
 
 Return ONLY valid JSON with exactly this shape:
 {
   "primer": {
     "purpose": "",
     "systems": "",
-    "kp_plain_language": "",
-    "numerology_plain_language": "",
+    "four_ideas": {
+      "houses": "",
+      "planets": "",
+      "dasha": "",
+      "chain_of_command": ""
+    },
     "convergence_method": "",
-    "limits": ["", ""]
+    "limits": ["", "", "", ""],
+    "disclaimer": ""
   },
   "glance": {
     "astrology": [
-      {"element":"", "position":"", "plain_meaning":""}
+      {"element":"Ascendant", "position":"", "plain_meaning":""},
+      {"element":"Ascendant lord", "position":"", "plain_meaning":""},
+      {"element":"Moon", "position":"", "plain_meaning":""},
+      {"element":"Strongest house", "position":"", "plain_meaning":""},
+      {"element":"Dominant planet", "position":"", "plain_meaning":""},
+      {"element":"Current period", "position":"", "plain_meaning":""},
+      {"element":"Next major shift", "position":"", "plain_meaning":""}
     ],
     "numerology": [
-      {"label":"", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""}
+      {"label":"Birth Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
+      {"label":"Destiny Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
+      {"label":"Name Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
+      {"label":"Personal Year ${reportYear}", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""}
     ],
     "headline_finding": ""
   },
   "life_areas": {
-    "personal_nature": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "past_life_karma": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "finances": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "marriage": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "health": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "children": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    },
-    "property": {
-      "intro":"",
-      "birth_chart":"",
-      "numbers":"",
-      "convergence":"",
-      "tension_or_silence":"",
-      "timing":[""],
-      "actions":[""],
-      "confidence":""
-    }
+    "personal_nature": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "past_life_karma": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "finances": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "marriage": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "health": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "children": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""},
+    "property": {"intro":"", "birth_chart":"", "numbers":"", "convergence":"", "tension_or_silence":"", "timing":[""], "actions":[""], "confidence":""}
   },
   "remedies": {
     "intro":"",
@@ -267,11 +294,52 @@ Return ONLY valid JSON with exactly this shape:
     "gemstone_note":""
   },
   "timing_map": [
+    {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""},
+    {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""},
+    {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""},
+    {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""},
     {"period":"", "astrology":"", "numerology":"", "combined_reading":"", "confidence":""}
   ],
+  "major_shift": {"period":"", "reading":"", "confidence":""},
   "closing_summary":["", "", "", "", ""],
   "scope_limitations":["", "", "", ""]
 }`;
+}
+
+function buildRepairPrompt(input, source, report, issues, wordCount) {
+  return `Repair the Integrated Life Report JSON below so it follows the exact contract.
+
+CLIENT
+Name: ${input.name}
+Date of birth: ${input.dob}
+Time of birth: ${input.tob}
+Place of birth: ${input.pob}
+Main concern: ${input.question || 'Complete life clarity'}
+
+VERIFIED SOURCE
+${JSON.stringify(source, null, 2)}
+
+CURRENT JSON
+${JSON.stringify(report, null, 2)}
+
+VALIDATION ISSUES
+${issues.map(item => `- ${item}`).join('\n')}
+Current rendered word count: ${wordCount}
+
+RULES
+- Return ONLY corrected valid JSON in the exact same schema used by CURRENT JSON.
+- Preserve all supported facts already present unless they conflict with VERIFIED SOURCE.
+- Do not add any unsupported factual claim.
+- Make all required sections complete.
+- Keep exactly seven fixed life areas.
+- Keep exactly seven fixed astrology glance rows and four fixed numerology glance rows.
+- Keep exactly five core timing rows corresponding to deterministic personal_years.
+- Keep exactly five closing summary points and at least four scope limitations.
+- Target 4,500 to 5,300 rendered words; acceptable 4,000 to 5,800.
+- If shortening, remove repetition before removing evidence, limitations, actions or timing.
+- If expanding, add explanation only where supported by VERIFIED SOURCE. Never pad with generic astrology language.
+- No em dashes.
+- Do not claim a separate Nadi calculation.`;
 }
 
 async function callOpenAI(prompt) {
@@ -293,7 +361,7 @@ async function callOpenAI(prompt) {
         model: getPaidModel(),
         reasoning: { effort: 'none' },
         input: prompt,
-        max_output_tokens: 10000
+        max_output_tokens: 11000
       })
     });
 
@@ -329,6 +397,10 @@ function list(items) {
   return (Array.isArray(items) ? items : []).filter(Boolean).map(item => `• ${item}`).join('\n');
 }
 
+function normalizedLabel(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+\d{4}$/, '');
+}
+
 function formatGlanceRows(rows, kind) {
   return (Array.isArray(rows) ? rows : []).filter(Boolean).map(item => {
     if (kind === 'numerology') {
@@ -349,7 +421,7 @@ function lifeAreaText(area = {}) {
     `Where they pull against each other, or where one system is silent:\n${area.tension_or_silence || 'No meaningful tension is supported by the available data.'}`,
     timing ? `Timing:\n${timing}` : 'Timing:\nNo timing claim is made because the verified data does not support one.',
     `What to actually do about it:\n${actions || '• Use this section as reflection rather than a fixed prediction.'}`,
-    `Confidence:\n${area.confidence || 'Limited by the available verified data.'}`
+    `Confidence: ${area.confidence || 'Limited by the available verified data.'}`
   ].filter(Boolean).join('\n\n');
 }
 
@@ -371,20 +443,27 @@ function remediesText(remedies = {}) {
   ].filter(Boolean).join('\n\n');
 }
 
-function timingMapText(items) {
-  return (Array.isArray(items) ? items : []).filter(Boolean).map(item =>
+function timingMapText(items, majorShift) {
+  const core = (Array.isArray(items) ? items : []).filter(Boolean).map(item =>
     `${item.period}\nAstrological chapter: ${item.astrology}\nNumerological year: ${item.numerology}\nCombined reading: ${item.combined_reading}\nConfidence: ${item.confidence}`
   ).join('\n\n');
+
+  const shift = majorShift && majorShift.period && majorShift.reading
+    ? `\n\nMajor shift beyond the five-year map:\n${majorShift.period}\n${majorShift.reading}\nConfidence: ${majorShift.confidence || 'Based on the verified Dasha source.'}`
+    : '';
+
+  return `${core}${shift}`.trim();
 }
 
 function reportTextFromJson(report) {
   const primer = report.primer || {};
+  const ideas = primer.four_ideas || {};
   const glance = report.glance || {};
   const areas = report.life_areas || {};
 
   return [
-    `1. How To Read This Report\n${primer.purpose}\n\nThe two systems used here:\n${primer.systems}\n\nKP Astrology in plain language:\n${primer.kp_plain_language}\n\nNumerology in plain language:\n${primer.numerology_plain_language}\n\nThe convergence method:\n${primer.convergence_method}\n\nWhat this report will not do:\n${list(primer.limits)}`,
-    `2. Your Chart And Numbers At A Glance\nThe astrological layer:\n${formatGlanceRows(glance.astrology, 'astrology')}\n\nThe numerological layer:\n${formatGlanceRows(glance.numerology, 'numerology')}\n\nHeadline finding:\n${glance.headline_finding || ''}`,
+    `1. How To Read This Report\n${primer.purpose || ''}\n\nThe two systems used here\n${primer.systems || ''}\n\nThe four ideas you need\n1. Houses are life departments\n${ideas.houses || ''}\n\n2. Planets are the officers in charge\n${ideas.planets || ''}\n\n3. Dasha is whose turn it is\n${ideas.dasha || ''}\n\n4. The chain of command\n${ideas.chain_of_command || ''}\n\nThe convergence method\n${primer.convergence_method || ''}\n\nWhat this report will not do\n${list(primer.limits)}\n\n${primer.disclaimer || ''}`,
+    `2. Your Chart And Numbers At A Glance\nThe astrological layer\n${formatGlanceRows(glance.astrology, 'astrology')}\n\nThe numerological layer\n${formatGlanceRows(glance.numerology, 'numerology')}\n\nThe headline finding\n${glance.headline_finding || ''}`,
     `3. Personal Nature: Strengths And Weaknesses\n${lifeAreaText(areas.personal_nature)}`,
     `4. Past Life Karma\n${lifeAreaText(areas.past_life_karma)}`,
     `5. Finances\n${lifeAreaText(areas.finances)}`,
@@ -393,10 +472,68 @@ function reportTextFromJson(report) {
     `8. Children\n${lifeAreaText(areas.children)}`,
     `9. Property Purchase\n${lifeAreaText(areas.property)}`,
     `10. Remedies\n${remediesText(report.remedies)}`,
-    `11. Your Timing Map\n${timingMapText(report.timing_map)}`,
+    `11. Your Timing Map\n${timingMapText(report.timing_map, report.major_shift)}`,
     `12. Closing Summary\n${list(report.closing_summary)}`,
     `13. Scope And Limitations\n${list(report.scope_limitations)}`
   ].join('\n\n');
+}
+
+function countWords(value) {
+  return String(value || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+function validateReport(report) {
+  const issues = [];
+
+  if (!report || typeof report !== 'object') return ['Report JSON is missing.'];
+
+  const primer = report.primer || {};
+  const ideas = primer.four_ideas || {};
+  ['purpose', 'systems', 'convergence_method', 'disclaimer'].forEach(key => {
+    if (!String(primer[key] || '').trim()) issues.push(`Primer field ${key} is missing.`);
+  });
+  ['houses', 'planets', 'dasha', 'chain_of_command'].forEach(key => {
+    if (!String(ideas[key] || '').trim()) issues.push(`Primer four_ideas.${key} is missing.`);
+  });
+  if (!Array.isArray(primer.limits) || primer.limits.filter(Boolean).length < 4) {
+    issues.push('Primer must include at least four explicit limits.');
+  }
+
+  const astrologyRows = Array.isArray(report.glance?.astrology) ? report.glance.astrology : [];
+  const astrologyLabels = astrologyRows.map(item => normalizedLabel(item?.element));
+  if (astrologyRows.length !== 7) issues.push('Astrology glance must contain exactly seven rows.');
+  REQUIRED_ASTROLOGY_GLANCE_ROWS.forEach(label => {
+    if (!astrologyLabels.includes(label)) issues.push(`Astrology glance row missing: ${label}.`);
+  });
+
+  const numerologyRows = Array.isArray(report.glance?.numerology) ? report.glance.numerology : [];
+  const numerologyLabels = numerologyRows.map(item => normalizedLabel(item?.label));
+  if (numerologyRows.length !== 4) issues.push('Numerology glance must contain exactly four rows.');
+  REQUIRED_NUMEROLOGY_GLANCE_ROWS.forEach(label => {
+    if (!numerologyLabels.includes(label)) issues.push(`Numerology glance row missing: ${label}.`);
+  });
+  if (!String(report.glance?.headline_finding || '').trim()) issues.push('Headline finding is missing.');
+
+  const areas = report.life_areas || {};
+  LIFE_AREA_KEYS.forEach(key => {
+    const area = areas[key];
+    if (!area || typeof area !== 'object') {
+      issues.push(`Life area ${key} is missing.`);
+      return;
+    }
+    ['intro', 'birth_chart', 'numbers', 'convergence', 'tension_or_silence', 'confidence'].forEach(field => {
+      if (!String(area[field] || '').trim()) issues.push(`Life area ${key}.${field} is missing.`);
+    });
+    if (!Array.isArray(area.actions) || !area.actions.filter(Boolean).length) issues.push(`Life area ${key}.actions is missing.`);
+    if (!Array.isArray(area.timing)) issues.push(`Life area ${key}.timing must be an array.`);
+  });
+
+  if (!report.remedies || typeof report.remedies !== 'object') issues.push('Remedies section is missing.');
+  if (!Array.isArray(report.timing_map) || report.timing_map.length !== 5) issues.push('Timing map must contain exactly five core rows.');
+  if (!Array.isArray(report.closing_summary) || report.closing_summary.filter(Boolean).length !== 5) issues.push('Closing Summary must contain exactly five points.');
+  if (!Array.isArray(report.scope_limitations) || report.scope_limitations.filter(Boolean).length < 4) issues.push('Scope And Limitations must contain at least four points.');
+
+  return issues;
 }
 
 async function generatePaidReportV2(input, { includePdfs = false } = {}) {
@@ -416,8 +553,29 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
 
   const compact = compactSource(sourceBundle, deterministicNumerology, verification);
   const raw = await callOpenAI(buildPrompt(input, compact));
-  const reportJson = parseJson(raw);
-  const reportText = reportTextFromJson(reportJson);
+  let reportJson = parseJson(raw);
+  let reportText = reportTextFromJson(reportJson);
+  let issues = validateReport(reportJson);
+  let wordCount = countWords(reportText);
+
+  if (wordCount < 4000 || wordCount > 5800) {
+    issues.push(`Rendered report word count ${wordCount} is outside the 4,000 to 5,800 contract.`);
+  }
+
+  if (issues.length) {
+    const repairedRaw = await callOpenAI(buildRepairPrompt(input, compact, reportJson, issues, wordCount));
+    reportJson = parseJson(repairedRaw);
+    reportText = reportTextFromJson(reportJson);
+    issues = validateReport(reportJson);
+    wordCount = countWords(reportText);
+    if (wordCount < 4000 || wordCount > 5800) {
+      issues.push(`Repaired report word count ${wordCount} is outside the 4,000 to 5,800 contract.`);
+    }
+  }
+
+  if (issues.length) {
+    throw new Error(`Integrated Life Report contract validation failed: ${issues.slice(0, 6).join(' | ')}`);
+  }
 
   return {
     generated: true,
@@ -425,6 +583,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     report_contract_version: 'integrated-life-report-v1',
     report_json: reportJson,
     report_text: reportText,
+    report_word_count: wordCount,
     verification,
     astrology_data: {
       provider: 'AstrologyAPI',
@@ -455,4 +614,10 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   };
 }
 
-module.exports = { generatePaidReportV2, getPaidModel, reportTextFromJson };
+module.exports = {
+  generatePaidReportV2,
+  getPaidModel,
+  reportTextFromJson,
+  validateReport,
+  countWords
+};

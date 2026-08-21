@@ -10,16 +10,15 @@ const NUMBER_PLANETS = Object.freeze({
   9: 'Mars'
 });
 
-const PYTHAGOREAN_VALUES = Object.freeze({
-  A: 1, J: 1, S: 1,
-  B: 2, K: 2, T: 2,
-  C: 3, L: 3, U: 3,
-  D: 4, M: 4, V: 4,
-  E: 5, N: 5, W: 5,
-  F: 6, O: 6, X: 6,
-  G: 7, P: 7, Y: 7,
-  H: 8, Q: 8, Z: 8,
-  I: 9, R: 9
+const CHALDEAN_VALUES = Object.freeze({
+  A: 1, I: 1, J: 1, Q: 1, Y: 1,
+  B: 2, K: 2, R: 2,
+  C: 3, G: 3, L: 3, S: 3,
+  D: 4, M: 4, T: 4,
+  E: 5, H: 5, N: 5, X: 5,
+  U: 6, V: 6, W: 6,
+  O: 7, Z: 7,
+  F: 8, P: 8
 });
 
 function digitSum(value) {
@@ -52,14 +51,26 @@ function parseDob(dob) {
 
 function calculateNameNumber(name) {
   const letters = String(name || '').toUpperCase().match(/[A-Z]/g) || [];
-  if (!letters.length) throw new Error('A name containing English letters is required for the Pythagorean Name Number');
-  const values = letters.map(letter => PYTHAGOREAN_VALUES[letter]);
+  if (!letters.length) throw new Error('A name containing English letters is required for the Chaldean Name Number');
+
+  const values = letters.map(letter => CHALDEAN_VALUES[letter] || 0);
   const total = values.reduce((sum, value) => sum + value, 0);
+
   return {
+    method: 'Chaldean',
     number: reduceToSingleDigit(total),
     total,
     letters,
     values
+  };
+}
+
+function calculatePersonalYear(day, month, year) {
+  const raw = day + month + digitSum(year);
+  return {
+    year,
+    raw,
+    number: reduceToSingleDigit(raw)
   };
 }
 
@@ -69,26 +80,30 @@ function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
   if (Number.isNaN(calculationDate.getTime())) throw new Error('Report date is invalid for Personal Year calculation');
 
   const currentYear = calculationDate.getUTCFullYear();
-  const psychicRaw = day;
+  const psychicNumber = reduceToSingleDigit(day);
   const destinyDigits = `${String(day).padStart(2, '0')}${String(month).padStart(2, '0')}${year}`;
   const destinyRaw = digitSum(destinyDigits);
-  const nameResult = calculateNameNumber(name);
-  const reducedDay = reduceToSingleDigit(day);
-  const reducedMonth = reduceToSingleDigit(month);
-  const reducedYear = reduceToSingleDigit(digitSum(currentYear));
-  const personalYearRaw = reducedDay + reducedMonth + reducedYear;
-
-  const psychicNumber = reduceToSingleDigit(psychicRaw);
   const destinyNumber = reduceToSingleDigit(destinyRaw);
-  const personalYear = reduceToSingleDigit(personalYearRaw);
+  const nameResult = calculateNameNumber(name);
+  const personalYears = Array.from({ length: 5 }, (_, index) => calculatePersonalYear(day, month, currentYear + index));
+  const personalYear = personalYears[0].number;
 
   return {
+    method: 'Chaldean numerology',
     psychic_number: psychicNumber,
+    birth_number: psychicNumber,
     destiny_number: destinyNumber,
     name_number: nameResult.number,
     personal_year: personalYear,
+    personal_years: personalYears.map(item => ({
+      year: item.year,
+      number: item.number,
+      ruling_planet: NUMBER_PLANETS[item.number],
+      working_total: item.raw
+    })),
     number_planets: {
       psychic: NUMBER_PLANETS[psychicNumber],
+      birth: NUMBER_PLANETS[psychicNumber],
       destiny: NUMBER_PLANETS[destinyNumber],
       name: NUMBER_PLANETS[nameResult.number],
       personal_year: NUMBER_PLANETS[personalYear]
@@ -105,17 +120,18 @@ function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
         reduced: destinyNumber
       },
       name: {
+        method: nameResult.method,
         letters: nameResult.letters,
         values: nameResult.values,
         total: nameResult.total,
         reduced: nameResult.number
       },
       personal_year: {
-        reduced_day: reducedDay,
-        reduced_month: reducedMonth,
+        input_day: day,
+        input_month: month,
         current_year: currentYear,
-        reduced_current_year: reducedYear,
-        total: personalYearRaw,
+        year_digit_sum: digitSum(currentYear),
+        total: personalYears[0].raw,
         reduced: personalYear
       }
     }
@@ -124,7 +140,7 @@ function calculateNumerology({ name, dob, reportDate = new Date() } = {}) {
 
 module.exports = {
   NUMBER_PLANETS,
-  PYTHAGOREAN_VALUES,
+  CHALDEAN_VALUES,
   calculateNameNumber,
   calculateNumerology,
   digitSum,

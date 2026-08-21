@@ -460,6 +460,111 @@ function reportTextFromJson(report, input) {
   ].filter(Boolean).join('\n\n').replace(/—/g, ' - ');
 }
 
+const LENGTH_PROTECTED_FIELDS = new Set([
+  'status',
+  'ascendant',
+  'moon_nakshatra',
+  'moon_nakshatra_lord',
+  'current_mahadasha',
+  'current_antardasha',
+  'current_pratyantar',
+  'current_sookshma',
+  'current_prana',
+  'report_title',
+  'client_name',
+  'birth_details',
+  'report_date',
+  'methodology',
+  'label',
+  'planet',
+  'level',
+  'start',
+  'end',
+  'confidence',
+  'period',
+  'numerological_cycle',
+  'category',
+  'how_often',
+  'symbolic_disclaimer',
+  'safety_line',
+  'medical_line',
+  'gemstones_and_individual_prescriptions'
+]);
+
+function wordCount(text) {
+  return String(text || '').split(/\s+/).filter(Boolean).length;
+}
+
+function shortenNarrative(value, limit) {
+  const words = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length <= limit) return String(value || '');
+
+  const sentences = String(value || '').trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  if (sentences.length < 2) return `${words.slice(0, limit).join(' ').replace(/[,:;\-]+$/, '')}.`;
+
+  const first = sentences[0].trim();
+  const last = sentences[sentences.length - 1].trim();
+  const edgeWords = wordCount(first) + wordCount(last);
+  if (edgeWords >= limit) return `${words.slice(0, limit).join(' ').replace(/[,:;\-]+$/, '')}.`;
+
+  const selected = [first];
+  let used = wordCount(first) + wordCount(last);
+  for (let index = 1; index < sentences.length - 1; index += 1) {
+    const sentence = sentences[index].trim();
+    const sentenceWords = wordCount(sentence);
+    if (used + sentenceWords > limit) break;
+    selected.push(sentence);
+    used += sentenceWords;
+  }
+  selected.push(last);
+  return selected.join(' ');
+}
+
+function collectNarrativeStrings(node, entries = [], parent = null, key = '') {
+  if (typeof node === 'string') {
+    const words = wordCount(node);
+    if (parent && words >= 24 && !LENGTH_PROTECTED_FIELDS.has(key)) entries.push({ parent, key, words });
+    return entries;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((item, index) => collectNarrativeStrings(item, entries, node, index));
+    return entries;
+  }
+  if (node && typeof node === 'object') {
+    Object.entries(node).forEach(([childKey, value]) => collectNarrativeStrings(value, entries, node, childKey));
+  }
+  return entries;
+}
+
+function compactReportToWordBudget(report, input, targetWords = 6200, maximumWords = 6800) {
+  let rendered = reportTextFromJson(report, input);
+  let renderedWords = wordCount(rendered);
+  if (renderedWords <= maximumWords) return { report, reportText: rendered, adjusted: false, originalWords: renderedWords };
+
+  const originalWords = renderedWords;
+  for (let pass = 0; pass < 3 && renderedWords > maximumWords; pass += 1) {
+    const entries = collectNarrativeStrings(report);
+    const mutableWords = entries.reduce((total, entry) => total + entry.words, 0);
+    if (!mutableWords) break;
+
+    const fixedEstimate = Math.max(0, renderedWords - mutableWords);
+    const desiredMutableWords = Math.max(entries.length * 18, targetWords - fixedEstimate);
+    const ratio = Math.max(0.35, Math.min(0.92, desiredMutableWords / mutableWords));
+    entries.forEach(entry => {
+      const limit = Math.max(18, Math.floor(entry.words * ratio));
+      entry.parent[entry.key] = shortenNarrative(entry.parent[entry.key], limit);
+    });
+
+    rendered = reportTextFromJson(report, input);
+    renderedWords = wordCount(rendered);
+  }
+
+  if (renderedWords > maximumWords) {
+    throw new Error(`Integrated Life Report could not be safely normalised below ${maximumWords} words: ${renderedWords} words`);
+  }
+  return { report, reportText: rendered, adjusted: true, originalWords };
+}
+
 function expectedDashaPlanet(verification, level) {
   return verification?.verified_facts?.dasha?.[level]?.direct_planet || verification?.verified_facts?.dasha?.[level]?.date_selected_planet || '';
 }
@@ -657,7 +762,7 @@ async function startPaidReportV2(input) {
     model: getPaidModel(),
     prompt: stagePrompt(input, prepared.context, stage),
     responseFormat: responseFormatFor(stage),
-    maxOutputTokens: 8000,
+    maxOutputTokens: 4000,
     reasoningEffort: 'none',
     background: true,
     metadata: {
@@ -720,8 +825,12 @@ async function pollPaidReportV2({ job_token, response_ids }) {
   let reportJson = {};
   results.forEach(result => { reportJson = { ...reportJson, ...(result.output || {}) }; });
   reportJson = applyDeterministicFacts(reportJson, state);
+  const compacted = compactReportToWordBudget(reportJson, state.input);
+  reportJson = applyDeterministicFacts(compacted.report, state);
   const reportText = reportTextFromJson(reportJson, state.input);
   const qa = assertQa(reportJson, reportText, state);
+  qa.length_adjusted = compacted.adjusted;
+  if (compacted.adjusted) qa.original_word_count = compacted.originalWords;
 
   return {
     completed: true,
@@ -747,6 +856,7 @@ async function pollPaidReportV2({ job_token, response_ids }) {
 
 module.exports = {
   CONTRACT_VERSION,
+  compactReportToWordBudget,
   getPaidModel,
   pollPaidReportV2,
   reportTextFromJson,

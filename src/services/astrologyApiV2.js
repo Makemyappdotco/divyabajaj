@@ -2,6 +2,7 @@ const brand = require('../config/divyaBrand');
 
 const JSON_BASE_URL = 'https://json.astrologyapi.com/v1';
 const PDF_BASE_URL = 'https://pdf.astrologyapi.com/v1';
+const OPEN_METEO_GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 
 function getMode() {
   return String(process.env.ASTROLOGYAPI_MODE || 'sandbox').toLowerCase();
@@ -105,7 +106,7 @@ async function post(path, payload, { pdf = false, timeoutMs = 60000 } = {}) {
 
     if (!response.ok) {
       const message = data?.message || data?.error || data?.raw || `HTTP ${response.status}`;
-      throw new Error(`AstrologyAPI ${path} failed: ${message}`);
+      throw new Error(`AstrologyAPI ${path} failed: ${typeof message === 'string' ? message : JSON.stringify(message)}`);
     }
 
     return data;
@@ -128,8 +129,8 @@ function normaliseLocationText(value) {
 }
 
 function locationScore(location, query) {
-  const name = normaliseLocationText(location.place_name);
-  const wanted = normaliseLocationText(query);
+  const name = normaliseLocationText(location.raw_name || location.place_name);
+  const wanted = normaliseLocationText(query.split(',')[0]);
   let score = 0;
 
   if (name === wanted) score += 1000;
@@ -139,28 +140,115 @@ function locationScore(location, query) {
   // Divya's primary audience is India, but international birth locations remain available.
   if (location.country_code === 'IN') score += 80;
   if (location.timezone_id === 'Asia/Kolkata') score += 20;
+  if (location.population) score += Math.min(Math.log10(Math.max(location.population, 1)) * 2, 20);
 
   return score;
 }
 
-async function searchLocations(place, maxRows = 7) {
-  const query = String(place || '').trim();
-  if (query.length < 2) return [];
+function qualifiedPlaceName(row) {
+  const parts = [row.name, row.admin2, row.admin1, row.country]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  return [...new Set(parts.map(value => value.replace(/\s+/g, ' ')))].join(', ');
+}
 
-  const requestedRows = Math.min(Math.max(Number(maxRows) || 7, 1), 10);
-  const result = await post('geo_details', { place: query, maxRows: '10' });
+async function searchOpenMeteoLocations(query, requestedRows) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const url = new URL(OPEN_METEO_GEOCODING_URL);
+    url.searchParams.set('name', query);
+    url.searchParams.set('count', String(Math.min(Math.max(requestedRows, 10), 25)));
+    url.searchParams.set('language', 'en');
+    url.searchParams.set('format', 'json');
+
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error(`Open-Meteo geocoding returned HTTP ${response.status}`);
+    const data = await response.json();
+    const rows = Array.isArray(data?.results) ? data.results : [];
+
+    return rows
+      .map((row, index) => ({
+        id: `om-${row.id || index}`,
+        raw_name: String(row.name || '').trim(),
+        place_name: qualifiedPlaceName(row),
+        latitude: Number(row.latitude),
+        longitude: Number(row.longitude),
+        timezone_id: String(row.timezone || '').trim(),
+        country_code: String(row.country_code || '').trim().toUpperCase(),
+        country: String(row.country || '').trim(),
+        admin1: String(row.admin1 || '').trim(),
+        admin2: String(row.admin2 || '').trim(),
+        population: Number(row.population) || 0,
+        provider: 'open_meteo_geonames'
+      }))
+      .filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Location search timed out');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function searchAstrologyApiLocations(query, requestedRows) {
+  const result = await post('geo_details', { place: query, maxRows: String(Math.min(requestedRows, 10)) }, { timeoutMs: 10000 });
   const rows = Array.isArray(result?.geonames) ? result.geonames : [];
-
   return rows
     .map((row, index) => ({
-      id: `${row.place_name || query}-${row.latitude}-${row.longitude}-${index}`,
+      id: `astro-${row.place_name || query}-${row.latitude}-${row.longitude}-${index}`,
+      raw_name: String(row.place_name || '').trim(),
       place_name: String(row.place_name || '').trim(),
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
       timezone_id: String(row.timezone_id || '').trim(),
-      country_code: String(row.country_code || '').trim().toUpperCase()
+      country_code: String(row.country_code || '').trim().toUpperCase(),
+      country: String(row.country_code || '').trim().toUpperCase(),
+      admin1: '',
+      admin2: '',
+      population: 0,
+      provider: 'astrologyapi'
     }))
-    .filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude))
+    .filter(row => row.place_name && Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
+}
+
+function dedupeLocations(rows) {
+  const seen = new Set();
+  return rows.filter(row => {
+    const key = `${normaliseLocationText(row.place_name)}|${row.latitude.toFixed(4)}|${row.longitude.toFixed(4)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function searchLocations(place, maxRows = 20) {
+  const query = String(place || '').trim();
+  if (query.length < 2) return [];
+
+  const requestedRows = Math.min(Math.max(Number(maxRows) || 20, 1), 25);
+  let rows = [];
+
+  try {
+    rows = await searchOpenMeteoLocations(query, requestedRows);
+  } catch (error) {
+    console.warn('[Location search primary provider]', error.message || error);
+  }
+
+  if (!rows.length) {
+    try {
+      rows = await searchAstrologyApiLocations(query, requestedRows);
+    } catch (error) {
+      console.error('[Location search fallback provider]', error.message || error);
+      throw new Error('Could not search locations right now. Please try again in a moment.');
+    }
+  }
+
+  return dedupeLocations(rows)
     .sort((a, b) => {
       const scoreDifference = locationScore(b, query) - locationScore(a, query);
       if (scoreDifference) return scoreDifference;

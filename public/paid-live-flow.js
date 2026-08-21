@@ -215,6 +215,10 @@
 
   function openModal() {
     var overlay = ensureModal();
+    var freePopup = document.getElementById('freePopup');
+    if (freePopup) freePopup.classList.remove('active');
+    try { sessionStorage.setItem('popup_dismissed', 'true'); } catch (_) {}
+    document.body.style.overflow = '';
     overlay.classList.add('is-open');
     document.body.classList.add('dbp-lock');
     setTimeout(function () { var el = qs('#dbp-name', overlay); if (el) el.focus({ preventScroll:true }); }, 80);

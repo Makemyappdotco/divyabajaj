@@ -2726,7 +2726,12 @@ setTimeout(showNotification,Math.random()*4000);
 
 
 // ===== FREE REPORT POPUP (PRODUCTION) =====
+function paidReportIsOpen(){
+var p=document.getElementById('dbpOverlay');
+return !!(p&&p.classList.contains('is-open'));
+}
 function openFreeReportPopup(){
+if(paidReportIsOpen())return;
 var p=document.getElementById('freePopup');
 if(!p)return;
 p.classList.add('active');
@@ -2757,8 +2762,8 @@ var pp=document.getElementById('popupPortrait');
 if(hi&&pp&&!pp.querySelector('img')){var im=document.createElement('img');im.src=hi.src;im.alt='Divya Bajaj';pp.appendChild(im)}
 var pc=document.getElementById('popProofCount');
 if(pc)pc.textContent=Math.floor(Math.random()*35)+34;
-var as=false;var ad=sessionStorage.getItem('popup_dismissed')==='true';
-function autoTrigger(){if(as||ad)return;as=true;openFreeReportPopup()}
+var as=false;
+function autoTrigger(){if(as||sessionStorage.getItem('popup_dismissed')==='true'||paidReportIsOpen())return;as=true;openFreeReportPopup()}
 function scrollCheck(){var pct=(window.scrollY/(document.documentElement.scrollHeight-window.innerHeight))*100;if(pct>35){autoTrigger();window.removeEventListener('scroll',scrollCheck)}}
 window.addEventListener('scroll',scrollCheck,{passive:true});
 setTimeout(function(){autoTrigger()},30000);

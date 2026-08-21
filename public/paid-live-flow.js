@@ -545,6 +545,32 @@
     return /get blueprint|full blueprint|advanced report|paid report|integrated report|go deeper|detailed report/.test(label + ' ' + href);
   }
 
+  function guardFreeReportAutoOpen() {
+    var originalOpen = window.openFreeReportPopup;
+    if (typeof originalOpen !== 'function' || originalOpen.__dbpExplicitOnly) return;
+    var allowFreeUntil = 0;
+    document.addEventListener('click', function (event) {
+      var target = event.target && event.target.closest ? event.target.closest('button,a') : null;
+      if (!target || target.closest('#dbpOverlay')) return;
+      var label = textOf(target);
+      var onclick = String(target.getAttribute && target.getAttribute('onclick') || '').toLowerCase();
+      if (/free report|read my numbers|get it free|read it free|start free/.test(label + ' ' + onclick)) {
+        allowFreeUntil = Date.now() + 2000;
+      }
+    }, true);
+    var guardedOpen = function () {
+      var paid = document.getElementById('dbpOverlay');
+      if (paid && paid.classList.contains('is-open')) return;
+      if (Date.now() > allowFreeUntil) return;
+      allowFreeUntil = 0;
+      return originalOpen.apply(this, arguments);
+    };
+    guardedOpen.__dbpExplicitOnly = true;
+    window.openFreeReportPopup = guardedOpen;
+  }
+
+  guardFreeReportAutoOpen();
+
   document.addEventListener('click', function (event) {
     var target = event.target && event.target.closest ? event.target.closest('button,a') : null;
     if (!target) return;

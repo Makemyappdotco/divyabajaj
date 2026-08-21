@@ -71,7 +71,7 @@ function normaliseV2Payload(body = {}) {
     country_code: String(body.country_code || '').trim(),
     question: String(body.question || '').trim(),
     include_source_pdfs: body.include_source_pdfs === true,
-    source: String(body.source || 'paid_blueprint_v2_preview').trim()
+    source: String(body.source || 'paid_blueprint_live').trim()
   };
 }
 
@@ -80,7 +80,7 @@ function numbersFromV2(result = {}) {
   const indian = result.numerology_data?.numero_table?.data || {};
   const deterministic = result.numerology_data?.deterministic || {};
   return {
-    ruling_number: deterministic.psychic_number || indian.radical_number || indian.radical_num || '',
+    ruling_number: deterministic.birth_number || deterministic.psychic_number || indian.radical_number || indian.radical_num || '',
     destiny_number: deterministic.destiny_number || indian.destiny_number || western.lifepath_number || '',
     name_number: deterministic.name_number || indian.name_number || western.expression_number || '',
     personal_year: deterministic.personal_year || '',
@@ -118,7 +118,7 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
       timezone_id: payload.timezone_id || '',
       country_code: payload.country_code || '',
       question: payload.question,
-      source: payload.source || 'paid_blueprint_public_test_form',
+      source: payload.source || 'paid_blueprint_live',
       status: 'paid_test_report_generated',
       tier: type
     };
@@ -129,17 +129,17 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
 
     if (!lead?.id) throw new Error('Lead record was not created');
 
-    const isV2 = type === 'paid_blueprint_v2_preview';
     const completedAt = new Date().toISOString();
+    const isIntegrated = type === 'paid_blueprint_v2_preview';
     const report = await db.createReport({
       lead_id: lead.id,
       type,
       status: 'completed',
       completed_at: completedAt,
-      report_contract_version: isV2 ? 'paid-v2-preview' : 'paid-legacy-preview',
-      calculation_contract_version: isV2 ? 'astrologyapi-kp-v1' : 'numerology-legacy',
-      prompt_version: isV2 ? 'paid-v2-kp-source-v1' : 'paid-legacy-prompt-v1',
-      knowledge_version: 'none',
+      report_contract_version: isIntegrated ? 'integrated-life-report-v1' : 'paid-legacy-preview',
+      calculation_contract_version: isIntegrated ? 'astrologyapi-kp-chaldean-v1' : 'numerology-legacy',
+      prompt_version: isIntegrated ? 'integrated-life-report-prompt-v1' : 'paid-legacy-prompt-v1',
+      knowledge_version: 'client-template-2026-08-21',
       pdf_template_version: 'legacy-paid-v1',
       input_data: {
         ...payload,
@@ -154,6 +154,7 @@ async function saveGeneratedReport({ payload, result, type = 'paid_blueprint_tes
         numerology_data: result.numerology_data || null,
         source_pdfs: result.source_pdfs || null,
         generation_ms: result.generation_ms,
+        report_contract_version: result.report_contract_version || '',
         delivery_ready: {
           email: payload.email,
           whatsapp: payload.phone
@@ -183,7 +184,12 @@ router.get('/astrology-v2/status', previewOnly, (req, res) => {
   });
 });
 
-router.get('/locations/search', previewOnly, async (req, res) => {
+/*
+  These three endpoints are required by the existing live Integrated Life Report form.
+  Diagnostics remain preview-only. The generation response remains explicitly test_mode
+  and payment_required:false until a real payment gate is connected and verified.
+*/
+router.get('/locations/search', async (req, res) => {
   try {
     const query = String(req.query.q || '').trim();
     if (query.length < 2) return res.json({ success: true, locations: [] });
@@ -195,7 +201,7 @@ router.get('/locations/search', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/locations/timezone', previewOnly, async (req, res) => {
+router.post('/locations/timezone', async (req, res) => {
   try {
     const timezone = await getTimezoneForBirth({
       latitude: req.body.latitude,
@@ -222,31 +228,10 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
       includePdfs: payload.include_source_pdfs
     });
 
-    const summary = {
-      planets: bundle.planets?.ok,
-      kp_planets: bundle.kp_planets?.ok,
-      kp_house_cusps: bundle.kp_house_cusps?.ok,
-      kp_planet_significators: bundle.kp_planet_significators?.ok,
-      kp_house_significators: bundle.kp_house_significators?.ok,
-      current_vdasha: bundle.current_vdasha?.ok,
-      current_vdasha_all: bundle.current_vdasha_all?.ok,
-      numerological_numbers: bundle.numerological_numbers?.ok,
-      numero_table: bundle.numero_table?.ok,
-      chart_d1: bundle.charts?.D1?.ok,
-      chart_d9: bundle.charts?.D9?.ok,
-      chart_d10: bundle.charts?.D10?.ok,
-      chart_image_d1: bundle.chart_images?.D1?.ok,
-      chart_image_d9: bundle.chart_images?.D9?.ok,
-      chart_image_d10: bundle.chart_images?.D10?.ok,
-      pro_horoscope_pdf: bundle.pdfs?.pro_horoscope?.ok,
-      pro_numerology_pdf: bundle.pdfs?.pro_numerology?.ok
-    };
-
     return res.json({
       success: true,
       mode: bundle.mode,
       generation_ms: Date.now() - startedAt,
-      summary,
       bundle
     });
   } catch (error) {
@@ -255,7 +240,7 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
+router.post('/reports/paid-test-v2', async (req, res) => {
   const startedAt = Date.now();
   try {
     const payload = normaliseV2Payload(req.body);
@@ -280,6 +265,7 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
       test_mode: true,
       provider: 'AstrologyAPI',
       payment_required: false,
+      report_contract_version: result.report_contract_version,
       lead_id: saved.lead_id,
       report_id: saved.report_id,
       generated_by: result.model,
@@ -298,8 +284,8 @@ router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[Paid blueprint V2 error]', error);
-    return res.status(500).json({ success: false, error: error.message || 'Paid report V2 generation failed' });
+    console.error('[Integrated Life Report error]', error);
+    return res.status(500).json({ success: false, error: error.message || 'Integrated Life Report generation failed' });
   }
 });
 
@@ -356,7 +342,7 @@ router.post('/reports/paid-test', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/reports/pdf-direct', previewOnly, async (req, res) => {
+router.post('/reports/pdf-direct', async (req, res) => {
   try {
     const {
       lead = {},
@@ -382,7 +368,7 @@ router.post('/reports/pdf-direct', previewOnly, async (req, res) => {
       reportText
     });
 
-    const filename = `${safeFileName(lead.name)}-Full-Blueprint.pdf`;
+    const filename = `${safeFileName(lead.name)}-Integrated-Life-Report.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', String(pdfBuffer.length));

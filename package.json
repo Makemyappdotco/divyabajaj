@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "build": "node --check src/server.js && node --check src/database.js && node --check src/adminRoutes.js && node --check src/adminDocumentRoutes.js && node --check src/services/reportArchive.js && node --check src/publicPaidRoutes.js && node --check src/routes.js && node --check public/admin-app.js"
+    "build": "node --check src/server.js && node --check src/database.js && node --check src/adminRoutes.js && node --check src/adminDocumentRoutes.js && node --check src/services/reportArchive.js && node --check src/services/numerologyEngine.js && node --check src/services/paidReportV2.js && node --check src/services/pdf.js && node --check src/publicPaidRoutes.js && node --check src/routes.js && node --check public/admin-app.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",

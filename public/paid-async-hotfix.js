@@ -37,7 +37,7 @@
     var button = qs('#dbpSubmit');
     if (!button) return;
     button.disabled = value;
-    button.textContent = value ? 'Preparing Your Full Blueprint...' : 'Generate My Full Blueprint';
+    button.textContent = value ? 'Preparing Your Integrated Report...' : 'Generate My Integrated Report';
   }
 
   function alignModalCopy() {
@@ -48,12 +48,12 @@
       'Verified KP birth chart and current Dasha',
       'Independent numerology and Double Confirmation',
       'Seven life areas with honest confidence levels',
-      'Practical remedies, examples and next actions'
+      'Practical remedies, timing map and next actions'
     ];
     for (var i = 0; i < benefits.length && i < benefitCopy.length; i += 1) benefits[i].textContent = benefitCopy[i];
 
     var asideCopy = overlay.querySelector('.dbp-aside-copy');
-    if (asideCopy) asideCopy.textContent = 'A deep personalised astrology and numerology blueprint built from your exact birth details, verified KP chart, current Dasha and independently calculated numbers.';
+    if (asideCopy) asideCopy.textContent = 'A focused integrated report built from your exact birth details, verified KP chart, current Dasha and independently calculated numerology.';
 
     var resultLead = overlay.querySelector('.dbp-result-lead');
     if (resultLead) resultLead.textContent = 'Download your complete personalised report. The written reading is also available below for quick review.';
@@ -66,7 +66,7 @@
 
   function friendlyGenerationError(error) {
     var text = String((error && error.message) || error || '').trim();
-    console.error('[Full Blueprint technical error]', error);
+    console.error('[Integrated Life Report technical error]', error);
     if (/source verification|chart verification/i.test(text)) {
       return 'One chart verification check could not be completed. Please reselect the birthplace and try once more.';
     }
@@ -76,7 +76,7 @@
     if (/network|fetch|connection|timeout|timed out|abort/i.test(text)) {
       return 'The connection was interrupted while your report was being prepared. Please try again.';
     }
-    return 'We could not complete the Full Blueprint on this attempt. Please try again. Your submitted details remain safe.';
+    return 'We could not complete the Integrated Life Report on this attempt. Please try again. Your submitted details remain safe.';
   }
 
   function parseDob(value) {
@@ -294,7 +294,7 @@
         body: JSON.stringify(payload)
       }, 90000);
       state.job = job;
-      setStatus('Verified. Writing your Full Blueprint in three sections in parallel...', '');
+      setStatus('Verified. Writing your Integrated Life Report in three sections in parallel...', '');
 
       var data = await pollUntilComplete(job);
       if (!data.report_text) throw new Error('Completed report content was unavailable.');
@@ -310,7 +310,7 @@
       var reportBox = qs('#dbpReport');
       if (reportBox) reportBox.textContent = data.report_text;
       if (result) result.classList.add('show');
-      setStatus('Your verified Full Blueprint is ready.', 'success');
+      setStatus('Your verified Integrated Life Report is ready.', 'success');
       setTimeout(function () {
         if (result) result.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -348,14 +348,14 @@
       var link = document.createElement('a');
       var safeName = String(state.pdfPayload.lead.name || 'Divya-Bajaj').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
       link.href = url;
-      link.download = safeName + '-Full-Blueprint.pdf';
+      link.download = safeName + '-Integrated-Life-Report.pdf';
       document.body.appendChild(link);
       link.click();
       link.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
-      setStatus('Your Full Blueprint PDF has been downloaded.', 'success');
+      setStatus('Your Integrated Life Report PDF has been downloaded.', 'success');
     } catch (error) {
-      console.error('[Full Blueprint PDF technical error]', error);
+      console.error('[Integrated Life Report PDF technical error]', error);
       setStatus('The PDF could not be prepared on this attempt. Your report remains available above; please try the download again.', 'error');
     } finally {
       target.disabled = false;

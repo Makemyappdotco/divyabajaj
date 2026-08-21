@@ -534,10 +534,11 @@
 
   function isPaidCta(el) {
     if (!el || el.closest('#dbpOverlay')) return false;
+    if (el.matches('[data-dbp-trigger="integrated-report"]')) return true;
     var label = textOf(el);
     var href = String(el.getAttribute && el.getAttribute('href') || '').toLowerCase();
     if (/free report|read my numbers free|whatsapp/.test(label)) return false;
-    return /get blueprint|full blueprint|advanced report|paid report|go deeper|detailed report/.test(label + ' ' + href);
+    return /get blueprint|full blueprint|advanced report|paid report|integrated report|go deeper|detailed report/.test(label + ' ' + href);
   }
 
   document.addEventListener('click', function (event) {

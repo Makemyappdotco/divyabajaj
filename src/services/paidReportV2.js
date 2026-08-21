@@ -342,12 +342,12 @@ RULES
 - Do not claim a separate Nadi calculation.`;
 }
 
-async function callOpenAI(prompt) {
+async function callOpenAI(prompt, { timeoutMs = 170000, maxOutputTokens = 10000 } = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 240000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -361,7 +361,7 @@ async function callOpenAI(prompt) {
         model: getPaidModel(),
         reasoning: { effort: 'none' },
         input: prompt,
-        max_output_tokens: 11000
+        max_output_tokens: maxOutputTokens
       })
     });
 
@@ -552,7 +552,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   }
 
   const compact = compactSource(sourceBundle, deterministicNumerology, verification);
-  const raw = await callOpenAI(buildPrompt(input, compact));
+  const raw = await callOpenAI(buildPrompt(input, compact), { timeoutMs: 170000, maxOutputTokens: 10000 });
   let reportJson = parseJson(raw);
   let reportText = reportTextFromJson(reportJson);
   let issues = validateReport(reportJson);
@@ -563,7 +563,10 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
   }
 
   if (issues.length) {
-    const repairedRaw = await callOpenAI(buildRepairPrompt(input, compact, reportJson, issues, wordCount));
+    const repairedRaw = await callOpenAI(
+      buildRepairPrompt(input, compact, reportJson, issues, wordCount),
+      { timeoutMs: 70000, maxOutputTokens: 10000 }
+    );
     reportJson = parseJson(repairedRaw);
     reportText = reportTextFromJson(reportJson);
     issues = validateReport(reportJson);

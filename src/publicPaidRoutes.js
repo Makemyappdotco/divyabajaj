@@ -2,7 +2,7 @@ const express = require('express');
 const db = require('./database');
 const { generateReportPdf } = require('./services/pdf');
 const { generatePaidReport } = require('./services/paidReport');
-const { startPaidReportV2, pollPaidReportV2 } = require('./services/paidReportV2');
+const { CONTRACT_VERSION, startPaidReportV2, pollPaidReportV2 } = require('./services/paidReportV2');
 const { archiveReportSnapshot } = require('./services/reportArchive');
 const {
   generateSourceBundle,
@@ -199,6 +199,7 @@ router.get('/astrology-v2/status', previewOnly, (req, res) => {
     access_token_configured: Boolean(process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN),
     pdf_sandbox_token_configured: Boolean(process.env.ASTROLOGYAPI_PDF_SANDBOX_TOKEN),
     openai_configured: Boolean(process.env.OPENAI_API_KEY),
+    report_contract_version: CONTRACT_VERSION,
     persistent_storage: db.storageHealth(),
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'local'
   });

@@ -101,7 +101,15 @@ async function photonSearch(query, { indiaOnly = false, limit = 50 } = {}) {
   }
 }
 
+function isAllowedPlaceType(row) {
+  const type = normalise(row.place_type);
+  if (!type) return true;
+  return /city|town|village|hamlet|suburb|neighbourhood|neighborhood|locality|quarter|residential|district|county|state|region|municipality|administrative|borough|ward/.test(type);
+}
+
 function isRelevant(row, query) {
+  if (!isAllowedPlaceType(row)) return false;
+
   const wanted = normalise(query.split(',')[0]);
   const wantedCompact = compact(query.split(',')[0]);
   const name = normalise(row.raw_name || row.place_name);

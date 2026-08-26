@@ -16,6 +16,10 @@ function normalise(value) {
     .trim();
 }
 
+function compact(value) {
+  return normalise(value).replace(/\s+/g, '');
+}
+
 function uniqueParts(parts) {
   const seen = new Set();
   return parts.filter(Boolean).map(clean).filter(part => {
@@ -97,26 +101,52 @@ async function photonSearch(query, { indiaOnly = false, limit = 50 } = {}) {
   }
 }
 
+function isRelevant(row, query) {
+  const wanted = normalise(query.split(',')[0]);
+  const wantedCompact = compact(query.split(',')[0]);
+  const name = normalise(row.raw_name || row.place_name);
+  const full = normalise(row.place_name);
+  const nameCompact = compact(row.raw_name || row.place_name);
+  const fullCompact = compact(row.place_name);
+
+  return Boolean(
+    name === wanted ||
+    nameCompact === wantedCompact ||
+    name.startsWith(wanted) ||
+    name.includes(wanted) ||
+    full.includes(wanted) ||
+    nameCompact.includes(wantedCompact) ||
+    fullCompact.includes(wantedCompact)
+  );
+}
+
 function score(row, query) {
   const wanted = normalise(query.split(',')[0]);
+  const wantedCompact = compact(query.split(',')[0]);
   const name = normalise(row.raw_name || row.place_name);
+  const nameCompact = compact(row.raw_name || row.place_name);
   const full = normalise(row.place_name);
   let points = 0;
 
-  if (name === wanted) points += 3000;
-  else if (name.startsWith(wanted)) points += 900;
-  else if (name.includes(wanted)) points += 500;
-  else if (full.includes(wanted)) points += 250;
+  if (name === wanted || nameCompact === wantedCompact) points += 5000;
+  else if (name.startsWith(wanted)) points += 1400;
+  else if (name.includes(wanted) || nameCompact.includes(wantedCompact)) points += 800;
+  else if (full.includes(wanted) || compact(full).includes(wantedCompact)) points += 350;
 
   if (row.country_code === 'IN') points += 1200;
 
   const type = normalise(row.place_type);
-  if (/neighbourhood|neighborhood|suburb|locality|quarter|residential/.test(type)) points += 260;
-  else if (/city|town|village|hamlet/.test(type)) points += 220;
-  else if (/district|county/.test(type)) points += 120;
-  else if (/state|region/.test(type)) points += 80;
+  if (/city|town/.test(type)) points += 500;
+  else if (/village|hamlet/.test(type)) points += 360;
+  else if (/neighbourhood|neighborhood|suburb|locality|quarter|residential/.test(type)) points += 300;
+  else if (/district|county/.test(type)) points += 180;
+  else if (/state|region/.test(type)) points += 120;
 
-  if (row.population) points += Math.min(Math.log10(Math.max(row.population, 1)) * 4, 30);
+  if (row.population >= 100000) points += 420;
+  else if (row.population >= 10000) points += 280;
+  else if (row.population >= 1000) points += 140;
+  if (row.population) points += Math.min(Math.log10(Math.max(row.population, 1)) * 10, 70);
+
   return points;
 }
 
@@ -158,6 +188,7 @@ async function broadSearch(query, legacySearch) {
   if (!rows.length) throw new Error('Could not search locations right now. Please try again in a moment.');
 
   return dedupe(rows)
+    .filter(row => isRelevant(row, query))
     .sort((a, b) => {
       const diff = score(b, query) - score(a, query);
       if (diff) return diff;

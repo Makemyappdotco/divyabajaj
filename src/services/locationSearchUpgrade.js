@@ -141,7 +141,8 @@ function isRelevant(row, query) {
   const fullWords = new Set(words(full));
   const allQueryWordsInFull = queryWords.length > 0 && queryWords.every(word => fullWords.has(word));
   const queryWordsInName = queryWords.filter(word => nameWords.has(word)).length;
-  const enoughNameOverlap = queryWordsInName >= Math.ceil(queryWords.length / 2);
+  const minimumNameOverlap = queryWords.length <= 2 ? queryWords.length : Math.ceil(queryWords.length / 2);
+  const enoughNameOverlap = queryWordsInName >= minimumNameOverlap;
 
   return Boolean(
     (full.includes(queryCore) || fullCompact.includes(wantedCompact)) &&

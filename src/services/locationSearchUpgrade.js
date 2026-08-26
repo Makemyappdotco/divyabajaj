@@ -20,6 +20,10 @@ function compact(value) {
   return normalise(value).replace(/\s+/g, '');
 }
 
+function words(value) {
+  return normalise(value).split(' ').filter(Boolean);
+}
+
 function uniqueParts(parts) {
   const seen = new Set();
   return parts.filter(Boolean).map(clean).filter(part => {
@@ -107,32 +111,50 @@ function isAllowedPlaceType(row) {
   return /city|town|village|hamlet|suburb|neighbourhood|neighborhood|locality|quarter|residential|district|county|state|region|municipality|administrative|borough|ward/.test(type);
 }
 
-function isRelevant(row, query) {
-  if (!isAllowedPlaceType(row)) return false;
-
+function looksLikePoiOrStreetName(row, query) {
+  const name = normalise(row.raw_name || '');
   const wanted = normalise(query.split(',')[0]);
-  const wantedCompact = compact(query.split(',')[0]);
+  if (!name || name === wanted || compact(name) === compact(wanted)) return false;
+  return /\b(road|rd|lane|street|avenue|boulevard|expressway|highway|station|stop|hospital|clinic|school|college|university|bank|mall|market|hotel|restaurant|temple|mosque|church|office|complex|centre|center)\b/.test(name);
+}
+
+function isRelevant(row, query) {
+  if (!isAllowedPlaceType(row) || looksLikePoiOrStreetName(row, query)) return false;
+
+  const queryCore = normalise(query.split(',')[0]);
+  const wantedCompact = compact(queryCore);
   const name = normalise(row.raw_name || row.place_name);
+  const nameCompact = compact(name);
   const full = normalise(row.place_name);
-  const nameCompact = compact(row.raw_name || row.place_name);
-  const fullCompact = compact(row.place_name);
+  const fullCompact = compact(full);
+
+  if (
+    name === queryCore ||
+    nameCompact === wantedCompact ||
+    name.startsWith(queryCore) ||
+    name.includes(queryCore) ||
+    nameCompact.includes(wantedCompact)
+  ) return true;
+
+  const queryWords = words(queryCore);
+  const nameWords = new Set(words(name));
+  const fullWords = new Set(words(full));
+  const allQueryWordsInFull = queryWords.length > 0 && queryWords.every(word => fullWords.has(word));
+  const queryWordsInName = queryWords.filter(word => nameWords.has(word)).length;
+  const enoughNameOverlap = queryWordsInName >= Math.ceil(queryWords.length / 2);
 
   return Boolean(
-    name === wanted ||
-    nameCompact === wantedCompact ||
-    name.startsWith(wanted) ||
-    name.includes(wanted) ||
-    full.includes(wanted) ||
-    nameCompact.includes(wantedCompact) ||
-    fullCompact.includes(wantedCompact)
+    (full.includes(queryCore) || fullCompact.includes(wantedCompact)) &&
+    allQueryWordsInFull &&
+    enoughNameOverlap
   );
 }
 
 function score(row, query) {
   const wanted = normalise(query.split(',')[0]);
-  const wantedCompact = compact(query.split(',')[0]);
+  const wantedCompact = compact(wanted);
   const name = normalise(row.raw_name || row.place_name);
-  const nameCompact = compact(row.raw_name || row.place_name);
+  const nameCompact = compact(name);
   const full = normalise(row.place_name);
   let points = 0;
 
@@ -144,9 +166,12 @@ function score(row, query) {
   if (row.country_code === 'IN') points += 1200;
 
   const type = normalise(row.place_type);
-  if (/city|town/.test(type)) points += 500;
+  if (/city|town/.test(type)) points += 600;
+  else if (/suburb/.test(type)) points += 520;
+  else if (/locality/.test(type)) points += 460;
+  else if (/neighbourhood|neighborhood|quarter/.test(type)) points += 400;
   else if (/village|hamlet/.test(type)) points += 360;
-  else if (/neighbourhood|neighborhood|suburb|locality|quarter|residential/.test(type)) points += 300;
+  else if (/residential/.test(type)) points += 160;
   else if (/district|county/.test(type)) points += 180;
   else if (/state|region/.test(type)) points += 120;
 

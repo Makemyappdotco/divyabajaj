@@ -2,7 +2,7 @@ module.exports = Object.freeze({
   version: 'integrated-report-design-v2',
   documentTitle: 'The Integrated Life Report',
   methodologyLine: 'Nadi Astrology + Vedic Numerology',
-  page: Object.freeze({ size: 'A4', left: 50, right: 50, top: 76, bottom: 58, safeBottom: 68 }),
+  page: Object.freeze({ size: 'A4', left: 50, right: 50, top: 76, bottom: 0, safeBottom: 68 }),
   colors: Object.freeze({
     navy: '#1F2F4F', navyDeep: '#142038', gold: '#A88343', goldSoft: '#C9AE77',
     paper: '#FBF9F4', sand: '#F2EBDD', sandDeep: '#E8DDCA', white: '#FFFFFF',

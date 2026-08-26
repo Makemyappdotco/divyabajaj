@@ -122,7 +122,7 @@ function drawCover(doc, { lead, numbers, paid }) {
   doc.fillColor(COLORS.white).font('Times-Bold').fontSize(paid ? 34 : 31)
     .text(paid ? 'The Full Blueprint' : 'Your Numerology Report', 62, 226, { width: doc.page.width - 124, align: 'center' });
   doc.fillColor(COLORS.goldLight).font('Times-Italic').fontSize(15)
-    .text(paid ? 'Astrology + Numerology Personal Report' : 'A personal numerology awareness report', 62, 275, { width: doc.page.width - 124, align: 'center' });
+    .text(paid ? 'Nadi Astrology + Vedic Numerology Personal Report' : 'A personal numerology awareness report', 62, 275, { width: doc.page.width - 124, align: 'center' });
 
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(8.2)
     .text('PREPARED PERSONALLY FOR', 62, 344, { width: doc.page.width - 124, align: 'center', characterSpacing: 2.2 });
@@ -222,7 +222,7 @@ function drawIntroPage(doc, { lead, numbers, reportText, paid }) {
   doc.moveDown(0.55);
   doc.fillColor(COLORS.muted).font('Helvetica').fontSize(10.5).lineGap(4)
     .text(paid
-      ? 'This report brings your numerology patterns and birth-detail based astrology guidance into one clear, practical reading. It is designed to help you understand your natural strengths, repeated challenges, current phase and the decisions that deserve your attention.'
+      ? 'This report brings your Vedic numerology patterns and birth-detail based Nadi Astrology guidance into one clear, practical reading. It is designed to help you understand your natural strengths, repeated challenges, current phase and the decisions that deserve your attention.'
       : 'This report gives you a clear first view of your numerology patterns, natural strengths and current phase.');
 
   doc.moveDown(1.25);
@@ -436,7 +436,7 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, astrologyData
         info: {
           Title: paid ? 'Divya Bajaj - The Full Blueprint' : 'Divya Bajaj - Numerology Report',
           Author: 'Divya Bajaj',
-          Subject: paid ? 'Astrology and Numerology Full Blueprint' : 'Numerology Awareness Report'
+          Subject: paid ? 'Nadi Astrology and Vedic Numerology Full Blueprint' : 'Numerology Awareness Report'
         }
       });
       const chunks = [];
@@ -466,15 +466,7 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, astrologyData
         doc.moveDown(0.75);
       });
 
-      if (astrologyData && paid) {
-        drawCallout(
-          doc,
-          'Astrology data note',
-          safeText(astrologyData.note) || 'This test report uses the submitted birth details. Exact chart-level planetary calculations should be connected before the paid report is sold publicly.'
-        );
-      }
-
-      drawDisclaimer(doc, paid);
+      if (!paid) drawDisclaimer(doc, paid);
       addFooters(doc);
       doc.end();
     } catch (error) {

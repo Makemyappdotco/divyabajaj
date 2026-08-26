@@ -29,6 +29,14 @@ const REQUIRED_NUMEROLOGY_GLANCE_ROWS = [
   'personal year'
 ];
 
+const CUSTOMER_FACING_FORBIDDEN_TERMS = [
+  { pattern: /\bKP\b/i, label: 'KP' },
+  { pattern: /Chaldean/i, label: 'Chaldean' },
+  { pattern: /Pythagorean/i, label: 'Pythagorean' },
+  { pattern: /AstrologyAPI/i, label: 'AstrologyAPI' },
+  { pattern: /separate\s+Nadi\s+calculation/i, label: 'separate Nadi calculation' }
+];
+
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
 }
@@ -134,11 +142,12 @@ Place of birth: ${input.pob}
 Birth-time accuracy: ${input.birth_time_accuracy || 'not stated'}
 Main concern: ${input.question || 'Complete life clarity'}
 
-VERIFIED ASTROLOGYAPI SOURCE DATA AND BACKEND NUMEROLOGY
+VERIFIED INTERNAL SOURCE DATA
 ${JSON.stringify(source, null, 2)}
 
 SOURCE OF TRUTH
 The client-approved report format is the Integrated Life Report structure. Follow its order, teaching style, convergence method and seven life-area rhythm. Do not copy the sample client's conclusions. Every conclusion must be freshly derived from the verified source above for this customer.
+The client has explicitly confirmed that the requested Nadi Astrology and Vedic Numerology change is customer-facing terminology only. Do not recalculate, alter or reinterpret any supplied number or astrological source value merely because of the terminology change.
 
 REPORT CONTRACT
 The report must contain these sections in this exact order:
@@ -158,11 +167,12 @@ The report must contain these sections in this exact order:
 
 SECTION 1 MUST TEACH THE METHOD IN THIS ORDER
 - Why the report shows its working.
-- The two systems used here.
+- The two customer-facing systems are Nadi Astrology and Vedic Numerology.
 - Four plain-language ideas: Houses are life departments; Planets are the officers in charge; Dasha is whose turn it is; The chain of command explains sign lord, star lord and sub lord.
 - The convergence method: Convergence, Tension and Silence.
 - What the report will not do, including health, irreversible-event, guarantee and fear-based-prediction limits.
 - A short plain disclaimer that astrology and numerology are traditional interpretive systems and are not medical, legal or financial advice.
+- In primer.systems, begin directly with Nadi Astrology and Vedic Numerology. Do not repeat the heading or begin with phrases such as "Two systems are used here".
 
 SECTION 2 MUST USE THESE FIXED ROWS
 Astrological layer, exactly seven rows in this order:
@@ -180,7 +190,7 @@ Numerological layer, exactly four rows in this order:
 2. Destiny Number
 3. Name Number
 4. Personal Year ${reportYear}
-Use deterministic_numerology as primary. The Name Number is Chaldean. Show the derivation briefly and accurately.
+Use deterministic_numerology as the primary internal number source. Present the customer-facing numerology system as Vedic Numerology. Show the derivation briefly and accurately without exposing internal calculation labels.
 End this section with one headline finding that names the strongest genuine cross-system confirmation. If there is no strong convergence, say that plainly instead of manufacturing one.
 
 THE SEVEN LIFE AREAS
@@ -194,14 +204,14 @@ The seven life areas are Personal Nature, Past Life Karma, Finances, Marriage, H
 - What to actually do about it
 - Confidence, with a short reason for that confidence
 
-METHOD
-- KP Astrology is the primary analytical map.
+CUSTOMER-FACING METHOD LABELS
+- Present the astrology system as Nadi Astrology throughout the report.
+- Present the numerology system as Vedic Numerology throughout the report.
 - Numerology is an independent second opinion, not a replacement for astrology.
-- Treat deterministic_numerology as the primary numerology source.
-- The deterministic Name Number is Chaldean. Do not call it Pythagorean.
-- Use the five deterministic values in personal_years for the core timing map.
+- Treat deterministic_numerology as an internal data source only. Do not expose that implementation label to the customer.
+- Use the five supplied values in personal_years for the core timing map without changing their calculations.
 - The report may describe convergence, tension and silence. Never force agreement.
-- Do not claim that a separate Nadi calculation was performed. Divya may practise Nadi Astrology, but this automated report currently has verified KP Astrology plus Numerology source data only.
+- Never mention KP, Chaldean, Pythagorean, AstrologyAPI, internal source keys, backend implementation names, or whether a separate Nadi calculation was or was not performed anywhere in the customer-facing JSON.
 
 TIMING MAP CONTRACT
 - Produce exactly five core timing rows, one for each deterministic personal_years entry, in chronological order.
@@ -221,7 +231,7 @@ ACCURACY RULES
 - Use only facts supported by the supplied source data.
 - Never invent a planet, house, sign, nakshatra, dasha, date, degree, Star Lord, Sub Lord, Sub-Sub Lord, cusp, significator or numerology number.
 - Read source_verification before writing. Never override a blocking issue or discrepancy.
-- Use KP planets, cusps and significator maps only when the corresponding kp_source_status value is true and the actual data is present.
+- Internally use planetary, cusp and significator source fields only when their corresponding source-status value is true and the actual data is present. Never expose internal source-field names to the customer.
 - When evidence is insufficient, say so plainly. Do not fill the gap with a generic prediction.
 - Do not create exact event dates unless the verified dasha source genuinely supports that precision.
 - Past Life Karma must be presented as symbolic traditional interpretation, not documented historical fact.
@@ -239,6 +249,7 @@ WRITING STYLE AND LENGTH
 - Avoid robotic phrases and vague spiritual filler.
 - Every paragraph should add interpretation, evidence, limitation, action or useful synthesis.
 - Do not repeat the same observation in multiple sections unless the new section adds a different implication.
+- Scope And Limitations must stay customer-facing. Do not describe APIs, backend verification, internal calculation systems or implementation details there.
 - Main target: 4,500 to 5,300 words for the rendered report.
 - Acceptable final range: 4,000 to 5,800 words. Do not exceed it.
 - Suggested balance: primer 450-550 words; glance 300-400; each life area 350-450; remedies 350-450; timing map 250-350; closing summary 200-300; limitations 180-260.
@@ -335,11 +346,15 @@ RULES
 - Keep exactly seven fixed astrology glance rows and four fixed numerology glance rows.
 - Keep exactly five core timing rows corresponding to deterministic personal_years.
 - Keep exactly five closing summary points and at least four scope limitations.
+- Present the customer-facing systems only as Nadi Astrology and Vedic Numerology.
+- This is a terminology/presentation change only. Do not recalculate or alter supplied values.
+- Never mention KP, Chaldean, Pythagorean, AstrologyAPI, backend implementation names, internal source keys, or whether a separate Nadi calculation was or was not performed.
+- primer.systems must begin directly with Nadi Astrology and Vedic Numerology and must not repeat the heading with phrases such as "Two systems are used here".
+- Scope And Limitations must contain only useful customer-facing boundaries, not technical implementation notes.
 - Target 4,500 to 5,300 rendered words; acceptable 4,000 to 5,800.
 - If shortening, remove repetition before removing evidence, limitations, actions or timing.
 - If expanding, add explanation only where supported by VERIFIED SOURCE. Never pad with generic astrology language.
-- No em dashes.
-- Do not claim a separate Nadi calculation.`;
+- No em dashes.`;
 }
 
 async function callOpenAI(prompt, { timeoutMs = 170000, maxOutputTokens = 10000 } = {}) {
@@ -462,7 +477,7 @@ function reportTextFromJson(report) {
   const areas = report.life_areas || {};
 
   return [
-    `1. How To Read This Report\n${primer.purpose || ''}\n\nThe two systems used here\n${primer.systems || ''}\n\nThe four ideas you need\n1. Houses are life departments\n${ideas.houses || ''}\n\n2. Planets are the officers in charge\n${ideas.planets || ''}\n\n3. Dasha is whose turn it is\n${ideas.dasha || ''}\n\n4. The chain of command\n${ideas.chain_of_command || ''}\n\nThe convergence method\n${primer.convergence_method || ''}\n\nWhat this report will not do\n${list(primer.limits)}\n\n${primer.disclaimer || ''}`,
+    `1. How To Read This Report\n${primer.purpose || ''}\n\nThe two systems used in your report\n${primer.systems || ''}\n\nThe four ideas you need\n1. Houses are life departments\n${ideas.houses || ''}\n\n2. Planets are the officers in charge\n${ideas.planets || ''}\n\n3. Dasha is whose turn it is\n${ideas.dasha || ''}\n\n4. The chain of command\n${ideas.chain_of_command || ''}\n\nThe convergence method\n${primer.convergence_method || ''}\n\nWhat this report will not do\n${list(primer.limits)}\n\n${primer.disclaimer || ''}`,
     `2. Your Chart And Numbers At A Glance\nThe astrological layer\n${formatGlanceRows(glance.astrology, 'astrology')}\n\nThe numerological layer\n${formatGlanceRows(glance.numerology, 'numerology')}\n\nThe headline finding\n${glance.headline_finding || ''}`,
     `3. Personal Nature: Strengths And Weaknesses\n${lifeAreaText(areas.personal_nature)}`,
     `4. Past Life Karma\n${lifeAreaText(areas.past_life_karma)}`,
@@ -498,6 +513,12 @@ function validateReport(report) {
   if (!Array.isArray(primer.limits) || primer.limits.filter(Boolean).length < 4) {
     issues.push('Primer must include at least four explicit limits.');
   }
+  if (/^\s*(?:the\s+)?two\s+systems\b/i.test(String(primer.systems || ''))) {
+    issues.push('Primer systems repeats the section heading instead of beginning directly with the system names.');
+  }
+  if (!/Nadi Astrology/i.test(String(primer.systems || '')) || !/Vedic Numerology/i.test(String(primer.systems || ''))) {
+    issues.push('Primer systems must identify Nadi Astrology and Vedic Numerology.');
+  }
 
   const astrologyRows = Array.isArray(report.glance?.astrology) ? report.glance.astrology : [];
   const astrologyLabels = astrologyRows.map(item => normalizedLabel(item?.element));
@@ -532,6 +553,11 @@ function validateReport(report) {
   if (!Array.isArray(report.timing_map) || report.timing_map.length !== 5) issues.push('Timing map must contain exactly five core rows.');
   if (!Array.isArray(report.closing_summary) || report.closing_summary.filter(Boolean).length !== 5) issues.push('Closing Summary must contain exactly five points.');
   if (!Array.isArray(report.scope_limitations) || report.scope_limitations.filter(Boolean).length < 4) issues.push('Scope And Limitations must contain at least four points.');
+
+  const customerFacingText = reportTextFromJson(report);
+  CUSTOMER_FACING_FORBIDDEN_TERMS.forEach(({ pattern, label }) => {
+    if (pattern.test(customerFacingText)) issues.push(`Customer-facing report must not mention ${label}.`);
+  });
 
   return issues;
 }
@@ -590,7 +616,7 @@ async function generatePaidReportV2(input, { includePdfs = false } = {}) {
     verification,
     astrology_data: {
       provider: 'AstrologyAPI',
-      note: 'This Integrated Life Report uses verified AstrologyAPI planetary positions, KP planets, KP house cusps, significator maps, chart calculations and Vimshottari Dasha data based on the submitted birth details. It does not claim a separate automated Nadi calculation.',
+      note: 'Prepared from the submitted birth details and verified astrological source data.',
       planets: sourceBundle.planets,
       kp_planets: sourceBundle.kp_planets,
       kp_house_cusps: sourceBundle.kp_house_cusps,

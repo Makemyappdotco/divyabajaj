@@ -1,20 +1,39 @@
 module.exports = Object.freeze({
-  version: 'integrated-report-design-v2',
+  version: 'integrated-report-design-v3',
   documentTitle: 'The Integrated Life Report',
   methodologyLine: 'Nadi Astrology + Vedic Numerology',
-  page: Object.freeze({ size: 'A4', left: 50, right: 50, top: 76, bottom: 0, safeBottom: 68 }),
+  page: Object.freeze({ size: 'A4', left: 50, right: 50, top: 70, bottom: 0, safeBottom: 82 }),
   colors: Object.freeze({
-    navy: '#1F2F4F', navyDeep: '#142038', gold: '#A88343', goldSoft: '#C9AE77',
-    paper: '#FBF9F4', sand: '#F2EBDD', sandDeep: '#E8DDCA', white: '#FFFFFF',
-    ink: '#222126', muted: '#6E6A63', line: '#D8CCB8', green: '#4D765F'
+    navy: '#2B2118',
+    navyDeep: '#251B13',
+    gold: '#B78A43',
+    goldDeep: '#AD7F39',
+    goldSoft: '#DFC17F',
+    paper: '#FFFAF1',
+    sand: '#F3E6CF',
+    sandDeep: '#F5E8D2',
+    white: '#FFFDF8',
+    ink: '#2E241B',
+    muted: '#716352',
+    line: '#D8C5A8',
+    green: '#257447'
   }),
   type: Object.freeze({
-    display: 'Times-Bold', displayItalic: 'Times-Italic', body: 'Helvetica', bodyBold: 'Helvetica-Bold',
-    h1: 26, h2: 17, h3: 11.5, bodySize: 9.35, small: 7.4, table: 8.15, lineGap: 3.6
+    display: 'Times-Bold',
+    displayItalic: 'Times-Italic',
+    body: 'Helvetica',
+    bodyBold: 'Helvetica-Bold',
+    h1: 24,
+    h2: 16,
+    h3: 11.2,
+    bodySize: 9.2,
+    small: 7.2,
+    table: 8.0,
+    lineGap: 3.25
   }),
-  spacing: Object.freeze({ xs: 5, sm: 9, md: 14, lg: 20, xl: 28, xxl: 38 }),
+  spacing: Object.freeze({ xs: 4, sm: 8, md: 12, lg: 17, xl: 23, xxl: 30 }),
   rules: Object.freeze({
-    startMajorSectionOnNewPage: true,
+    startMajorSectionOnNewPage: false,
     keepHeadingWithNextBlock: true,
     neverSplitShortCalloutAcrossPages: true,
     useSingleColumnForLongInterpretation: true,
@@ -22,6 +41,8 @@ module.exports = Object.freeze({
     summaryPagePosition: 'after-contents',
     summaryPageMustStayOnePage: true,
     bodyAlignment: 'left',
-    minimumGapBetweenComponents: 12
+    minimumGapBetweenComponents: 10,
+    minimumSectionStartSpace: 150,
+    maximumIntentionalBlankSpace: 110
   })
 });

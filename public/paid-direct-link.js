@@ -5,6 +5,7 @@
   window.__divyaPaidDirectLink = true;
 
   var nativeFetch = window.fetch.bind(window);
+  var lastReportJson = null;
 
   function requestPath(input) {
     try {
@@ -26,16 +27,50 @@
       : 'The location search connection was interrupted. Please type the place again.';
   }
 
-  window.fetch = async function (input, init) {
-    if (!shouldRetryNetworkRequest(input)) return nativeFetch(input, init);
+  async function rememberStructuredReport(input, response) {
+    if (requestPath(input) !== '/api/reports/paid-test-v2' || !response || !response.ok) return response;
+    try {
+      var clone = response.clone();
+      var data = await clone.json();
+      if (data && data.report_json && typeof data.report_json === 'object') {
+        lastReportJson = data.report_json;
+        window.__divyaPaidReportJson = data.report_json;
+      }
+    } catch (error) {}
+    return response;
+  }
+
+  function withStructuredReport(input, init) {
+    if (requestPath(input) !== '/api/reports/pdf-direct') return init;
+    var reportJson = lastReportJson || window.__divyaPaidReportJson;
+    if (!reportJson || !init || typeof init.body !== 'string') return init;
 
     try {
-      return await nativeFetch(input, init);
+      var body = JSON.parse(init.body || '{}');
+      if (!body.report_json) body.report_json = reportJson;
+      var next = {};
+      Object.keys(init).forEach(function (key) { next[key] = init[key]; });
+      next.body = JSON.stringify(body);
+      return next;
+    } catch (error) {
+      return init;
+    }
+  }
+
+  window.fetch = async function (input, init) {
+    var nextInit = withStructuredReport(input, init);
+
+    if (!shouldRetryNetworkRequest(input)) {
+      return rememberStructuredReport(input, await nativeFetch(input, nextInit));
+    }
+
+    try {
+      return rememberStructuredReport(input, await nativeFetch(input, nextInit));
     } catch (firstError) {
       if (firstError && firstError.name === 'AbortError') throw firstError;
       await new Promise(function (resolve) { setTimeout(resolve, 900); });
       try {
-        return await nativeFetch(input, init);
+        return rememberStructuredReport(input, await nativeFetch(input, nextInit));
       } catch (secondError) {
         if (secondError && secondError.name === 'AbortError') throw secondError;
         var friendlyError = new Error(retryMessage(input));
@@ -53,9 +88,7 @@
 
   function openDirectPaidLink() {
     if (!shouldOpenPaidBlueprint()) return;
-    if (typeof window.openPaidBlueprint === 'function') {
-      window.openPaidBlueprint();
-    }
+    if (typeof window.openPaidBlueprint === 'function') window.openPaidBlueprint();
   }
 
   if (document.readyState === 'loading') {

@@ -1,5 +1,5 @@
 const publicPaidRoutes = require('../publicPaidRoutes');
-const { generateApprovedPaidPdfV4 } = require('./pdfApprovedV4');
+const { generateApprovedPaidPdfV4 } = require('./pdfApprovedV4AssetBridge');
 
 let applied = false;
 

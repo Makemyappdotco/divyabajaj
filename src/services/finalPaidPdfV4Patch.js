@@ -17,6 +17,53 @@ function safeFileName(value) {
     .replace(/^-|-$/g, '') || 'Divya-Bajaj';
 }
 
+function qaReportJson() {
+  const life = {
+    intro: 'QA intro.',
+    birth_chart: 'QA chart signal.',
+    numbers: 'QA number signal.',
+    convergence: 'QA convergence.',
+    tension_or_silence: 'QA mixed signal.',
+    timing: ['QA timing.'],
+    actions: ['QA action.'],
+    confidence: 'High'
+  };
+  return {
+    primer: {
+      purpose: 'QA purpose.',
+      systems: 'Nadi Astrology and Vedic Numerology.',
+      four_ideas: { houses: 'QA.', planets: 'QA.', dasha: 'QA.', chain_of_command: 'QA.' },
+      convergence_method: 'QA convergence method.',
+      limits: ['QA limitation.'],
+      disclaimer: 'QA disclaimer.'
+    },
+    glance: {
+      headline_finding: 'QA headline finding.',
+      astrology: [{ element: 'Ascendant', position: 'Virgo', plain_meaning: 'QA meaning.' }],
+      numerology: [{ label: 'Birth Number', value: '6', derived_from: 'DOB', plain_meaning: 'QA meaning.' }]
+    },
+    life_areas: {
+      personal_nature: life,
+      past_life_karma: life,
+      finances: life,
+      marriage: life,
+      health: life,
+      children: life,
+      property: life
+    },
+    remedies: {
+      intro: 'QA remedies.',
+      behavioural: [],
+      professional_structural: ['QA structural action.'],
+      traditional_observance: [],
+      gemstone_note: 'No gemstone recommendation in QA.'
+    },
+    timing_map: [{ period: '2026', astrology: 'QA', numerology: 'QA', combined_reading: 'QA combined.', confidence: 'High' }],
+    closing_summary: ['QA closing point.'],
+    scope_limitations: ['QA scope limitation.']
+  };
+}
+
 module.exports = function applyFinalPaidPdfV4Patch() {
   if (applied) return;
 
@@ -57,6 +104,21 @@ module.exports = function applyFinalPaidPdfV4Patch() {
       });
     }
   };
+
+  if (process.env.VERCEL_ENV !== 'production') {
+    publicPaidRoutes.get('/reports/pdf-v4-selftest', async (req, res) => {
+      try {
+        const pdfBuffer = await generateApprovedPaidPdfV4({
+          lead: { name: 'V4 QA Test', dob: '1994-08-23', tob: '07:35', pob: 'Delhi, India', question: 'career' },
+          reportJson: qaReportJson()
+        });
+        return res.json({ success: true, bytes: pdfBuffer.length, template: 'approved-v4-hq' });
+      } catch (error) {
+        console.error('[Approved V4 self-test error]', error);
+        return res.status(500).json({ success: false, error: error.message });
+      }
+    });
+  }
 
   applied = true;
 };

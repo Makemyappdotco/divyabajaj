@@ -1,5 +1,5 @@
 const publicPaidRoutes = require('../publicPaidRoutes');
-const { generateFinalPaidPdfV4, safeFileName } = require('./pdfFinalV4');
+const { generateApprovedPaidPdfV4 } = require('./pdfApprovedV4');
 
 let applied = false;
 
@@ -11,6 +11,12 @@ function parseReportJson(value) {
   return null;
 }
 
+function safeFileName(value) {
+  return String(value || 'Divya-Bajaj')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '') || 'Divya-Bajaj';
+}
+
 module.exports = function applyFinalPaidPdfV4Patch() {
   if (applied) return;
 
@@ -19,12 +25,12 @@ module.exports = function applyFinalPaidPdfV4Patch() {
   );
 
   if (!layer || !layer.route || !Array.isArray(layer.route.stack) || !layer.route.stack[0]) {
-    throw new Error('Could not locate the paid PDF download route for Final V4 patching');
+    throw new Error('Could not locate the paid PDF download route for approved V4 patching');
   }
 
   const originalHandler = layer.route.stack[0].handle;
 
-  layer.route.stack[0].handle = async function finalPaidPdfV4Handler(req, res, next) {
+  layer.route.stack[0].handle = async function approvedPaidPdfV4Handler(req, res, next) {
     const reportJson = parseReportJson(req.body && req.body.report_json);
     if (!reportJson) return originalHandler(req, res, next);
 
@@ -34,7 +40,7 @@ module.exports = function applyFinalPaidPdfV4Patch() {
         return res.status(400).json({ success: false, error: 'Client name is required for PDF generation' });
       }
 
-      const pdfBuffer = await generateFinalPaidPdfV4({ lead, reportJson });
+      const pdfBuffer = await generateApprovedPaidPdfV4({ lead, reportJson });
       const filename = `${safeFileName(lead.name)}-Integrated-Life-Report.pdf`;
 
       res.setHeader('Content-Type', 'application/pdf');
@@ -44,7 +50,7 @@ module.exports = function applyFinalPaidPdfV4Patch() {
       res.setHeader('X-Divya-PDF-Template', 'approved-v4-hq');
       return res.end(pdfBuffer);
     } catch (error) {
-      console.error('[Final V4 paid PDF error]', error);
+      console.error('[Approved V4 paid PDF error]', error);
       return res.status(500).json({
         success: false,
         error: error.message || 'Could not generate the approved paid report PDF'

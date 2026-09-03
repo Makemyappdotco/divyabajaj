@@ -3,18 +3,11 @@ const path = require('path');
 const { generateApprovedPaidPdfV4: generateBaseApprovedPaidPdfV4 } = require('./pdfApprovedV4');
 
 const CHUNK_DIR = path.join(process.cwd(), 'public', 'report-v4', 'chunks');
-const LOGO_SVG = path.join(process.cwd(), 'public', 'divya-bajaj-golden-logo.svg');
-const PORTRAIT_FILE = path.join(process.cwd(), 'public', 'divya-profile.png');
+const LOGO_FILE = path.join(process.cwd(), 'public', 'report-v4', 'logo-hq.jpg');
+const PORTRAIT_FILE = path.join(process.cwd(), 'public', 'report-v4', 'portrait-hq.jpg');
 
 function samePath(a, b) {
   return path.resolve(String(a)) === path.resolve(String(b));
-}
-
-function logoBuffer(readFileSync) {
-  const svg = readFileSync.call(fs, LOGO_SVG, 'utf8');
-  const match = String(svg).match(/data:image\/png;base64,([^"']+)/i);
-  if (!match) throw new Error('Could not extract packaged Divya logo PNG from SVG');
-  return Buffer.from(match[1].replace(/\s+/g, ''), 'base64');
 }
 
 async function generateApprovedPaidPdfV4(input) {
@@ -40,7 +33,7 @@ async function generateApprovedPaidPdfV4(input) {
 
   fs.readFileSync = function bridgedReadFileSync(target, encoding, ...args) {
     if (samePath(target, syntheticLogo)) {
-      const encoded = logoBuffer(originalReadFileSync).toString('base64');
+      const encoded = originalReadFileSync.call(fs, LOGO_FILE).toString('base64');
       return encoding ? encoded : Buffer.from(encoded, 'utf8');
     }
     if (samePath(target, syntheticPortrait)) {

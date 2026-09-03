@@ -3,21 +3,26 @@ const path = require('path');
 const { generateApprovedPaidPdfV4: generateBaseApprovedPaidPdfV4 } = require('./pdfApprovedV4');
 
 const CHUNK_DIR = path.join(process.cwd(), 'public', 'report-v4', 'chunks');
-const LOGO_FILE = path.join(process.cwd(), 'public', 'report-v4', 'logo-hq.jpg');
-const PORTRAIT_FILE = path.join(process.cwd(), 'public', 'report-v4', 'portrait-hq.jpg');
+const LOGO_SVG = path.join(process.cwd(), 'public', 'divya-bajaj-golden-logo.svg');
+const PORTRAIT_FILE = path.join(process.cwd(), 'public', 'divya-profile.png');
 
 function samePath(a, b) {
   return path.resolve(String(a)) === path.resolve(String(b));
+}
+
+function logoBuffer(readFileSync) {
+  const svg = readFileSync.call(fs, LOGO_SVG, 'utf8');
+  const match = String(svg).match(/data:image\/png;base64,([^"']+)/i);
+  if (!match) throw new Error('Could not extract packaged Divya logo PNG from SVG');
+  return Buffer.from(match[1].replace(/\s+/g, ''), 'base64');
 }
 
 async function generateApprovedPaidPdfV4(input) {
   const originalReaddirSync = fs.readdirSync;
   const originalReadFileSync = fs.readFileSync;
 
-  const synthetic = new Map([
-    [path.join(CHUNK_DIR, 'logo.01.b64'), LOGO_FILE],
-    [path.join(CHUNK_DIR, 'portrait.01.b64'), PORTRAIT_FILE]
-  ]);
+  const syntheticLogo = path.join(CHUNK_DIR, 'logo.01.b64');
+  const syntheticPortrait = path.join(CHUNK_DIR, 'portrait.01.b64');
 
   fs.readdirSync = function bridgedReaddirSync(target, ...args) {
     const result = originalReaddirSync.call(fs, target, ...args);
@@ -34,10 +39,12 @@ async function generateApprovedPaidPdfV4(input) {
   };
 
   fs.readFileSync = function bridgedReadFileSync(target, encoding, ...args) {
-    for (const [syntheticPath, binaryPath] of synthetic.entries()) {
-      if (!samePath(target, syntheticPath)) continue;
-      const buffer = originalReadFileSync.call(fs, binaryPath);
-      const encoded = buffer.toString('base64');
+    if (samePath(target, syntheticLogo)) {
+      const encoded = logoBuffer(originalReadFileSync).toString('base64');
+      return encoding ? encoded : Buffer.from(encoded, 'utf8');
+    }
+    if (samePath(target, syntheticPortrait)) {
+      const encoded = originalReadFileSync.call(fs, PORTRAIT_FILE).toString('base64');
       return encoding ? encoded : Buffer.from(encoded, 'utf8');
     }
     return originalReadFileSync.call(fs, target, encoding, ...args);

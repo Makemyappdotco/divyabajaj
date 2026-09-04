@@ -12,6 +12,7 @@ const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const adminRoutes = require('./adminRoutes');
+const bookingRoutes = require('./bookingRoutes');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -249,6 +250,8 @@ app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
   });
 });
 
+// public booking API - no auth, this is the customer-facing consultation flow
+app.use('/api/booking', bookingRoutes);
 app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
 // admin panel API - read-only, mounted before the general /api routes so its

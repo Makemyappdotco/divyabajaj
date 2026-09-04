@@ -1,126 +1,428 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Book a Consultation | Divya Bajaj</title>
-  <meta name="description" content="Book a 60-minute one-to-one astrology and numerology consultation with Divya Bajaj.">
-  <style>
-    :root{--black:#0b0a0d;--soft:#151219;--gold:#c9a96e;--gold2:#ead39c;--cream:#f7f1e8;--ink:#1b181c;--muted:#746b63;--line:#d7c5a3;--error:#b64f45}
-    *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:Arial,sans-serif;line-height:1.6}.hero{background:radial-gradient(circle at 85% 15%,rgba(201,169,110,.18),transparent 28%),var(--black);color:#fff;padding:28px 20px 70px}.nav{max-width:1120px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:18px}.brand{letter-spacing:2.6px;font-size:12px;color:var(--gold);font-weight:800}.back{color:#ddd0bd;text-decoration:none;font-size:13px}.hero-inner{max-width:860px;margin:70px auto 0;text-align:center}.mark{width:66px;height:66px;border:1px solid var(--gold);border-radius:50%;margin:0 auto 22px;position:relative}.mark:before,.mark:after{content:"";position:absolute;inset:20px -14px;border:1px solid var(--gold);border-radius:50%;transform:rotate(24deg)}.mark:after{transform:rotate(-24deg)}h1{font-family:Georgia,serif;font-size:clamp(38px,7vw,72px);line-height:1.02;margin:0 0 18px}.hero p{max-width:700px;margin:auto;color:#cfc3b6;font-size:16px}.meta{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:28px}.meta span{border:1px solid rgba(201,169,110,.35);padding:9px 13px;color:var(--gold2);font-size:12px}.wrap{max-width:1080px;margin:-38px auto 70px;padding:0 20px}.grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:26px;align-items:start}.card{background:#fffdf8;border:1px solid var(--line);padding:28px;box-shadow:0 18px 50px rgba(20,15,10,.08)}h2{font-family:Georgia,serif;font-size:30px;line-height:1.15;margin:0 0 15px}.eyebrow{font-size:10px;letter-spacing:2px;color:#9a763f;text-transform:uppercase;font-weight:800}.points{padding:0;list-style:none;margin:22px 0}.points li{padding:12px 0 12px 26px;border-bottom:1px solid #eadfce;position:relative}.points li:before{content:"✓";position:absolute;left:0;color:#9a763f;font-weight:800}.notice{background:#f1e7d7;border-left:4px solid var(--gold);padding:14px;font-size:13px;color:#554c44}.field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}.field label{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#8d6d3d;font-weight:800}.field input,.field select,.field textarea{width:100%;padding:14px;border:1px solid #d9c8ac;background:#fff;font:inherit;color:#1d191b;outline:none}.field input::placeholder,.field textarea::placeholder{color:#9b9188}.field input:focus,.field select:focus,.field textarea:focus{border-color:#a98247;box-shadow:0 0 0 3px rgba(169,130,71,.12)}.field textarea{min-height:120px;resize:vertical}.field.invalid input,.field.invalid select,.field.invalid textarea{border-color:var(--error);box-shadow:0 0 0 3px rgba(182,79,69,.08)}.field-error{display:none;color:var(--error);font-size:11px;line-height:1.35}.field.invalid .field-error{display:block}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.submit{width:100%;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#09070a;padding:17px 18px;font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:4px}.help{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}.footer{text-align:center;padding:30px 20px 50px;color:#7b7169;font-size:12px}.footer a{color:#8f6b36}.price{font-family:Georgia,serif;font-size:42px;margin:10px 0 0}.price small{font:12px Arial,sans-serif;color:#7b7169}.live-badge{display:inline-block;margin-top:16px;padding:7px 10px;background:#efe2ce;color:#795a2e;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;font-weight:800}
-    @media(max-width:800px){.grid{grid-template-columns:1fr}.hero{padding-bottom:60px}.hero-inner{margin-top:48px}.two{grid-template-columns:1fr}.card{padding:22px}.wrap{margin-top:-28px}.brand{font-size:10px;letter-spacing:1.6px}.back{font-size:12px}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book a Private Consultation | Divya Bajaj</title>
+<meta name="description" content="Book a one-to-one consultation with Divya Bajaj. Pick a time that suits you and get a confirmed slot.">
+<link rel="icon" href="/divya-bajaj-monogram.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Same tokens as landing.html and the admin panel, so the three surfaces
+     cannot drift apart. */
+  :root{
+    --serif:'Fraunces',Georgia,serif;
+    --sans:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
+    --bg:#F6F3EC; --surface:#FDFBF7; --surface-2:#EDE8DF;
+    --line:#E2D9C8; --line-soft:#EFE8DA;
+    --ink:#1A1714; --ink-2:#5C544A; --ink-3:#8A8073;
+    --gold:#B08D4A; --gold-l:#C9A96E; --gold-d:#8A6F3A;
+    --danger:#a11b28;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(26,23,20,.05), 0 8px 24px rgba(26,23,20,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+  input,select,textarea{font:inherit;color:inherit;width:100%}
+
+  .wrap{max-width:820px;margin:0 auto;padding:26px 20px 80px}
+  @media (max-width:560px){.wrap{padding:18px 14px 60px}}
+
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .top img{width:44px;height:auto;flex:none}
+  .top-name{font-family:var(--serif);font-size:18px;font-weight:600;line-height:1.15}
+  .top-sub{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+
+  h1{font-family:var(--serif);font-size:30px;font-weight:600;letter-spacing:-.015em;line-height:1.15}
+  @media (max-width:560px){h1{font-size:25px}}
+  .lede{color:var(--ink-2);margin-top:8px;max-width:56ch}
+  .facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .fact{font-size:12.5px;color:var(--gold-d);border:1px solid var(--line);background:var(--surface);
+        border-radius:20px;padding:4px 12px;white-space:nowrap}
+  .rule{height:1px;background:linear-gradient(90deg,var(--gold-l),transparent);opacity:.6;margin:22px 0 24px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+        padding:20px;box-shadow:var(--shadow)}
+  .card + .card{margin-top:16px}
+  .step-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  .step-title{font-family:var(--serif);font-size:17px;font-weight:600;margin-top:6px}
+  .step-note{font-size:13px;color:var(--ink-3);margin-top:4px}
+
+  .days{display:flex;gap:8px;overflow-x:auto;padding:16px 0 4px;scrollbar-width:thin}
+  .day{flex:none;min-width:78px;text-align:center;border:1px solid var(--line);background:var(--surface);
+       border-radius:10px;padding:10px 8px;transition:border-color .13s,background .13s}
+  .day:hover{border-color:var(--gold-l)}
+  .day[aria-pressed="true"]{border-color:var(--gold);background:var(--surface-2)}
+  .day-wd{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .day-n{font-family:var(--serif);font-size:20px;font-weight:600;margin-top:2px;line-height:1}
+  .day-mo{font-size:11px;color:var(--ink-3);margin-top:3px}
+  .day-count{font-size:10.5px;color:var(--gold-d);margin-top:5px}
+
+  .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px;margin-top:16px}
+  .slot{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:11px 8px;
+        font-size:14px;font-variant-numeric:tabular-nums;transition:border-color .13s,background .13s}
+  .slot:hover{border-color:var(--gold-l)}
+  .slot[aria-pressed="true"]{border-color:var(--gold);background:var(--surface-2);color:var(--gold-d);font-weight:600}
+
+  .field{margin-top:14px}
+  .field label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px;font-weight:500}
+  .field .opt{color:var(--ink-3);font-weight:400}
+  .field input,.field select,.field textarea{
+    background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:2px solid var(--gold-l);outline-offset:1px;border-color:var(--gold-l)}
+  .field textarea{min-height:84px;resize:vertical}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:520px){.two{grid-template-columns:1fr}}
+
+  .cta{background:var(--ink);color:var(--surface);border-radius:10px;padding:14px 22px;
+       font-size:15px;font-weight:600;width:100%;margin-top:20px;transition:opacity .13s}
+  .cta:hover{opacity:.88}
+  .cta:disabled{opacity:.4;cursor:not-allowed}
+
+  .picked{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;background:var(--surface-2);
+          border-radius:9px;padding:11px 14px;margin-top:4px;font-size:14px}
+  .picked strong{font-family:var(--serif);font-weight:600}
+  .picked button{font-size:12.5px;color:var(--gold-d);text-decoration:underline;margin-left:auto}
+
+  .timer{font-size:12.5px;color:var(--ink-3);margin-top:10px}
+  .timer strong{color:var(--danger);font-variant-numeric:tabular-nums}
+
+  .msg{border-radius:10px;padding:12px 15px;font-size:13.5px;margin-top:14px}
+  .msg.bad{background:var(--surface);border:1px solid var(--danger);color:var(--danger)}
+  .msg.info{background:var(--surface-2);color:var(--ink-2)}
+
+  .empty{text-align:center;padding:34px 18px;color:var(--ink-3);font-size:14px}
+  .empty strong{display:block;font-family:var(--serif);font-size:17px;color:var(--ink-2);margin-bottom:6px;font-weight:600}
+  .skeleton{background:linear-gradient(90deg,var(--surface-2),var(--line-soft),var(--surface-2));
+            background-size:200% 100%;animation:sh 1.3s linear infinite;border-radius:9px;height:70px;margin-top:16px}
+  @keyframes sh{to{background-position:-200% 0}}
+
+  .done{text-align:center;padding:12px 6px 4px}
+  .done .tick{width:52px;height:52px;border-radius:50%;background:var(--surface-2);color:var(--gold-d);
+              display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px}
+  .done h2{font-family:var(--serif);font-size:23px;font-weight:600}
+  .done .when{font-family:var(--serif);font-size:18px;margin-top:12px}
+  .done p{color:var(--ink-2);margin-top:10px;font-size:14px;max-width:46ch;margin-left:auto;margin-right:auto}
+  .foot{text-align:center;font-size:12.5px;color:var(--ink-3);margin-top:26px}
+  .foot a{color:var(--gold-d)}
+  [hidden]{display:none !important}
+</style>
 </head>
 <body>
-  <section class="hero">
-    <div class="nav"><div class="brand">DIVYA BAJAJ · ASTRO-NUMEROLOGIST</div><a class="back" href="/">← Back to website</a></div>
-    <div class="hero-inner">
-      <div class="mark" aria-hidden="true"></div>
-      <div class="eyebrow" style="color:var(--gold)">One-to-One Personal Reading</div>
-      <h1>Turn your report into a clear decision</h1>
-      <p>A written report identifies the pattern. A personal consultation helps Divya understand your exact question, compare the real choices in front of you and guide you with greater context.</p>
-      <div class="meta"><span>₹4,999</span><span>60 minutes</span><span>Phone or video call</span></div>
+<div class="wrap">
+
+  <div class="top">
+    <img src="/divya-bajaj-monogram.svg" alt="">
+    <div>
+      <div class="top-name">Divya Bajaj</div>
+      <div class="top-sub">Astro-Numerologist</div>
     </div>
-  </section>
+  </div>
 
-  <main class="wrap">
-    <div class="grid">
-      <section class="card">
-        <div class="eyebrow">What the session is for</div>
-        <h2>A focused personal discussion, not a generic reading</h2>
-        <ul class="points">
-          <li>Exact timing and priorities within your current Dasha</li>
-          <li>Career, business, money or relationship decisions</li>
-          <li>Comparing two options before making a commitment</li>
-          <li>Compatibility and partnership questions</li>
-          <li>Personal remedies and practical next steps</li>
-        </ul>
-        <div class="price">₹4,999 <small>for one 60-minute session</small></div>
-        <div class="live-badge">Private one-to-one session</div>
-        <div class="notice" style="margin-top:18px">Submitting this form opens WhatsApp with all details pre-filled. Divya's team will confirm the available slot and payment instructions personally.</div>
-      </section>
+  <h1>Book a private consultation</h1>
+  <p class="lede">A one-to-one reading where we go through your chart and your numbers together, and you can ask whatever you actually want to ask.</p>
+  <div class="facts" id="facts"></div>
+  <div class="rule"></div>
 
-      <section class="card">
-        <div class="eyebrow">Request your consultation</div>
-        <h2>Share the question you want to discuss</h2>
-        <form id="bookingForm" novalidate>
-          <div class="two">
-            <div class="field" data-field="name"><label>Full name</label><input id="name" placeholder="Enter your full name" autocomplete="name"><div class="field-error"></div></div>
-            <div class="field" data-field="phone"><label>WhatsApp number</label><input id="phone" placeholder="98765 43210" inputmode="tel" autocomplete="tel"><div class="field-error"></div></div>
-          </div>
-          <div class="field" data-field="email"><label>Email</label><input id="email" type="email" placeholder="you@example.com" autocomplete="email"><div class="field-error"></div></div>
-          <div class="two">
-            <div class="field" data-field="dob"><label>Date of birth</label><input id="dob" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="bday"><div class="field-error"></div></div>
-            <div class="field" data-field="mode"><label>Preferred mode</label><select id="mode"><option>Video call</option><option>Phone call</option></select><div class="field-error"></div></div>
-          </div>
-          <div class="field" data-field="question"><label>Main question</label><textarea id="question" placeholder="What decision, timing or situation do you want Divya to examine personally?"></textarea><div class="field-error"></div></div>
-          <button class="submit" type="submit">Continue on WhatsApp</button>
-          <div class="help">You will not be charged on this page. Slot and payment confirmation will happen on WhatsApp.</div>
-        </form>
-      </section>
+  <div id="flow">
+    <div class="card">
+      <div class="step-label">Step 1</div>
+      <div class="step-title">Pick a day and time</div>
+      <div class="step-note">All times shown in India Standard Time (IST).</div>
+      <div id="picker"><div class="skeleton"></div></div>
     </div>
-  </main>
 
-  <footer class="footer">Divya Bajaj · Gurugram · <a href="mailto:contact@divyabajaj.com">contact@divyabajaj.com</a> · <a href="https://wa.me/919545136766">+91 95451 36766</a></footer>
+    <div class="card" id="detailsCard" hidden>
+      <div class="step-label">Step 2</div>
+      <div class="step-title">Your details</div>
+      <div class="picked" id="picked"></div>
+      <div class="timer" id="timer"></div>
 
-  <script>
-    (function(){
-      var form = document.getElementById('bookingForm');
-      var value = function(id){ return document.getElementById(id).value.trim(); };
-      var digits = function(input){ return String(input || '').replace(/\D/g,''); };
-      var formatDate = function(input){
-        var d = digits(input).slice(0,8);
-        if(d.length<=2)return d;
-        if(d.length<=4)return d.slice(0,2)+'/'+d.slice(2);
-        return d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4);
-      };
-      var validDate = function(input){
-        var m=String(input||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if(!m)return false;
-        var day=Number(m[1]),month=Number(m[2]),year=Number(m[3]);
-        var date=new Date(Date.UTC(year,month-1,day));
-        return year>=1900&&date<=new Date()&&date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day;
-      };
-      var setError = function(name,message){
-        var field=document.querySelector('[data-field="'+name+'"]');
-        field.classList.add('invalid');
-        field.querySelector('.field-error').textContent=message;
-      };
-      var clearError = function(name){
-        var field=document.querySelector('[data-field="'+name+'"]');
-        if(field)field.classList.remove('invalid');
-      };
-      document.getElementById('dob').addEventListener('input',function(){this.value=formatDate(this.value);clearError('dob');});
-      ['name','phone','email','question'].forEach(function(name){document.getElementById(name).addEventListener('input',function(){clearError(name);});});
+      <form id="form" novalidate>
+        <div class="two">
+          <div class="field">
+            <label for="name">Full name</label>
+            <input id="name" name="name" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="phone">WhatsApp number</label>
+            <input id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="10 digit number" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div class="two">
+          <div class="field">
+            <label for="dob">Date of birth</label>
+            <input id="dob" name="dob" type="date" required>
+          </div>
+          <div class="field">
+            <label for="tob">Time of birth <span class="opt">(if you know it)</span></label>
+            <input id="tob" name="tob" type="time">
+          </div>
+        </div>
+        <div class="field">
+          <label for="pob">Place of birth</label>
+          <input id="pob" name="pob" placeholder="City, country" required>
+        </div>
+        <div class="field">
+          <label for="mode">How would you like to talk?</label>
+          <select id="mode" name="mode">
+            <option value="video_call">Video call</option>
+            <option value="phone_call">Audio call</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="question">What is on your mind? <span class="opt">(optional)</span></label>
+          <textarea id="question" name="question" placeholder="The one thing you most want answered."></textarea>
+        </div>
+        <div id="formMsg"></div>
+        <button class="cta" id="submit" type="submit">Confirm this slot</button>
+      </form>
+    </div>
+  </div>
 
-      form.addEventListener('submit', function(event){
-        event.preventDefault();
-        ['name','phone','email','dob','question'].forEach(clearError);
-        var errors={};
-        if(!/^[A-Za-zÀ-ž][A-Za-zÀ-ž .'’-]{1,79}$/.test(value('name')))errors.name='Enter a valid full name.';
-        var phoneDigits=digits(value('phone'));
-        if(phoneDigits.length<10||phoneDigits.length>15)errors.phone='Enter a valid WhatsApp number.';
-        if(value('email')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value('email')))errors.email='Enter a valid email address.';
-        if(value('dob')&&!validDate(value('dob')))errors.dob='Use DD/MM/YYYY format.';
-        if(value('question').length<5)errors.question='Please describe your main question.';
-        Object.keys(errors).forEach(function(name){setError(name,errors[name]);});
-        if(Object.keys(errors).length){document.querySelector('.field.invalid input,.field.invalid textarea').focus();return;}
+  <div class="card" id="doneCard" hidden>
+    <div class="done">
+      <div class="tick">&#10003;</div>
+      <h2>Your slot is reserved</h2>
+      <div class="when" id="doneWhen"></div>
+      <p id="doneNote"></p>
+    </div>
+  </div>
 
-        var message = [
-          'Hello Divya, I want to request a one-to-one consultation.',
-          '',
-          'Name: ' + value('name'),
-          'WhatsApp: ' + value('phone'),
-          'Email: ' + (value('email') || 'Not provided'),
-          'Date of birth: ' + (value('dob') || 'Not provided'),
-          'Preferred mode: ' + value('mode'),
-          'Main question: ' + value('question'),
-          '',
-          'Consultation: ₹4,999 for 60 minutes.'
-        ].join('\n');
-        window.location.href = 'https://wa.me/919545136766?text=' + encodeURIComponent(message);
+  <div class="foot">
+    Need to change something? Message us on
+    <a href="https://wa.me/919545136766" rel="noopener">WhatsApp</a>.
+  </div>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { days: [], date: null, slot: null, hold: null, fee: 4999, holdMinutes: 10, tick: null };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // Everything is rendered in IST no matter where the customer is sitting,
+  // because that is the timezone Divya works in and the one the confirmation
+  // will quote. Showing a browser-local time here would mean two different
+  // times for the same call.
+  var IST = 'Asia/Kolkata';
+  function fmt(iso, opts) {
+    return new Date(iso).toLocaleString('en-IN', Object.assign({ timeZone: IST }, opts));
+  }
+  var timeOf = function (iso) { return fmt(iso, { hour: 'numeric', minute: '2-digit', hour12: true }); };
+  var longDate = function (iso) { return fmt(iso, { weekday: 'long', day: 'numeric', month: 'long' }); };
+
+  function money(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
+
+  function show(el, on) { el.hidden = !on; }
+
+  function message(target, kind, text) {
+    target.innerHTML = text ? '<div class="msg ' + kind + '">' + esc(text) + '</div>' : '';
+  }
+
+  // ------------------------------------------------------------- load slots
+
+  function load() {
+    fetch('/api/booking/availability?days=21', { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) throw new Error(d.error || 'Could not load times');
+        state.days = d.days || [];
+        state.fee = d.fee_inr;
+        state.holdMinutes = d.hold_minutes;
+        state.paymentsLive = d.payments_live;
+
+        $('facts').innerHTML =
+          '<span class="fact">' + esc(d.duration_minutes) + ' minutes</span>' +
+          '<span class="fact">' + esc(money(d.fee_inr)) + '</span>' +
+          '<span class="fact">Video or audio call</span>';
+
+        if (!d.configured) {
+          $('picker').innerHTML = '<div class="empty"><strong>Booking opens shortly</strong>' +
+            'Divya has not published her hours for this period yet. Message us on WhatsApp and we will sort a time out personally.</div>';
+          return;
+        }
+        renderDays();
+      })
+      .catch(function (e) {
+        $('picker').innerHTML = '<div class="empty"><strong>Could not load available times</strong>' + esc(e.message) + '</div>';
       });
-    })();
-  </script>
+  }
+
+  function renderDays() {
+    if (!state.days.length) {
+      $('picker').innerHTML = '<div class="empty"><strong>No times free right now</strong>' +
+        'Every slot in the next three weeks is taken. Message us on WhatsApp and we will find you one.</div>';
+      return;
+    }
+    var html = '<div class="days" id="days">';
+    state.days.forEach(function (day, i) {
+      var first = day.slots[0].starts_at;
+      html += '<button type="button" class="day" data-date="' + esc(day.date) + '" aria-pressed="' + (i === 0) + '">' +
+        '<div class="day-wd">' + esc(fmt(first, { weekday: 'short' })) + '</div>' +
+        '<div class="day-n">' + esc(fmt(first, { day: 'numeric' })) + '</div>' +
+        '<div class="day-mo">' + esc(fmt(first, { month: 'short' })) + '</div>' +
+        '<div class="day-count">' + day.slots.length + ' free</div>' +
+        '</button>';
+    });
+    html += '</div><div class="slots" id="slots"></div>';
+    $('picker').innerHTML = html;
+
+    $('days').addEventListener('click', function (e) {
+      var button = e.target.closest('[data-date]');
+      if (!button) return;
+      Array.prototype.forEach.call($('days').children, function (child) {
+        child.setAttribute('aria-pressed', String(child === button));
+      });
+      renderSlots(button.getAttribute('data-date'));
+    });
+
+    renderSlots(state.days[0].date);
+  }
+
+  function renderSlots(date) {
+    state.date = date;
+    var day = state.days.filter(function (d) { return d.date === date; })[0];
+    if (!day) return;
+    $('slots').innerHTML = day.slots.map(function (slot) {
+      return '<button type="button" class="slot" data-key="' + esc(slot.slot_key) + '" aria-pressed="false">' +
+        esc(timeOf(slot.starts_at)) + '</button>';
+    }).join('');
+
+    $('slots').addEventListener('click', function (e) {
+      var button = e.target.closest('[data-key]');
+      if (!button) return;
+      var slot = day.slots.filter(function (s) { return s.slot_key === button.getAttribute('data-key'); })[0];
+      if (slot) hold(slot, button);
+    }, { once: true });
+  }
+
+  // -------------------------------------------------------------- hold slot
+
+  function hold(slot, button) {
+    Array.prototype.forEach.call($('slots').children, function (child) {
+      child.setAttribute('aria-pressed', String(child === button));
+      child.disabled = true;
+    });
+
+    fetch('/api/booking/hold', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ slot_key: slot.slot_key, starts_at: slot.starts_at, ends_at: slot.ends_at })
+    })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
+      .then(function (d) {
+        state.slot = slot;
+        state.hold = d;
+        $('picked').innerHTML = '<span><strong>' + esc(longDate(slot.starts_at)) + '</strong> at <strong>' +
+          esc(timeOf(slot.starts_at)) + '</strong> IST</span>' +
+          '<button type="button" id="changeSlot">Change</button>';
+        $('changeSlot').addEventListener('click', reset);
+        show($('detailsCard'), true);
+        startTimer(new Date(d.expires_at));
+        $('detailsCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('name').focus({ preventScroll: true });
+      })
+      .catch(function (e) {
+        message($('picker'), 'bad', e.message || 'That slot just went. Please pick another.');
+        load();
+      });
+  }
+
+  function reset() {
+    if (state.tick) clearInterval(state.tick);
+    state.slot = null; state.hold = null;
+    show($('detailsCard'), false);
+    message($('formMsg'), 'info', '');
+    load();
+  }
+
+  /**
+   * The hold is a promise to the customer, so it is shown counting down rather
+   * than expiring silently under them.
+   */
+  function startTimer(expiresAt) {
+    if (state.tick) clearInterval(state.tick);
+    var render = function () {
+      var left = Math.max(0, Math.round((expiresAt - new Date()) / 1000));
+      if (left <= 0) {
+        clearInterval(state.tick);
+        $('timer').innerHTML = '';
+        message($('formMsg'), 'bad', 'Your hold expired. Pick a slot again and it will be reserved fresh.');
+        $('submit').disabled = true;
+        return;
+      }
+      var m = Math.floor(left / 60), s = left % 60;
+      $('timer').innerHTML = 'This slot is held for you for <strong>' + m + ':' + (s < 10 ? '0' : '') + s + '</strong>';
+    };
+    render();
+    state.tick = setInterval(render, 1000);
+  }
+
+  // ------------------------------------------------------------------ book
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!state.hold) return;
+
+    var payload = {
+      hold_id: state.hold.hold_id,
+      slot_key: state.slot.slot_key,
+      name: $('name').value, phone: $('phone').value, email: $('email').value,
+      dob: $('dob').value, tob: $('tob').value, pob: $('pob').value,
+      mode: $('mode').value, question: $('question').value
+    };
+    var params = new URLSearchParams(location.search);
+    payload.utm_source = params.get('utm_source') || '';
+    payload.utm_medium = params.get('utm_medium') || '';
+    payload.utm_campaign = params.get('utm_campaign') || '';
+
+    if (!payload.name.trim() || !payload.phone.trim() || !payload.email.trim() || !payload.dob || !payload.pob.trim()) {
+      return message($('formMsg'), 'bad', 'Please fill in your name, number, email, date of birth and place of birth.');
+    }
+
+    $('submit').disabled = true;
+    $('submit').textContent = 'Reserving…';
+    message($('formMsg'), 'info', '');
+
+    fetch('/api/booking/book', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
+      .then(function (d) {
+        if (state.tick) clearInterval(state.tick);
+        show($('flow'), false);
+        show($('doneCard'), true);
+        $('doneWhen').textContent = longDate(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
+        $('doneNote').textContent = d.next_step === 'payment'
+          ? 'Payment confirmed. Your call is booked and the joining link is on its way to your email and WhatsApp.'
+          : 'We have reserved this time for you. Divya will message you on WhatsApp shortly with the payment link, and your slot is confirmed the moment it is paid.';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .catch(function (e) {
+        $('submit').disabled = false;
+        $('submit').textContent = 'Confirm this slot';
+        message($('formMsg'), 'bad', e.message || 'Could not complete the booking. Please try again.');
+      });
+  });
+
+  load();
+})();
+</script>
 </body>
 </html>

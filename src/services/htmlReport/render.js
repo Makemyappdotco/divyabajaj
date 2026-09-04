@@ -6,13 +6,13 @@
 // template renders identically for every customer, every time.
 
 const path = require('path');
-const puppeteer = require('puppeteer-core');
-// @sparticuz/chromium is a pure ESM package. On some Node/serverless runtimes
-// require() of it throws ERR_REQUIRE_ESM immediately - and since this used to
-// be a top-level require, that crashed the *entire app* on cold start, not
-// just the PDF route. It's now loaded lazily via dynamic import() inside
-// getBrowser(), which works under both CJS and ESM regardless of Node
-// version, and only runs when a PDF is actually being generated.
+// puppeteer-core (25.x) and @sparticuz/chromium are both pure ESM packages.
+// require()'ing either one throws ERR_REQUIRE_ESM and crashes the *entire
+// app* on cold start, since this used to be a top-level require executed for
+// every route, not just the PDF one - confirmed via Vercel runtime logs.
+// Both are now loaded lazily via dynamic import() inside getBrowser(), which
+// works under both CJS and ESM regardless of Node version, and only runs
+// when a PDF is actually being generated.
 
 const { loadFontFaceCss, loadImages } = require('./assets');
 const buildCss = require('./css');
@@ -37,7 +37,11 @@ let _browserPromise = null;
 async function getBrowser() {
   if (_browserPromise) return _browserPromise;
   _browserPromise = (async () => {
-    const chromiumModule = await import('@sparticuz/chromium');
+    const [puppeteerModule, chromiumModule] = await Promise.all([
+      import('puppeteer-core'),
+      import('@sparticuz/chromium')
+    ]);
+    const puppeteer = puppeteerModule.default || puppeteerModule;
     const chromium = chromiumModule.default || chromiumModule;
     return puppeteer.launch({
       args: chromium.args,

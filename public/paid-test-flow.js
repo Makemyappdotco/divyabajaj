@@ -339,6 +339,9 @@
         numbers: data.numbers || {},
         astrology_data: data.astrology_data || null,
         report_text: data.report_text,
+        // carries the Integrated Life Report design; without it the PDF route
+        // falls back to the legacy layout
+        report_json: data.report_json || null,
         report_type: 'paid_blueprint_v2_preview'
       };
       window.__paidBlueprintPdfPayload = pdfPayload;

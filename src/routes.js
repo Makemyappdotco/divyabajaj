@@ -3,7 +3,7 @@ const express = require('express');
 const db = require('./database');
 const { adminAuth } = require('./auth');
 const numerology = require('./services/numerology');
-const { generateReportPdf } = require('./services/pdf');
+const { generateDeliverablePdf } = require('./services/reportPdf');
 const { buildCombinedCsv, buildExcelWorkbook } = require('./services/export');
 
 const router = express.Router();
@@ -266,9 +266,10 @@ router.get('/reports/:id/pdf', async (req, res) => {
     if (!report || report.status !== 'completed') return res.status(404).json({ error: 'Report not found' });
 
     const lead = await db.getLead(report.lead_id) || {};
-    const pdfBuffer = await generateReportPdf({
+    const { buffer: pdfBuffer } = await generateDeliverablePdf({
       lead,
       report,
+      reportJson: report.report_json || null,
       numbers: report.horosoft_data || {},
       astrologyData: report.astrology_data || null,
       reportText: report.ai_report || 'Report content is not available.'

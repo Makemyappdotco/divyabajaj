@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('./database');
-const { generateReportPdf } = require('./services/pdf');
+const { generateDeliverablePdf } = require('./services/reportPdf');
 const { generatePaidReport } = require('./services/paidReport');
 const { generatePaidReportV2 } = require('./services/paidReportV2');
 const { renderReportPdfBuffer } = require('./services/htmlReport/render');
@@ -350,6 +350,7 @@ router.post('/reports/pdf-direct', async (req, res) => {
       numbers = {},
       astrology_data: astrologyData = null,
       report_text: reportText = '',
+      report_json: reportJson = null,
       report_type: reportType = 'paid_blueprint_direct'
     } = req.body || {};
 
@@ -361,13 +362,15 @@ router.post('/reports/pdf-direct', async (req, res) => {
       return res.status(400).json({ error: 'Generated report text is required for PDF generation' });
     }
 
-    const pdfBuffer = await generateReportPdf({
+    const { buffer: pdfBuffer, renderer } = await generateDeliverablePdf({
       lead,
       report: { type: reportType },
+      reportJson,
       numbers,
       astrologyData,
       reportText
     });
+    console.log(`[pdf-direct] rendered with the ${renderer} renderer`);
 
     const filename = `${safeFileName(lead.name)}-Integrated-Life-Report.pdf`;
     res.setHeader('Content-Type', 'application/pdf');

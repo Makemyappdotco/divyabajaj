@@ -7,9 +7,12 @@
 
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-// @sparticuz/chromium ships as an ESM module accessed through CJS interop -
-// the actual launcher object is the default export, not the module itself.
-const chromium = require('@sparticuz/chromium').default || require('@sparticuz/chromium');
+// @sparticuz/chromium is a pure ESM package. On some Node/serverless runtimes
+// require() of it throws ERR_REQUIRE_ESM immediately - and since this used to
+// be a top-level require, that crashed the *entire app* on cold start, not
+// just the PDF route. It's now loaded lazily via dynamic import() inside
+// getBrowser(), which works under both CJS and ESM regardless of Node
+// version, and only runs when a PDF is actually being generated.
 
 const { loadFontFaceCss, loadImages } = require('./assets');
 const buildCss = require('./css');
@@ -33,13 +36,16 @@ function sectionKeyForTocNumber(number, hasOnePage) {
 let _browserPromise = null;
 async function getBrowser() {
   if (_browserPromise) return _browserPromise;
-  const isLocal = !process.env.AWS_LAMBDA_FUNCTION_VERSION && !process.env.VERCEL;
-  _browserPromise = puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-    defaultViewport: chromium.defaultViewport
-  }).catch(err => {
+  _browserPromise = (async () => {
+    const chromiumModule = await import('@sparticuz/chromium');
+    const chromium = chromiumModule.default || chromiumModule;
+    return puppeteer.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport
+    });
+  })().catch(err => {
     _browserPromise = null;
     throw err;
   });

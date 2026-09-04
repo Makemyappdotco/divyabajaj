@@ -48,6 +48,18 @@ function table(headers, rows) {
   };
 }
 
+// The prompt names these four ideas, so the generated text almost always opens
+// by restating the label it was handed. Prefixing the label unconditionally
+// therefore printed it twice ("Houses are life departments. Houses are life
+// departments. For example..."). The label is only added when the text does not
+// already begin with it, which also keeps the sentence intact for the idea whose
+// text runs straight on out of its label ("The chain of command explains...").
+function fourIdea(label, text) {
+  const body = String(text || '').trim();
+  if (!body) return label;
+  return body.toLowerCase().startsWith(label.toLowerCase()) ? body : `${label}. ${body}`;
+}
+
 function numberedList(items) {
   const clean = (items || []).filter(Boolean);
   if (!clean.length) return null;
@@ -116,10 +128,10 @@ function buildFlowSections(report, hasOnePage) {
       para(report.primer.systems),
       sub('The four ideas you need'),
       numberedList([
-        `Houses are life departments. ${report.primer.four_ideas.houses}`,
-        `Planets are the officers in charge. ${report.primer.four_ideas.planets}`,
-        `Dasha is whose turn it is. ${report.primer.four_ideas.dasha}`,
-        `The chain of command. ${report.primer.four_ideas.chain_of_command}`
+        fourIdea('Houses are life departments', report.primer.four_ideas.houses),
+        fourIdea('Planets are the officers in charge', report.primer.four_ideas.planets),
+        fourIdea('Dasha is whose turn it is', report.primer.four_ideas.dasha),
+        fourIdea('The chain of command', report.primer.four_ideas.chain_of_command)
       ]),
       sub('The convergence method'),
       para(report.primer.convergence_method),

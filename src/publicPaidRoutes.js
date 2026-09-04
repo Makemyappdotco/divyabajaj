@@ -3,6 +3,7 @@ const db = require('./database');
 const { generateReportPdf } = require('./services/pdf');
 const { generatePaidReport } = require('./services/paidReport');
 const { generatePaidReportV2 } = require('./services/paidReportV2');
+const { renderReportPdfBuffer } = require('./services/htmlReport/render');
 const {
   generateSourceBundle,
   getMode,
@@ -379,6 +380,50 @@ router.post('/reports/pdf-direct', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Could not generate the premium PDF'
+    });
+  }
+});
+
+/*
+  New, isolated preview route. This does NOT touch /reports/pdf-direct or the
+  live paid-report download path - it renders the same report_json content
+  through the HTML/CSS template (the approved design, pulled from the real
+  approved PDF's own artwork) via headless Chromium instead of PDFKit.
+
+  Body: { lead: { name, dob, tob, pob }, report: <report_json from
+  /reports/paid-test-v2 or /reports/paid-test>, onePage?: <optional> }
+
+  Pass the same report_json back in as many times as needed while checking
+  the design - this route never calls OpenAI or AstrologyAPI, so iterating on
+  the PDF costs nothing and never changes the wording.
+*/
+router.post('/reports/pdf-html-preview', previewOnly, async (req, res) => {
+  try {
+    const { lead = {}, report = {}, onePage = null } = req.body || {};
+
+    if (!String(lead.name || '').trim()) {
+      return res.status(400).json({ success: false, error: 'lead.name is required' });
+    }
+    if (!report || !report.primer || !report.glance || !report.life_areas) {
+      return res.status(400).json({
+        success: false,
+        error: 'report must be a report_json object (primer, glance, life_areas, ...) from /reports/paid-test-v2'
+      });
+    }
+
+    const pdfBuffer = await renderReportPdfBuffer({ lead, report, onePage });
+
+    const filename = `${safeFileName(lead.name)}-Integrated-Life-Report-PREVIEW.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', String(pdfBuffer.length));
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    return res.end(pdfBuffer);
+  } catch (error) {
+    console.error('[HTML report preview PDF error]', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Could not generate the preview PDF'
     });
   }
 });

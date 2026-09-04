@@ -69,7 +69,7 @@ async function buildReportHtml({ lead, report, onePage }) {
   const hasOnePage = !!(onePage && (onePage.strongest_signal || (onePage.pulse || []).length));
   const fontFaceCss = loadFontFaceCss();
   const images = loadImages();
-  const css = buildCss(fontFaceCss);
+  const css = buildCss(fontFaceCss, images);
 
   const browser = await getBrowser();
   const measurePage = await browser.newPage();

@@ -1,6 +1,6 @@
 const { page: P, color: C } = require('./tokens');
 
-module.exports = function buildCss(fontFaceCss) {
+module.exports = function buildCss(fontFaceCss, images) {
   return `
 ${fontFaceCss}
 
@@ -21,10 +21,39 @@ body{font-family:'DB Sans',sans-serif; color:${C.ink}; font-size:10.2pt; line-he
 }
 .page:last-child{ break-after:auto; page-break-after:auto; }
 
-/* The letterhead (logo, top/bottom rules, footer text, portrait) is the real
-   designer artwork pulled out of the approved PDF, used as a full-bleed
-   background image so it is pixel-identical on every page, not recreated. */
 .page-bg{ background-size:${P.width}pt ${P.height}pt; background-repeat:no-repeat; }
+
+/* ---- interior letterhead ----
+   Every position below was measured off the approved PDF's own page
+   background, where 1 image pixel maps to exactly 1pt (595px across
+   595.28pt). That background was a flat cream field carrying just six
+   things: the logo, two gold rules, the footer line of type and the corner
+   portrait. Carrying them as a 72 DPI image made all six soft at print size,
+   so they are drawn here instead: the rules and type as vectors, the logo and
+   portrait as their own high-resolution files. */
+.page-interior{ background:${C.paperExact}; }
+.chrome-logo{
+  position:absolute; left:244.1pt; top:16pt; width:107pt; height:85.5pt;
+  background-image:url(${images.logo}); background-size:100% 100%; background-repeat:no-repeat;
+}
+.chrome-rule{ position:absolute; height:0.9pt; background:${C.chromeRule}; }
+.chrome-rule-top{ left:44pt; top:112.6pt; width:508pt; }
+.chrome-rule-bottom{ left:44pt; top:778.6pt; width:386pt; }
+.chrome-footer{
+  /* The approved page sets the studio name a little larger than the descriptor
+     and shares one baseline; both sizes and both tracking values were solved
+     against the real font to reproduce the measured widths (55pt / 83pt). */
+  position:absolute; left:44pt; top:796pt; line-height:1;
+  font-family:'DB Sans',sans-serif; font-weight:600;
+  color:${C.ink}; text-transform:uppercase; white-space:nowrap;
+}
+.chrome-footer .nm{ font-size:6.6pt; letter-spacing:1.043pt; }
+.chrome-footer .sep{ font-size:6.6pt; padding:0 4.2pt 0 3.4pt; color:${C.muted}; }
+.chrome-footer .sub{ font-size:5.4pt; letter-spacing:0.329pt; }
+.chrome-portrait{
+  position:absolute; left:462pt; top:709.8pt; width:134.2pt; height:134.2pt;
+  background-image:url(${images.portrait}); background-size:100% 100%; background-repeat:no-repeat;
+}
 
 .page-content{
   position:absolute;
@@ -38,7 +67,9 @@ body{font-family:'DB Sans',sans-serif; color:${C.ink}; font-size:10.2pt; line-he
 /* section label, top right - the only piece of header chrome that changes per
    page, so it's the only piece drawn in code instead of baked into the image */
 .chrome-section-label{
-  position:absolute; right:${P.marginX}pt; top:88pt; max-width:230pt;
+  /* capped at 186pt so a long label wraps instead of running into the logo,
+     whose right edge sits at 351.1pt - this box starts at 355.3pt */
+  position:absolute; right:${P.marginX}pt; top:88pt; max-width:186pt;
   font-family:'DB Sans',sans-serif; font-weight:600; font-size:7.6pt; letter-spacing:1.1pt;
   color:${C.muted}; text-transform:uppercase; text-align:right;
 }
@@ -79,6 +110,20 @@ table.dtable td.col-label{ font-weight:700; white-space:nowrap; }
    of the approved PDF - the source file ships it pre-flattened with the
    "Prepared For" fields already blanked out. So the only things drawn in code
    are the four dynamic fields, positioned on top of that exact background. */
+/* The cover keeps the approved artwork as its background, but the logo and the
+   portrait are painted over it from the high-resolution sources at the exact
+   position and scale the artwork itself uses - both fits were solved by
+   template-matching against the approved cover (correlation 0.99+), so they
+   land on top of their own low-resolution originals and replace them. */
+.cover-logo{
+  position:absolute; left:85.2pt; top:41.8pt; width:190.7pt; height:152.3pt;
+  background-image:url(${images.logo}); background-size:100% 100%; background-repeat:no-repeat;
+}
+.cover-portrait{
+  position:absolute; left:248.6pt; top:296.2pt; width:359.4pt; height:359.4pt;
+  background-image:url(${images.portraitCover}); background-size:100% 100%; background-repeat:no-repeat;
+}
+
 .cover-name-overlay{
   /* Width measured directly against the real portrait pixels in cover-bg.jpg:
      the portrait/hair starts at ~230pt on this row, so the box is capped well

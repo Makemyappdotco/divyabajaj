@@ -27,14 +27,25 @@ function loadFontFaceCss() {
 
 let _imageCache = null;
 function loadImages() {
-  // coverBg / pageBg are pulled directly out of the approved PDF (pdfimages,
-  // native resolution) - real designer artwork, not a recreation, so every
-  // decorative element (zodiac wheel, border, icons, moon phases, logo,
-  // portrait) is pixel-identical to the approved reference by construction.
+  // coverBg is the approved PDF's cover artwork (zodiac wheel, border, icons,
+  // moon phases, number grid) at its native extracted resolution - real
+  // designer artwork, not a recreation.
+  //
+  // The logo and portrait are NOT taken from that artwork. An A4 page is
+  // 595.28pt wide, so the extracted page background (595px) lands at exactly
+  // 72 DPI and the cover at ~128 DPI. Anything baked into those images -
+  // logo, portrait, footer rules, footer text - was therefore being blown up
+  // roughly 4x at print size and looked soft and blocky next to the live text,
+  // which renders as vectors. So the logo and portrait now ship as their own
+  // high-resolution files, placed by CSS at measured positions, and the
+  // interior letterhead (flat cream, two rules, footer text) is drawn in code
+  // rather than carried as a 72 DPI picture.
   if (_imageCache) return _imageCache;
   _imageCache = {
     coverBg: toDataUri(path.join(ROOT, 'assets', 'cover-bg.jpg'), 'image/jpeg'),
-    pageBg: toDataUri(path.join(ROOT, 'assets', 'page-bg.jpg'), 'image/jpeg')
+    logo: toDataUri(path.join(ROOT, 'assets', 'logo.webp'), 'image/webp'),
+    portrait: toDataUri(path.join(ROOT, 'assets', 'portrait.webp'), 'image/webp'),
+    portraitCover: toDataUri(path.join(ROOT, 'assets', 'portrait-cover.webp'), 'image/webp')
   };
   return _imageCache;
 }

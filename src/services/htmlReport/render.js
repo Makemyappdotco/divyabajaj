@@ -61,12 +61,14 @@ async function getBrowser() {
  * @param {{name:string, dob:string, tob:string, pob:string}} args.lead
  * @param {object} args.report - the report_json.report object from paidReportV2
  * @param {object} [args.onePage] - optional "Your Report In One Page" content.
- *   The paidReportV2 prompt does not generate this yet, so callers only pass
- *   it once that gap is closed; until then the page is skipped entirely
- *   rather than inventing content for it.
+ *   paidReportV2 now generates this as report_json.one_page, so it is read from
+ *   the report itself unless a caller passes it explicitly. Reports generated
+ *   before that (or any report missing it) simply skip the page rather than
+ *   having content invented for them.
  */
 async function buildReportHtml({ lead, report, onePage }) {
-  const hasOnePage = !!(onePage && (onePage.strongest_signal || (onePage.pulse || []).length));
+  const summary = onePage || report?.one_page || null;
+  const hasOnePage = !!(summary && (summary.strongest_signal || (summary.pulse || []).length));
   const fontFaceCss = loadFontFaceCss();
   const images = loadImages();
   const css = buildCss(fontFaceCss, images);
@@ -90,7 +92,7 @@ async function buildReportHtml({ lead, report, onePage }) {
     const bodyHtml = [
       coverPageHtml(lead, images),
       tocPageHtml(entries, images),
-      hasOnePage ? onePageSummaryHtml(lead, onePage, images) : '',
+      hasOnePage ? onePageSummaryHtml(lead, summary, images) : '',
       ...pages.map(p => flowPageHtml(p.sectionLabel, p.html, images))
     ].join('\n');
 

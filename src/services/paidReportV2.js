@@ -150,7 +150,8 @@ The client-approved report format is the Integrated Life Report structure. Follo
 The client has explicitly confirmed that the requested Nadi Astrology and Vedic Numerology change is customer-facing terminology only. Do not recalculate, alter or reinterpret any supplied number or astrological source value merely because of the terminology change.
 
 REPORT CONTRACT
-The report must contain these sections in this exact order:
+The report opens with Your Report In One Page, then contains these sections in
+this exact order:
 1. How To Read This Report
 2. Your Chart And Numbers At A Glance
 3. Personal Nature: Strengths And Weaknesses
@@ -213,6 +214,23 @@ CUSTOMER-FACING METHOD LABELS
 - The report may describe convergence, tension and silence. Never force agreement.
 - Never mention KP, Chaldean, Pythagorean, AstrologyAPI, internal source keys, backend implementation names, or whether a separate Nadi calculation was or was not performed anywhere in the customer-facing JSON.
 
+ONE PAGE SUMMARY CONTRACT
+- This is the opening page, read before anything else. Write it last, once the
+  rest of the report exists, so it summarises what the report actually says.
+- strongest_signal: the single clearest pattern across both systems, including
+  the central tension it creates. 45 to 70 words.
+- pulse: exactly seven rows, one per life area, in the same order as the seven
+  life areas. Each area is the plain area name (Personal Nature, Past Life
+  Karma, Finances, Marriage, Health, Children, Property) and each note is one
+  sentence of 12 to 22 words giving the most useful thing to notice in that
+  area.
+- current_chapter: what the present period rewards, drawn from the timing map.
+  20 to 35 words.
+- concern: the client's likely main question in their own voice, phrased as a
+  question and ending with a question mark.
+- Summarise only. Introduce no finding that does not appear later in the report,
+  and add no new dates, numbers or claims.
+
 TIMING MAP CONTRACT
 - Produce exactly five core timing rows, one for each deterministic personal_years entry, in chronological order.
 - For each row compare the verified astrological chapter with that Personal Year.
@@ -252,11 +270,25 @@ WRITING STYLE AND LENGTH
 - Scope And Limitations must stay customer-facing. Do not describe APIs, backend verification, internal calculation systems or implementation details there.
 - Main target: 4,500 to 5,300 words for the rendered report.
 - Acceptable final range: 4,000 to 5,800 words. Do not exceed it.
-- Suggested balance: primer 450-550 words; glance 300-400; each life area 350-450; remedies 350-450; timing map 250-350; closing summary 200-300; limitations 180-260.
+- Suggested balance: one page summary 220-300 words; primer 450-550 words; glance 300-400; each life area 350-450; remedies 350-450; timing map 250-350; closing summary 200-300; limitations 180-260.
 - The client's sample is deliberately longer. Keep the same logic and depth, but edit tightly.
 
 Return ONLY valid JSON with exactly this shape:
 {
+  "one_page": {
+    "strongest_signal": "",
+    "pulse": [
+      {"area":"Personal Nature", "note":""},
+      {"area":"Past Life Karma", "note":""},
+      {"area":"Finances", "note":""},
+      {"area":"Marriage", "note":""},
+      {"area":"Health", "note":""},
+      {"area":"Children", "note":""},
+      {"area":"Property", "note":""}
+    ],
+    "current_chapter": "",
+    "concern": ""
+  },
   "primer": {
     "purpose": "",
     "systems": "",
@@ -548,6 +580,21 @@ function validateReport(report) {
     if (!Array.isArray(area.actions) || !area.actions.filter(Boolean).length) issues.push(`Life area ${key}.actions is missing.`);
     if (!Array.isArray(area.timing)) issues.push(`Life area ${key}.timing must be an array.`);
   });
+
+  const onePage = report.one_page;
+  if (!onePage || typeof onePage !== 'object') {
+    issues.push('Your Report In One Page is missing.');
+  } else {
+    if (!String(onePage.strongest_signal || '').trim()) issues.push('one_page.strongest_signal is missing.');
+    if (!String(onePage.current_chapter || '').trim()) issues.push('one_page.current_chapter is missing.');
+    if (!String(onePage.concern || '').trim()) issues.push('one_page.concern is missing.');
+    const pulse = Array.isArray(onePage.pulse) ? onePage.pulse : [];
+    if (pulse.length !== 7) {
+      issues.push('one_page.pulse must contain exactly seven rows, one per life area.');
+    } else if (pulse.some(row => !String(row?.area || '').trim() || !String(row?.note || '').trim())) {
+      issues.push('Every one_page.pulse row needs both an area and a note.');
+    }
+  }
 
   if (!report.remedies || typeof report.remedies !== 'object') issues.push('Remedies section is missing.');
   if (!Array.isArray(report.timing_map) || report.timing_map.length !== 5) issues.push('Timing map must contain exactly five core rows.');

@@ -80,18 +80,22 @@ table.dtable td.col-label{ font-weight:700; white-space:nowrap; }
    "Prepared For" fields already blanked out. So the only things drawn in code
    are the four dynamic fields, positioned on top of that exact background. */
 .cover-name-overlay{
-  position:absolute; left:66pt; top:493pt; width:260pt; height:27pt;
+  /* Width measured directly against the real portrait pixels in cover-bg.jpg:
+     the portrait/hair starts at ~230pt on this row, so the box is capped well
+     inside that (216pt right edge) with margin, never the photo. */
+  position:absolute; left:66pt; top:493pt; width:150pt; height:27pt;
   background:${C.cream};
-  font-family:'DB Serif',serif; font-weight:700; font-size:20pt; color:${C.ink};
-  white-space:nowrap; overflow:hidden;
+  font-family:'DB Serif',serif; font-weight:700; font-size:19pt; color:${C.ink};
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .cover-field-overlay{
-  /* masks only the baked-in dotted-line span itself (measured ~107pt-228pt),
-     with a small buffer - wide enough to hide the dots under any realistic
-     value, but stops well short of the portrait so it never draws over her */
-  position:absolute; left:107pt; width:165pt; height:19pt;
+  /* Width measured directly against the real portrait pixels in cover-bg.jpg
+     for all three rows (tightest is ~264pt on the Place Of Birth row) - capped
+     well inside that (255pt right edge) with margin, so this can never touch
+     the photo, while still hiding the baked-in dotted line under the text. */
+  position:absolute; left:107pt; width:148pt; height:19pt;
   background:${C.cream};
-  font-family:'DB Sans',sans-serif; font-weight:600; font-size:12.5pt; color:${C.ink};
+  font-family:'DB Sans',sans-serif; font-weight:600; font-size:12pt; color:${C.ink};
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 

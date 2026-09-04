@@ -304,6 +304,10 @@ async function getStats() {
 
 module.exports = {
   usingSupabase,
+  // exposed read-only for the admin analytics module, which runs its own
+  // column-scoped queries instead of loading whole rows through the helpers
+  // above; nothing in the report or PDF path uses this.
+  getSupabaseClient: () => supabase,
   getLeads, createLead, getLead, updateLead,
   getReports, createReport, updateReport,
   getPayments, createPayment, updatePayment,

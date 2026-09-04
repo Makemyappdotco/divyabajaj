@@ -11,6 +11,7 @@ if (!process.env.ASTROLOGYAPI_V2_ACCESS_TOKEN && process.env.ASTROLOGYAPI_ACCESS
 const db = require('./database');
 const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
+const adminRoutes = require('./adminRoutes');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -250,6 +251,9 @@ app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
 
 app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
+// admin panel API - read-only, mounted before the general /api routes so its
+// own namespace is unambiguous; shares the same Basic auth
+app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 
 app.get('/admin', adminAuth, (req, res) => {

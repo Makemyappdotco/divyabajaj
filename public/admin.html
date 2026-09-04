@@ -1,71 +1,751 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Divya Bajaj Admin</title>
-  <style>
-    body{margin:0;background:#08070a;color:#f4efe7;font-family:Arial,sans-serif}
-    header{padding:24px;border-bottom:1px solid #2b251d;background:#111015}
-    h1{margin:0;font-size:24px} p{color:#b9afa2}
-    main{padding:24px;display:grid;gap:20px}
-    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
-    .card{background:#14131a;border:1px solid #2b251d;border-radius:12px;padding:18px}
-    .num{font-size:28px;color:#c9a96e;font-weight:700;margin-top:8px}
-    button,.export-btn{display:inline-flex;align-items:center;justify-content:center;background:#c9a96e;color:#08070a;border:0;border-radius:8px;padding:12px 16px;font-weight:700;cursor:pointer;text-decoration:none;font-size:14px}
-    .export-btn.secondary{background:transparent;color:#c9a96e;border:1px solid #6d5735}
-    .actions{display:flex;flex-wrap:wrap;gap:10px}
-    table{width:100%;border-collapse:collapse;background:#14131a;border:1px solid #2b251d;border-radius:12px;overflow:hidden}
-    th,td{padding:12px;border-bottom:1px solid #2b251d;text-align:left;font-size:14px;vertical-align:top}
-    th{color:#c9a96e;background:#111015}
-    pre{white-space:pre-wrap;background:#14131a;border:1px solid #2b251d;border-radius:12px;padding:16px;max-height:320px;overflow:auto}
-    .muted{color:#9b9287;font-size:13px}
-    .storage{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:7px 10px;border-radius:999px;background:#1a181f;border:1px solid #2b251d;font-size:12px;color:#c9a96e}
-    .dot{width:8px;height:8px;border-radius:50%;background:#3fd17c;box-shadow:0 0 10px rgba(63,209,124,.45)}
-    @media(max-width:700px){main{padding:16px}.actions{display:grid;grid-template-columns:1fr}.actions>*{width:100%;box-sizing:border-box}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Divya Bajaj Admin</title>
+<style>
+  /* Chart marks use a palette validated for this dark surface: lightness band,
+     chroma floor, colour-vision separation and 3:1 contrast all pass. The brand
+     gold is lighter than the chart gold on purpose - chrome and marks have
+     different jobs. */
+  :root{
+    --bg:#0e0e10; --surface:#17171a; --surface-2:#1e1e22; --line:#2a2a30;
+    --ink:#f4f1ea; --ink-2:#a7a49c; --ink-3:#6f6d67;
+    --brand:#d4b978; --brand-dim:#8a7647;
+    --paid:#b08a3c; --free:#4a90d9; --failed:#d03b3b;
+    --good:#0ca30c; --warn:#fab219;
+    --radius:12px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+  .shell{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
+  @media (max-width:860px){.shell{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:20;border-right:0;border-bottom:1px solid var(--line)}.side-nav{flex-direction:row;overflow-x:auto}.brand-sub{display:none}}
+
+  .side{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
+  .brand{font-family:Georgia,'Times New Roman',serif;font-size:17px;letter-spacing:.04em;color:var(--brand)}
+  .brand-sub{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+  .side-nav{display:flex;flex-direction:column;gap:2px}
+  .nav-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-radius:8px;color:var(--ink-2);font-size:13.5px;white-space:nowrap;transition:background .12s,color .12s}
+  .nav-item:hover{background:var(--surface-2);color:var(--ink)}
+  .nav-item[aria-current="page"]{background:var(--surface-2);color:var(--brand);font-weight:600}
+  .nav-badge{font-size:11px;background:var(--failed);color:#fff;border-radius:20px;padding:1px 7px;font-weight:600}
+
+  .main{padding:22px 26px 60px;min-width:0}
+  @media (max-width:860px){.main{padding:18px 14px 40px}}
+  .topbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .page-title{font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .page-sub{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{padding:6px 11px;font-size:12.5px;color:var(--ink-2)}
+  .seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--brand);font-weight:600}
+  .seg button:hover:not([aria-pressed="true"]){color:var(--ink)}
+  .env-note{font-size:11.5px;color:var(--ink-3)}
+
+  .grid{display:grid;gap:14px}
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .tile-label{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+  .tile-value{font-size:29px;font-weight:600;margin-top:7px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .tile-meta{font-size:12px;color:var(--ink-2);margin-top:5px}
+  .tile-value.sm{font-size:22px}
+
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .section-title{font-size:14.5px;font-weight:600}
+  .section-note{font-size:12px;color:var(--ink-3)}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+  .t-wrap{overflow-x:auto}
+  .clickable{cursor:pointer}
+  .mono{font-variant-numeric:tabular-nums}
+  .dim{color:var(--ink-3)}
+  .nowrap{white-space:nowrap}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
+  .pill.paid{color:var(--brand);border-color:var(--brand-dim)}
+  .pill.free{color:#7fb6ea;border-color:#2f5878}
+  .pill.ok{color:#5ac25a;border-color:#1f5c1f}
+  .pill.bad{color:#f08a8a;border-color:#6d2626}
+  .pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  .empty{text-align:center;padding:38px 20px;color:var(--ink-3);font-size:13px}
+  .empty strong{display:block;color:var(--ink-2);font-size:14px;margin-bottom:5px;font-weight:600}
+  .err{background:#2a1618;border:1px solid #6d2626;color:#f0b8b8;padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:14px}
+  .skeleton{height:74px;border-radius:var(--radius);background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%);background-size:400% 100%;animation:sh 1.3s ease infinite}
+  @keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+  .search{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 11px;font-size:13px;min-width:210px}
+  .search:focus{outline:none;border-color:var(--brand-dim)}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:12.5px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);border-radius:7px;padding:5px 11px;color:var(--ink-2)}
+  .pager button:disabled{opacity:.35;cursor:default}
+  .pager button:not(:disabled):hover{color:var(--ink);border-color:var(--brand-dim)}
+
+  .bars{display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:150px;padding-top:6px}
+  .bar-col{flex:1;max-width:26px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0;position:relative;height:100%}
+  .bar-col:hover .bar-seg{filter:brightness(1.22)}
+  .bar-seg{border-radius:3px;min-height:2px}
+  .bar-col:last-child .bar-seg:first-child,.bar-seg.top{border-radius:4px 4px 3px 3px}
+  .axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+  .tip{position:fixed;pointer-events:none;background:#000;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:12px;z-index:60;opacity:0;transition:opacity .1s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .tip.on{opacity:1}
+  .tip b{display:block;margin-bottom:4px;color:var(--brand);font-size:11.5px}
+  .tip i{font-style:normal;display:flex;justify-content:space-between;gap:14px}
+
+  .drawer{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:70}
+  .drawer.on{display:block}
+  .drawer-panel{position:absolute;right:0;top:0;bottom:0;width:min(620px,100%);background:var(--bg);border-left:1px solid var(--line);overflow-y:auto;padding:22px 24px}
+  .drawer-close{position:absolute;right:18px;top:16px;font-size:22px;color:var(--ink-3);line-height:1}
+  .drawer-close:hover{color:var(--ink)}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:7px 14px;font-size:13px;margin-top:12px}
+  .kv dt{color:var(--ink-3)}
+  .stack{display:flex;flex-direction:column;gap:14px}
+  .statrow{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .statrow>div{flex:1;padding:12px 14px;border-right:1px solid var(--line);min-width:0}
+  .statrow>div:last-child{border-right:0}
+  .statrow .tile-value{font-size:21px;margin-top:5px}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Divya Bajaj Admin Dashboard</h1>
-    <p>Leads, reports, revenue and system activity.</p>
-    <div class="storage"><span class="dot"></span><span id="storageMode">Checking storage...</span></div>
-  </header>
-  <main>
-    <section class="cards">
-      <div class="card"><div>Leads</div><div class="num" id="leadsCount">0</div></div>
-      <div class="card"><div>Reports</div><div class="num" id="reportsCount">0</div></div>
-      <div class="card"><div>Revenue</div><div class="num" id="revenue">₹0</div></div>
-      <div class="card"><div>Conversion</div><div class="num" id="conversion">0%</div></div>
-    </section>
+<div class="shell">
+  <aside class="side">
+    <div>
+      <div class="brand">Divya Bajaj</div>
+      <div class="brand-sub">Admin</div>
+    </div>
+    <nav class="side-nav" id="nav"></nav>
+  </aside>
 
-    <section class="card">
-      <div class="actions">
-        <button onclick="loadAll()">Refresh Dashboard</button>
-        <button onclick="testReport()">Create Test Free Report</button>
-        <a class="export-btn" href="/api/export/all.xlsx">Download All Excel</a>
-        <a class="export-btn secondary" href="/api/export/all.csv">Download All CSV</a>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="pageTitle">Overview</div>
+        <div class="page-sub" id="pageSub"></div>
       </div>
-      <p class="muted">Exports include leads, reports, payments, bookings and events.</p>
-    </section>
-
-    <section>
-      <h2>Leads</h2>
-      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>DOB</th><th>Status</th><th>Created</th></tr></thead><tbody id="leadsBody"><tr><td colspan="6">Loading...</td></tr></tbody></table>
-    </section>
-
-    <section>
-      <h2>Reports</h2>
-      <table><thead><tr><th>ID</th><th>Lead</th><th>Type</th><th>Status</th><th>Generated By</th></tr></thead><tbody id="reportsBody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
-    </section>
-
-    <section><h2>Latest Response</h2><pre id="output">Ready.</pre></section>
+      <div class="controls">
+        <div class="seg" id="envSeg" role="group" aria-label="Environment"></div>
+        <div class="seg" id="daySeg" role="group" aria-label="Time range"></div>
+      </div>
+    </div>
+    <div id="envNote" class="env-note" style="margin:-10px 0 16px"></div>
+    <div id="view"></div>
   </main>
+</div>
+
+<div class="tip" id="tip"></div>
+<div class="drawer" id="drawer"><div class="drawer-panel"><button class="drawer-close" id="drawerClose" aria-label="Close">&times;</button><div id="drawerBody"></div></div></div>
+
 <script>
-async function api(path, options){const res=await fetch(path,options);const text=await res.text();try{return JSON.parse(text)}catch(e){return{raw:text}}}
-async function loadAll(){const stats=await api('/api/stats');const leads=await api('/api/leads');const reports=await api('/api/reports');document.getElementById('output').textContent=JSON.stringify({stats,leads,reports},null,2);const s=stats.stats||{};document.getElementById('leadsCount').textContent=s.leads||0;document.getElementById('reportsCount').textContent=s.reports||0;document.getElementById('revenue').textContent='₹'+(s.revenue||0);document.getElementById('conversion').textContent=(s.conversion_rate||0)+'%';const storage=stats.storage||leads.storage||reports.storage||'unknown';document.getElementById('storageMode').textContent=storage==='supabase'?'Supabase connected':'Local fallback storage';const leadRows=(leads.leads||[]).map(l=>`<tr><td>${l.name||''}</td><td>${l.email||''}</td><td>${l.phone||''}</td><td>${l.dob||''}</td><td>${l.status||''}</td><td>${(l.created_at||'').slice(0,10)}</td></tr>`).join('');document.getElementById('leadsBody').innerHTML=leadRows||'<tr><td colspan="6">No leads yet</td></tr>';const reportRows=(reports.reports||[]).map(r=>`<tr><td>${r.id}</td><td>${r.lead_id}</td><td>${r.type}</td><td>${r.status}</td><td>${r.generated_by||''}</td></tr>`).join('');document.getElementById('reportsBody').innerHTML=reportRows||'<tr><td colspan="5">No reports yet</td></tr>'}
-async function testReport(){const payload={name:'Test User',email:'test@example.com',phone:'9999999999',dob:'1994-08-23',question:'Career clarity'};const result=await api('/api/reports/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});document.getElementById('output').textContent=JSON.stringify(result,null,2);await loadAll()}
-loadAll();
+(function () {
+  'use strict';
+
+  var SECTIONS = [
+    { id: 'overview',      label: 'Overview',      sub: 'How the business is doing' },
+    { id: 'reports',       label: 'Reports',       sub: 'Every report generated, free and paid' },
+    { id: 'customers',     label: 'Customers',     sub: 'Everyone who has come through' },
+    { id: 'consultations', label: 'Consultations', sub: 'Bookings and appointments' },
+    { id: 'health',        label: 'Health',        sub: 'Failures, slow generations and stuck work' }
+  ];
+
+  var state = {
+    section: 'overview',
+    environment: 'production',
+    days: 30,
+    reportPage: 1, reportCategory: 'all', reportStatus: 'all',
+    customerPage: 1, customerSearch: '',
+    failedCount: 0
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var view = $('view');
+
+  function esc(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function num(value) {
+    return value === null || value === undefined ? '—' : Number(value).toLocaleString('en-IN');
+  }
+
+  // Durations read as minutes once they pass a minute, because a paid report
+  // takes two to three of them and "148s" makes nobody picture that.
+  function duration(seconds) {
+    if (seconds === null || seconds === undefined || !isFinite(seconds)) return '—';
+    var s = Number(seconds);
+    if (s < 1) return '<1s';
+    if (s < 60) return Math.round(s) + 's';
+    var m = Math.floor(s / 60);
+    var rest = Math.round(s % 60);
+    return m + 'm' + (rest ? ' ' + rest + 's' : '');
+  }
+
+  function when(iso) {
+    if (!iso) return '—';
+    var then = new Date(iso).getTime();
+    if (!isFinite(then)) return '—';
+    var mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    if (mins < 1440) return Math.floor(mins / 60) + 'h ago';
+    var days = Math.floor(mins / 1440);
+    if (days < 30) return days + 'd ago';
+    return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function exactWhen(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    return isFinite(d.getTime())
+      ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '';
+  }
+
+  function api(path, params) {
+    var query = Object.assign({ environment: state.environment }, params || {});
+    var qs = Object.keys(query)
+      .filter(function (k) { return query[k] !== '' && query[k] !== undefined && query[k] !== null; })
+      .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]); })
+      .join('&');
+    return fetch('/api/admin/' + path + (qs ? '?' + qs : ''), { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(function (response) {
+        return response.text().then(function (raw) {
+          var body;
+          try { body = raw ? JSON.parse(raw) : {}; } catch (e) { body = { error: raw }; }
+          if (!response.ok) throw new Error(body.error || ('Request failed (' + response.status + ')'));
+          return body;
+        });
+      });
+  }
+
+  function loading(count) {
+    var out = '<div class="grid tiles">';
+    for (var i = 0; i < (count || 4); i += 1) out += '<div class="skeleton"></div>';
+    return out + '</div>';
+  }
+
+  function fail(message) {
+    return '<div class="err"><strong>Could not load this.</strong> ' + esc(message) + '</div>';
+  }
+
+  function empty(title, note) {
+    return '<div class="card"><div class="empty"><strong>' + esc(title) + '</strong>' + esc(note || '') + '</div></div>';
+  }
+
+  function tile(label, value, meta, small) {
+    return '<div class="card"><div class="tile-label">' + esc(label) + '</div>' +
+      '<div class="tile-value' + (small ? ' sm' : '') + '">' + value + '</div>' +
+      (meta ? '<div class="tile-meta">' + meta + '</div>' : '') + '</div>';
+  }
+
+  /* ---------------- chart ----------------
+     Stacked bars, one column per day: paid and free stack as the work done,
+     failures sit on top in the reserved status red. Identity is carried by a
+     legend and by the tooltip, never by colour alone. */
+  function barChart(series) {
+    var max = series.reduce(function (m, d) { return Math.max(m, d.paid + d.free + d.failed); }, 0);
+    if (!max) {
+      return '<div class="empty"><strong>Nothing in this window</strong>No reports were generated in the last ' + state.days + ' days.</div>';
+    }
+    var cols = series.map(function (d, i) {
+      var total = d.paid + d.free + d.failed;
+      var seg = function (value, varName, isTop) {
+        if (!value) return '';
+        return '<div class="bar-seg' + (isTop ? ' top' : '') + '" style="height:' + (value / max * 100) + '%;background:var(' + varName + ')"></div>';
+      };
+      // stacking order top-down: failed, free, paid
+      return '<div class="bar-col" data-i="' + i + '" tabindex="0" role="img" aria-label="' +
+        esc(d.date + ': ' + d.paid + ' paid, ' + d.free + ' free, ' + d.failed + ' failed') + '">' +
+        seg(d.failed, '--failed', true) +
+        seg(d.free, '--free', !d.failed) +
+        seg(d.paid, '--paid', !d.failed && !d.free) +
+        (total ? '' : '') + '</div>';
+    }).join('');
+
+    var first = series[0] ? series[0].date : '';
+    var mid = series[Math.floor(series.length / 2)] ? series[Math.floor(series.length / 2)].date : '';
+    var last = series[series.length - 1] ? series[series.length - 1].date : '';
+    var label = function (d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''; };
+
+    return '<div class="bars" id="bars">' + cols + '</div>' +
+      '<div class="axis"><span>' + esc(label(first)) + '</span><span>' + esc(label(mid)) + '</span><span>' + esc(label(last)) + '</span></div>';
+  }
+
+  function wireChart(series) {
+    var host = $('bars');
+    if (!host) return;
+    var tip = $('tip');
+    function show(event, index) {
+      var d = series[index];
+      if (!d) return;
+      tip.innerHTML = '<b>' + esc(new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })) + '</b>' +
+        '<i><span>Paid</span><span class="mono">' + d.paid + '</span></i>' +
+        '<i><span>Free</span><span class="mono">' + d.free + '</span></i>' +
+        (d.failed ? '<i><span style="color:#f08a8a">Failed</span><span class="mono">' + d.failed + '</span></i>' : '') +
+        '<i class="dim"><span>New leads</span><span class="mono">' + d.leads + '</span></i>';
+      tip.classList.add('on');
+      var rect = tip.getBoundingClientRect();
+      var x = (event.clientX || 0) + 14;
+      tip.style.left = Math.min(x, window.innerWidth - rect.width - 12) + 'px';
+      tip.style.top = Math.max(8, (event.clientY || 0) - rect.height - 12) + 'px';
+    }
+    host.addEventListener('mousemove', function (event) {
+      var col = event.target.closest ? event.target.closest('.bar-col') : null;
+      if (col) show(event, Number(col.getAttribute('data-i')));
+      else tip.classList.remove('on');
+    });
+    host.addEventListener('mouseleave', function () { tip.classList.remove('on'); });
+    host.addEventListener('focusin', function (event) {
+      var col = event.target.closest ? event.target.closest('.bar-col') : null;
+      if (!col) return;
+      var box = col.getBoundingClientRect();
+      show({ clientX: box.left, clientY: box.top }, Number(col.getAttribute('data-i')));
+    });
+    host.addEventListener('focusout', function () { tip.classList.remove('on'); });
+  }
+
+  /* ---------------- sections ---------------- */
+
+  function renderOverview() {
+    view.innerHTML = loading(4);
+    api('overview', { days: state.days }).then(function (d) {
+      state.failedCount = d.reports.failed;
+      renderNav();
+
+      var gen = d.generation_time_seconds.all;
+      var paidGen = d.generation_time_seconds.paid;
+      var successMeta = d.reports.failed
+        ? '<span style="color:#f08a8a">' + d.reports.failed + ' failed</span>'
+        : 'no failures';
+
+      var html = '<div class="grid tiles">' +
+        tile('Reports', num(d.reports.total),
+          d.reports.paid + ' paid &middot; ' + d.reports.free + ' free') +
+        tile('Success rate', (d.reports.success_rate === null ? '—' : d.reports.success_rate + '%'), successMeta) +
+        tile('Typical generation', duration(paidGen.median !== null ? paidGen.median : gen.median),
+          'a paid report, median of ' + (paidGen.measured || 0)) +
+        tile('New leads', num(d.leads.total), d.leads.today + ' today') +
+        '</div>';
+
+      html += '<div class="card" style="margin-top:14px">' +
+        '<div class="section-head"><div><div class="section-title">Reports per day</div>' +
+        '<div class="section-note">Last ' + d.window_days + ' days</div></div>' +
+        '<div class="legend">' +
+          '<span><i class="swatch" style="background:var(--paid)"></i>Paid</span>' +
+          '<span><i class="swatch" style="background:var(--free)"></i>Free</span>' +
+          '<span><i class="swatch" style="background:var(--failed)"></i>Failed</span>' +
+        '</div></div>' + barChart(d.series) + '</div>';
+
+      html += '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:14px">';
+
+      html += '<div class="card"><div class="section-head"><div class="section-title">Generation time</div>' +
+        '<div class="section-note">completed reports</div></div>' +
+        (gen.measured
+          ? '<div class="statrow">' +
+              '<div><div class="tile-label">Median</div><div class="tile-value">' + duration(gen.median) + '</div></div>' +
+              '<div><div class="tile-label">90th pct</div><div class="tile-value">' + duration(gen.p90) + '</div></div>' +
+              '<div><div class="tile-label">Slowest</div><div class="tile-value">' + duration(gen.slowest) + '</div></div>' +
+            '</div>' +
+            '<div class="tile-meta" style="margin-top:10px">Measured on ' + gen.measured + ' report' + (gen.measured === 1 ? '' : 's') +
+            (d.generation_time_seconds.free.measured ? '' : '. Free reports finish instantly and are not timed.') + '</div>'
+          : '<div class="empty">No timed reports in this window.</div>') +
+        '</div>';
+
+      var sources = Object.keys(d.leads.by_source).sort(function (a, b) { return d.leads.by_source[b] - d.leads.by_source[a]; });
+      html += '<div class="card"><div class="section-head"><div class="section-title">Where leads came from</div></div>' +
+        (sources.length
+          ? '<div class="t-wrap"><table><tbody>' + sources.map(function (key) {
+              return '<tr><td>' + esc(key) + '</td><td class="mono" style="text-align:right;width:60px">' + d.leads.by_source[key] + '</td></tr>';
+            }).join('') + '</tbody></table></div>'
+          : '<div class="empty">No leads in this window.</div>') +
+        '</div>';
+
+      html += '<div class="card"><div class="section-head"><div class="section-title">Revenue</div></div>' +
+        '<div class="tile-value">₹' + num(d.revenue.captured) + '</div>' +
+        '<div class="tile-meta">' + (d.revenue.transactions
+          ? d.revenue.transactions + ' captured payment' + (d.revenue.transactions === 1 ? '' : 's')
+          : 'No payment gateway is live yet, so this stays at zero until one is connected.') + '</div>' +
+        '<div class="tile-meta" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">' +
+        'Consultations booked: <span class="mono">' + (d.consultations.bookings + d.consultations.appointments) + '</span></div>' +
+        '</div>';
+
+      html += '</div>';
+      view.innerHTML = html;
+      wireChart(d.series);
+    }).catch(function (error) { view.innerHTML = fail(error.message); });
+  }
+
+  function renderReports() {
+    var head =
+      '<div class="controls" style="margin-bottom:14px">' +
+        '<div class="seg" id="catSeg">' +
+          ['all', 'paid', 'free'].map(function (c) {
+            return '<button data-cat="' + c + '" aria-pressed="' + (state.reportCategory === c) + '">' +
+              (c === 'all' ? 'All' : c === 'paid' ? 'Paid' : 'Free') + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="seg" id="statSeg">' +
+          ['all', 'completed', 'failed'].map(function (s) {
+            return '<button data-stat="' + s + '" aria-pressed="' + (state.reportStatus === s) + '">' +
+              (s === 'all' ? 'Any status' : s === 'completed' ? 'Completed' : 'Failed') + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    view.innerHTML = head + loading(1);
+
+    api('reports', { days: state.days, category: state.reportCategory, status: state.reportStatus, page: state.reportPage })
+      .then(function (d) {
+        var body = !d.rows.length
+          ? empty('No reports here', 'Nothing matches these filters in this environment.')
+          : '<div class="card" style="padding:0"><div class="t-wrap"><table>' +
+            '<thead><tr><th>Customer</th><th>Type</th><th>Status</th><th>Took</th><th>Generated</th></tr></thead><tbody>' +
+            d.rows.map(function (r) {
+              return '<tr class="clickable" data-lead="' + esc(r.lead_id) + '">' +
+                '<td>' + esc(r.lead_name || '—') + '<div class="dim" style="font-size:11.5px">' + esc(r.lead_email || '') + '</div></td>' +
+                '<td><span class="pill ' + esc(r.category) + '">' + (r.category === 'paid' ? 'Paid' : 'Free') + '</span>' +
+                  '<div class="dim nowrap" style="font-size:11px;margin-top:3px">' + esc(r.type) + '</div></td>' +
+                '<td><span class="pill ' + (r.status === 'failed' ? 'bad' : 'ok') + '">' + esc(r.status) + '</span>' +
+                  (r.failure_code ? '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(r.failure_code) + '</div>' : '') + '</td>' +
+                '<td class="mono nowrap">' + duration(r.generation_seconds) + '</td>' +
+                '<td class="nowrap" title="' + esc(exactWhen(r.created_at)) + '">' + esc(when(r.created_at)) + '</td>' +
+                '</tr>';
+            }).join('') +
+            '</tbody></table></div></div>' + pager(d, 'reportPage');
+
+        view.innerHTML = head + body;
+        wireSegs();
+        wirePager('reportPage', renderReports);
+        wireRowDrawer();
+      })
+      .catch(function (error) { view.innerHTML = head + fail(error.message); });
+  }
+
+  function renderCustomers() {
+    var head = '<div class="controls" style="margin-bottom:14px">' +
+      '<input class="search" id="custSearch" placeholder="Search name, email or phone" value="' + esc(state.customerSearch) + '">' +
+      '</div>';
+    view.innerHTML = head + loading(1);
+
+    api('customers', { search: state.customerSearch, page: state.customerPage }).then(function (d) {
+      var body = !d.rows.length
+        ? empty('No customers found', state.customerSearch ? 'Nothing matches that search.' : 'No one in this environment yet.')
+        : '<div class="card" style="padding:0"><div class="t-wrap"><table>' +
+          '<thead><tr><th>Name</th><th>Contact</th><th>Reports</th><th>Status</th><th>Joined</th></tr></thead><tbody>' +
+          d.rows.map(function (l) {
+            return '<tr class="clickable" data-lead="' + esc(l.id) + '">' +
+              '<td>' + esc(l.name || '—') + '<div class="dim" style="font-size:11.5px">' + esc(l.pob || '') + '</div></td>' +
+              '<td style="font-size:12px">' + esc(l.email || '') + '<div class="dim">' + esc(l.phone || '') + '</div></td>' +
+              '<td class="mono nowrap">' + l.reports.total +
+                (l.reports.paid ? ' <span class="dim">(' + l.reports.paid + ' paid)</span>' : '') +
+                (l.reports.failed ? ' <span style="color:#f08a8a">' + l.reports.failed + ' failed</span>' : '') + '</td>' +
+              '<td><span class="pill">' + esc(l.status || '—') + '</span></td>' +
+              '<td class="nowrap" title="' + esc(exactWhen(l.created_at)) + '">' + esc(when(l.created_at)) + '</td>' +
+              '</tr>';
+          }).join('') + '</tbody></table></div></div>' + pager(d, 'customerPage');
+
+      view.innerHTML = head + body;
+      var box = $('custSearch');
+      var timer;
+      box.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          state.customerSearch = box.value;
+          state.customerPage = 1;
+          renderCustomers();
+          var again = $('custSearch');
+          if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+        }, 300);
+      });
+      wirePager('customerPage', renderCustomers);
+      wireRowDrawer();
+    }).catch(function (error) { view.innerHTML = head + fail(error.message); });
+  }
+
+  function renderConsultations() {
+    view.innerHTML = loading(3);
+    api('consultations').then(function (d) {
+      var html = '<div class="grid tiles">' +
+        tile('Upcoming', num(d.upcoming), 'scheduled ahead') +
+        tile('Completed', num(d.past), 'already happened') +
+        tile('Held slots', num(d.active_holds), 'awaiting payment') +
+        '</div>';
+
+      if (!d.appointments.length && !d.bookings.length) {
+        html += '<div style="margin-top:14px">' + empty(
+          'No consultations yet',
+          'The booking tables are wired up and ready. Once the consultation flow goes live, appointments will appear here automatically.'
+        ) + '</div>';
+      } else {
+        var rows = d.appointments.map(function (a) {
+          return '<tr class="clickable" data-lead="' + esc(a.lead_id) + '">' +
+            '<td>' + esc(a.lead_name || '—') + '</td>' +
+            '<td class="nowrap">' + esc(exactWhen(a.starts_at)) + '</td>' +
+            '<td>' + esc(a.mode || '') + '</td>' +
+            '<td><span class="pill">' + esc(a.status) + '</span></td>' +
+            '<td style="font-size:12px">' + esc(a.customer_question || '') + '</td></tr>';
+        }).concat(d.bookings.map(function (b) {
+          return '<tr class="clickable" data-lead="' + esc(b.lead_id) + '">' +
+            '<td>' + esc(b.lead_name || '—') + '</td>' +
+            '<td class="nowrap">' + esc(b.date) + ' ' + esc(b.time_slot) + '</td>' +
+            '<td>' + esc(b.mode || '') + '</td>' +
+            '<td><span class="pill">' + esc(b.status) + '</span></td>' +
+            '<td style="font-size:12px">' + esc(b.notes || '') + '</td></tr>';
+        })).join('');
+        html += '<div class="card" style="padding:0;margin-top:14px"><div class="t-wrap"><table>' +
+          '<thead><tr><th>Customer</th><th>When</th><th>Mode</th><th>Status</th><th>Note</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody></table></div></div>';
+      }
+      view.innerHTML = html;
+      wireRowDrawer();
+    }).catch(function (error) { view.innerHTML = fail(error.message); });
+  }
+
+  function renderHealth() {
+    view.innerHTML = loading(3);
+    api('health', { days: state.days }).then(function (d) {
+      var gen = d.generation_time_seconds;
+      var reasons = Object.keys(d.failure_reasons);
+
+      var html = '<div class="grid tiles">' +
+        tile('Failed reports', num(d.failed_reports.length), 'in the last ' + d.window_days + ' days') +
+        tile('Slowest generation', duration(gen.slowest), gen.measured + ' timed') +
+        tile('Stuck jobs', num(d.stuck_jobs.length), 'queued or retrying') +
+        tile('Unprocessed webhooks', num(d.unprocessed_webhooks.length), '') +
+        '</div>';
+
+      html += '<div class="card" style="margin-top:14px"><div class="section-head"><div class="section-title">Failures</div>' +
+        '<div class="section-note">' + (reasons.length ? 'grouped by cause' : '') + '</div></div>';
+      if (!d.failed_reports.length) {
+        html += '<div class="empty"><strong>Nothing has failed</strong>No report failed in this window.</div>';
+      } else {
+        html += '<div class="legend" style="margin-bottom:12px">' + reasons.map(function (r) {
+          return '<span><i class="swatch" style="background:var(--failed)"></i>' + esc(r) + ' &middot; ' + d.failure_reasons[r] + '</span>';
+        }).join('') + '</div><div class="t-wrap"><table>' +
+          '<thead><tr><th>Customer</th><th>Type</th><th>Reason</th><th>When</th></tr></thead><tbody>' +
+          d.failed_reports.map(function (r) {
+            return '<tr class="clickable" data-lead="' + esc(r.lead_id) + '">' +
+              '<td>' + esc(r.lead_name || '—') + '</td>' +
+              '<td class="dim" style="font-size:12px">' + esc(r.type) + '</td>' +
+              '<td style="font-size:12px"><span class="pill bad">' + esc(r.failure_code || 'unspecified') + '</span>' +
+                '<div class="dim" style="margin-top:4px">' + esc((r.failure_message || '').slice(0, 160)) + '</div></td>' +
+              '<td class="nowrap" title="' + esc(exactWhen(r.created_at)) + '">' + esc(when(r.created_at)) + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+      html += '</div>';
+
+      if (d.slowest_reports.length) {
+        var worst = d.slowest_reports[0].generation_seconds || 1;
+        html += '<div class="card" style="margin-top:14px"><div class="section-head"><div class="section-title">Slowest generations</div>' +
+          '<div class="section-note">median is ' + duration(gen.median) + '</div></div><div class="t-wrap"><table><tbody>' +
+          d.slowest_reports.map(function (r) {
+            var pct = Math.max(3, (Number(r.generation_seconds) / worst) * 100);
+            return '<tr><td style="width:150px">' + esc(r.lead_name || r.id) + '</td>' +
+              '<td><div style="background:var(--paid);height:8px;border-radius:4px;width:' + pct + '%"></div></td>' +
+              '<td class="mono nowrap" style="width:80px;text-align:right">' + duration(r.generation_seconds) + '</td></tr>';
+          }).join('') + '</tbody></table></div></div>';
+      }
+
+      view.innerHTML = html;
+      wireRowDrawer();
+    }).catch(function (error) { view.innerHTML = fail(error.message); });
+  }
+
+  /* ---------------- customer drawer ---------------- */
+
+  function openCustomer(leadId) {
+    var drawer = $('drawer');
+    var body = $('drawerBody');
+    body.innerHTML = '<div class="skeleton" style="height:160px"></div>';
+    drawer.classList.add('on');
+
+    fetch('/api/admin/customer/' + encodeURIComponent(leadId), { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Not found'); return j; }); })
+      .then(function (d) {
+        var l = d.lead;
+        var html = '<div class="page-title">' + esc(l.name || 'Customer') + '</div>' +
+          '<div class="page-sub">' + esc(l.email || '') + (l.phone ? ' &middot; ' + esc(l.phone) : '') + '</div>' +
+          '<dl class="kv">' +
+            '<dt>Born</dt><dd>' + esc(l.dob || '—') + (l.tob ? ' at ' + esc(l.tob) : '') + '</dd>' +
+            '<dt>Place</dt><dd>' + esc(l.pob || '—') + '</dd>' +
+            '<dt>Status</dt><dd>' + esc(l.status || '—') + '</dd>' +
+            '<dt>Source</dt><dd>' + esc(l.utm_source || l.source || 'direct') + '</dd>' +
+            '<dt>Environment</dt><dd>' + esc(l.environment || '') + '</dd>' +
+            '<dt>First seen</dt><dd>' + esc(exactWhen(l.created_at)) + '</dd>' +
+          '</dl>';
+
+        html += '<div class="stack" style="margin-top:20px">';
+        html += '<div><div class="section-title" style="margin-bottom:8px">Reports (' + d.reports.length + ')</div>' +
+          (d.reports.length
+            ? '<div class="card" style="padding:0"><div class="t-wrap"><table><tbody>' + d.reports.map(function (r) {
+                return '<tr><td><span class="pill ' + esc(r.category) + '">' + (r.category === 'paid' ? 'Paid' : 'Free') + '</span></td>' +
+                  '<td><span class="pill ' + (r.status === 'failed' ? 'bad' : 'ok') + '">' + esc(r.status) + '</span>' +
+                  (r.failure_message ? '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(r.failure_message.slice(0, 120)) + '</div>' : '') + '</td>' +
+                  '<td class="mono nowrap">' + duration(r.generation_seconds) + '</td>' +
+                  '<td class="nowrap dim">' + esc(when(r.created_at)) + '</td></tr>';
+              }).join('') + '</tbody></table></div></div>'
+            : '<div class="empty">No reports yet.</div>') + '</div>';
+
+        if (d.appointments.length || d.bookings.length) {
+          html += '<div><div class="section-title" style="margin-bottom:8px">Consultations</div><div class="card" style="padding:0"><div class="t-wrap"><table><tbody>' +
+            d.appointments.map(function (a) {
+              return '<tr><td>' + esc(exactWhen(a.starts_at)) + '</td><td><span class="pill">' + esc(a.status) + '</span></td></tr>';
+            }).join('') +
+            d.bookings.map(function (b) {
+              return '<tr><td>' + esc(b.date) + ' ' + esc(b.time_slot) + '</td><td><span class="pill">' + esc(b.status) + '</span></td></tr>';
+            }).join('') + '</tbody></table></div></div></div>';
+        }
+
+        if (d.messages.length) {
+          html += '<div><div class="section-title" style="margin-bottom:8px">Messages sent</div><div class="card" style="padding:0"><div class="t-wrap"><table><tbody>' +
+            d.messages.map(function (m) {
+              return '<tr><td>' + esc(m.channel) + '</td><td>' + esc(m.subject || m.recipient || '') + '</td>' +
+                '<td><span class="pill ' + (m.failed_at ? 'bad' : 'ok') + '">' + esc(m.status) + '</span></td>' +
+                '<td class="dim nowrap">' + esc(when(m.sent_at || m.queued_at)) + '</td></tr>';
+            }).join('') + '</tbody></table></div></div></div>';
+        }
+
+        if (d.events.length) {
+          html += '<div><div class="section-title" style="margin-bottom:8px">Activity</div><div class="card"><div class="t-wrap"><table><tbody>' +
+            d.events.slice(0, 15).map(function (e) {
+              return '<tr><td class="dim" style="font-size:12px">' + esc(e.type) + '</td>' +
+                '<td class="dim nowrap" style="text-align:right">' + esc(when(e.created_at)) + '</td></tr>';
+            }).join('') + '</tbody></table></div></div></div>';
+        }
+
+        html += '</div>';
+        body.innerHTML = html;
+      })
+      .catch(function (error) { body.innerHTML = fail(error.message); });
+  }
+
+  /* ---------------- wiring ---------------- */
+
+  function pager(d, key) {
+    var pages = Math.max(1, Math.ceil((d.total || 0) / (d.page_size || 25)));
+    if (pages <= 1) return '<div class="pager"><span>' + num(d.total) + ' total</span></div>';
+    return '<div class="pager"><span>' + num(d.total) + ' total &middot; page ' + d.page + ' of ' + pages + '</span>' +
+      '<button data-page="prev"' + (d.page <= 1 ? ' disabled' : '') + '>Previous</button>' +
+      '<button data-page="next"' + (d.page >= pages ? ' disabled' : '') + '>Next</button></div>';
+  }
+
+  function wirePager(key, rerender) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-page]'), function (button) {
+      button.addEventListener('click', function () {
+        state[key] += button.getAttribute('data-page') === 'next' ? 1 : -1;
+        if (state[key] < 1) state[key] = 1;
+        rerender();
+      });
+    });
+  }
+
+  function wireSegs() {
+    var cat = $('catSeg');
+    if (cat) cat.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-cat]'); if (!b) return;
+      state.reportCategory = b.getAttribute('data-cat'); state.reportPage = 1; renderReports();
+    });
+    var stat = $('statSeg');
+    if (stat) stat.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-stat]'); if (!b) return;
+      state.reportStatus = b.getAttribute('data-stat'); state.reportPage = 1; renderReports();
+    });
+  }
+
+  function wireRowDrawer() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-lead]'), function (row) {
+      row.addEventListener('click', function () {
+        var id = row.getAttribute('data-lead');
+        if (id) openCustomer(id);
+      });
+    });
+  }
+
+  function renderNav() {
+    $('nav').innerHTML = SECTIONS.map(function (s) {
+      var badge = s.id === 'health' && state.failedCount
+        ? '<span class="nav-badge">' + state.failedCount + '</span>' : '';
+      return '<button class="nav-item" data-section="' + s.id + '"' +
+        (state.section === s.id ? ' aria-current="page"' : '') + '>' + s.label + badge + '</button>';
+    }).join('');
+    $('nav').querySelectorAll('[data-section]').forEach(function (b) {
+      b.addEventListener('click', function () { go(b.getAttribute('data-section')); });
+    });
+  }
+
+  function renderControls() {
+    $('envSeg').innerHTML = [['production', 'Live'], ['test', 'Test'], ['all', 'All']].map(function (p) {
+      return '<button data-env="' + p[0] + '" aria-pressed="' + (state.environment === p[0]) + '">' + p[1] + '</button>';
+    }).join('');
+    $('daySeg').innerHTML = [7, 30, 90].map(function (d) {
+      return '<button data-days="' + d + '" aria-pressed="' + (state.days === d) + '">' + d + 'd</button>';
+    }).join('');
+
+    $('envSeg').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-env]'); if (!b) return;
+      state.environment = b.getAttribute('data-env');
+      state.reportPage = 1; state.customerPage = 1;
+      renderControls(); draw();
+    });
+    $('daySeg').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-days]'); if (!b) return;
+      state.days = Number(b.getAttribute('data-days'));
+      renderControls(); draw();
+    });
+
+    $('envNote').innerHTML = state.environment === 'production'
+      ? 'Showing live customer data only. Your own test runs are excluded.'
+      : state.environment === 'test'
+        ? 'Showing test data only — your own runs, not real customers.'
+        : 'Showing live and test data together, so these numbers are inflated by your own testing.';
+  }
+
+  function draw() {
+    var section = SECTIONS.filter(function (s) { return s.id === state.section; })[0] || SECTIONS[0];
+    $('pageTitle').textContent = section.label;
+    $('pageSub').textContent = section.sub;
+    renderNav();
+    if (state.section === 'overview') renderOverview();
+    else if (state.section === 'reports') renderReports();
+    else if (state.section === 'customers') renderCustomers();
+    else if (state.section === 'consultations') renderConsultations();
+    else renderHealth();
+  }
+
+  function go(id) {
+    state.section = id;
+    if (location.hash !== '#' + id) location.hash = id;
+    draw();
+  }
+
+  window.addEventListener('hashchange', function () {
+    var id = location.hash.replace('#', '');
+    if (SECTIONS.some(function (s) { return s.id === id; }) && id !== state.section) go(id);
+  });
+
+  $('drawerClose').addEventListener('click', function () { $('drawer').classList.remove('on'); });
+  $('drawer').addEventListener('click', function (e) { if (e.target === $('drawer')) $('drawer').classList.remove('on'); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('drawer').classList.remove('on'); });
+
+  var initial = location.hash.replace('#', '');
+  if (SECTIONS.some(function (s) { return s.id === initial; })) state.section = initial;
+  renderControls();
+  draw();
+})();
 </script>
 </body>
 </html>

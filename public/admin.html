@@ -5,68 +5,125 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Divya Bajaj Admin</title>
+<link rel="icon" href="/admin/divya-bajaj-monogram.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,400&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Chart marks use a palette validated for this dark surface: lightness band,
-     chroma floor, colour-vision separation and 3:1 contrast all pass. The brand
-     gold is lighter than the chart gold on purpose - chrome and marks have
-     different jobs. */
+  /* Brand tokens are taken straight from the live site (landing.html), so the
+     panel and the public site cannot drift apart: same Fraunces/Hanken Grotesk
+     pairing, same golds, same ivory and cream steps, same logo.
+
+     Chart marks are the one place that cannot simply reuse the brand gold - at
+     its brand chroma it reads grey as a data mark and fails the palette check.
+     Each theme therefore carries its own validated trio (lightness band, chroma
+     floor, colour-vision separation and 3:1 contrast all pass against that
+     theme's own card surface). */
   :root{
-    --bg:#0e0e10; --surface:#17171a; --surface-2:#1e1e22; --line:#2a2a30;
-    --ink:#f4f1ea; --ink-2:#a7a49c; --ink-3:#6f6d67;
-    --brand:#d4b978; --brand-dim:#8a7647;
-    --paid:#b08a3c; --free:#4a90d9; --failed:#d03b3b;
-    --good:#0ca30c; --warn:#fab219;
-    --radius:12px;
-    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --serif:'Fraunces',Georgia,serif;
+    --sans:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
+    --radius:10px;
+  }
+  /* light - the brand's signature cream, and the panel default */
+  :root, :root[data-theme="light"]{
+    --bg:#F6F3EC; --surface:#FDFBF7; --surface-2:#EDE8DF; --line:#E2D9C8; --line-soft:#EFE8DA;
+    --ink:#1A1714; --ink-2:#5C544A; --ink-3:#8A8073;
+    --gold:#B08D4A; --gold-l:#C9A96E; --gold-d:#8A6F3A;
+    /* Chart marks. Validated as a set against this theme's card surface:
+       lightness band, chroma floor, CVD separation on ALL pairs (paid and
+       failed sit directly against each other inside a stacked bar, so
+       adjacent-pairs is not a strong enough check here) and 3:1 contrast. */
+    --paid:#bb8844; --free:#2f6fbf; --failed:#990022;
+    /* Red as TEXT and UI chrome is a different job from red as a mark - it
+       needs 4.5:1, not 3:1 - so it gets its own token. */
+    --danger:#a11b28; --badge-ink:#ffffff;
+    --shadow:0 1px 2px rgba(26,23,20,.05), 0 8px 24px rgba(26,23,20,.04);
+  }
+  :root[data-theme="dark"]{
+    --bg:#08070A; --surface:#0E0D12; --surface-2:#14131A; --line:#241f2c; --line-soft:#1b1823;
+    --ink:#FAF7F2; --ink-2:#a89f93; --ink-3:#6f675e;
+    --gold:#C9A96E; --gold-l:#DBBF8A; --gold-d:#A8894F;
+    --paid:#bb8844; --free:#4a90d9; --failed:#bb2233;
+    --danger:#ef6b6b; --badge-ink:#12070a;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.35);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  a{color:inherit}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
   button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
 
-  .shell{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
-  @media (max-width:860px){.shell{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:20;border-right:0;border-bottom:1px solid var(--line)}.side-nav{flex-direction:row;overflow-x:auto}.brand-sub{display:none}}
+  .shell{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
 
-  .side{background:var(--surface);border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;gap:22px}
-  .brand{font-family:Georgia,'Times New Roman',serif;font-size:17px;letter-spacing:.04em;color:var(--brand)}
-  .brand-sub{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
-  .side-nav{display:flex;flex-direction:column;gap:2px}
-  .nav-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border-radius:8px;color:var(--ink-2);font-size:13.5px;white-space:nowrap;transition:background .12s,color .12s}
+  .side{background:var(--surface);border-right:1px solid var(--line);padding:24px 16px;display:flex;flex-direction:column;gap:26px}
+  .brand{display:flex;align-items:center;gap:11px}
+  /* height:auto - pinning both axes squashes the mark, and its ratio (1.129)
+     is not the one a fixed box would guess. */
+  .brand img{width:38px;height:auto;flex:none}
+  .brand-name{font-family:var(--serif);font-size:16.5px;font-weight:600;letter-spacing:.005em;line-height:1.15}
+  .brand-sub{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+  .side-nav{display:flex;flex-direction:column;gap:1px}
+  .nav-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:8px;color:var(--ink-2);font-size:13.5px;white-space:nowrap;transition:background .13s,color .13s}
   .nav-item:hover{background:var(--surface-2);color:var(--ink)}
-  .nav-item[aria-current="page"]{background:var(--surface-2);color:var(--brand);font-weight:600}
-  .nav-badge{font-size:11px;background:var(--failed);color:#fff;border-radius:20px;padding:1px 7px;font-weight:600}
+  .nav-item[aria-current="page"]{background:var(--surface-2);color:var(--gold-d);font-weight:600}
+  .nav-badge{font-size:10.5px;background:var(--danger);color:var(--badge-ink);border-radius:20px;padding:1px 7px;font-weight:600}
+  .side-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:14px;border-top:1px solid var(--line-soft)}
+  .theme-btn{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-3);padding:6px 9px;border-radius:7px}
+  .theme-btn:hover{background:var(--surface-2);color:var(--ink)}
+  /* All of the narrow-screen overrides live here, AFTER the rules they override.
+     Sitting above them (where this block used to be) they lost on source order
+     alone and the sidebar stayed a full-width column ~850px tall on a phone. */
+  @media (max-width:880px){
+    /* minmax(0,1fr), not 1fr - a 1fr track's automatic minimum is min-content,
+       so the nav row stretched the single column to 678px on a 390px phone and
+       the whole page scrolled sideways. */
+    .shell{grid-template-columns:minmax(0,1fr)}
+    .side{position:sticky;top:0;z-index:20;border-right:0;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 14px;min-width:0}
+    /* min-width:0 - a flex item refuses to shrink below its content width by
+       default, so the five nav items pushed the sticky header (and the whole
+       page with it) 288px wider than the phone viewport. */
+    /* Its own full-width second row. Sharing one row with the wordmark and the
+       theme toggle left roughly 130px for five items, so most of the nav was
+       hidden behind a scroll with no affordance. */
+    .side-nav{flex-direction:row;overflow-x:auto;gap:2px;order:3;flex-basis:100%;min-width:0}
+    .nav-item{padding:7px 11px}
+    .brand-sub{display:none}
+    .side-foot{margin-top:0;border-top:0;padding-top:0;margin-left:auto}
+  }
+  @media (max-width:460px){
+    .brand-name{font-size:15px}
+    .nav-item{padding:6px 9px;font-size:12.5px}
+  }
 
-  .main{padding:22px 26px 60px;min-width:0}
-  @media (max-width:860px){.main{padding:18px 14px 40px}}
-  .topbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px}
-  .page-title{font-size:21px;font-weight:600;letter-spacing:-.01em}
-  .page-sub{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .main{padding:26px 30px 64px;min-width:0}
+  @media (max-width:880px){.main{padding:18px 14px 40px}}
+  .topbar{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;margin-bottom:6px}
+  .page-title{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-.012em;line-height:1.15}
+  .page-sub{font-size:12.5px;color:var(--ink-3);margin-top:3px}
   .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg button{padding:6px 11px;font-size:12.5px;color:var(--ink-2)}
-  .seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--brand);font-weight:600}
+  .seg button{padding:6px 12px;font-size:12.5px;color:var(--ink-2)}
+  .seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--gold-d);font-weight:600}
   .seg button:hover:not([aria-pressed="true"]){color:var(--ink)}
   .env-note{font-size:11.5px;color:var(--ink-3)}
+  .rule{height:1px;background:linear-gradient(90deg,var(--gold-l),transparent);opacity:.55;margin:14px 0 18px}
 
   .grid{display:grid;gap:14px}
-  .tiles{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
-  .tile-label{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
-  .tile-value{font-size:29px;font-weight:600;margin-top:7px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-  .tile-meta{font-size:12px;color:var(--ink-2);margin-top:5px}
-  .tile-value.sm{font-size:22px}
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(172px,1fr))}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:17px 19px;box-shadow:var(--shadow)}
+  .tile-label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  .tile-value{font-family:var(--serif);font-size:31px;font-weight:600;margin-top:8px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.05}
+  .tile-meta{font-size:12px;color:var(--ink-2);margin-top:6px}
 
-  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px}
-  .section-title{font-size:14.5px;font-weight:600}
+  .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .section-title{font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:-.005em}
   .section-note{font-size:12px;color:var(--ink-3)}
 
-  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+  .legend{display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .swatch{width:10px;height:10px;border-radius:3px;display:inline-block}
 
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{text-align:left;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:11px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover{background:var(--surface-2)}
   .t-wrap{overflow-x:auto}
@@ -76,58 +133,69 @@
   .nowrap{white-space:nowrap}
 
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
-  .pill.paid{color:var(--brand);border-color:var(--brand-dim)}
-  .pill.free{color:#7fb6ea;border-color:#2f5878}
-  .pill.ok{color:#5ac25a;border-color:#1f5c1f}
-  .pill.bad{color:#f08a8a;border-color:#6d2626}
+  .pill.paid{color:var(--gold-d);border-color:var(--gold-l)}
+  .pill.free{color:var(--free);border-color:var(--free)}
+  /* Success is the overwhelming majority of rows, so it is deliberately quiet:
+     a green ring on 29 of 30 rows carries no information and fights the cream
+     and gold. Only failures are allowed to be loud. */
+  .pill.ok{color:var(--ink-2);border-color:var(--line)}
+  .pill.bad{color:var(--danger);border-color:var(--danger)}
   .pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 
-  .empty{text-align:center;padding:38px 20px;color:var(--ink-3);font-size:13px}
-  .empty strong{display:block;color:var(--ink-2);font-size:14px;margin-bottom:5px;font-weight:600}
-  .err{background:#2a1618;border:1px solid #6d2626;color:#f0b8b8;padding:12px 14px;border-radius:10px;font-size:13px;margin-bottom:14px}
-  .skeleton{height:74px;border-radius:var(--radius);background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%);background-size:400% 100%;animation:sh 1.3s ease infinite}
+  .empty{text-align:center;padding:42px 20px;color:var(--ink-3);font-size:13px}
+  .empty strong{display:block;font-family:var(--serif);color:var(--ink-2);font-size:16px;margin-bottom:6px;font-weight:600}
+  .err{background:var(--surface);border:1px solid var(--danger);color:var(--danger);padding:12px 15px;border-radius:10px;font-size:13px;margin-bottom:14px}
+  .skeleton{height:78px;border-radius:var(--radius);background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 37%,var(--surface) 63%);background-size:400% 100%;animation:sh 1.3s ease infinite}
   @keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
 
-  .search{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:7px 11px;font-size:13px;min-width:210px}
-  .search:focus{outline:none;border-color:var(--brand-dim)}
+  .search{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .search:focus{outline:none;border-color:var(--gold)}
   .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:12.5px;color:var(--ink-2)}
-  .pager button{border:1px solid var(--line);border-radius:7px;padding:5px 11px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);border-radius:7px;padding:5px 12px;color:var(--ink-2)}
   .pager button:disabled{opacity:.35;cursor:default}
-  .pager button:not(:disabled):hover{color:var(--ink);border-color:var(--brand-dim)}
+  .pager button:not(:disabled):hover{color:var(--ink);border-color:var(--gold)}
 
-  .bars{display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:150px;padding-top:6px}
+  .bars{display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:152px;padding-top:6px}
   .bar-col{flex:1;max-width:26px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;min-width:0;position:relative;height:100%}
-  .bar-col:hover .bar-seg{filter:brightness(1.22)}
+  .bar-col:hover .bar-seg{filter:brightness(1.15)}
   .bar-seg{border-radius:3px;min-height:2px}
-  .bar-col:last-child .bar-seg:first-child,.bar-seg.top{border-radius:4px 4px 3px 3px}
-  .axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
-  .tip{position:fixed;pointer-events:none;background:#000;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:12px;z-index:60;opacity:0;transition:opacity .1s;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .bar-seg.top{border-radius:4px 4px 3px 3px}
+  .axis{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);margin-top:9px;border-top:1px solid var(--line-soft);padding-top:7px}
+  .tip{position:fixed;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12px;z-index:60;opacity:0;transition:opacity .1s;box-shadow:var(--shadow);color:var(--ink)}
   .tip.on{opacity:1}
-  .tip b{display:block;margin-bottom:4px;color:var(--brand);font-size:11.5px}
-  .tip i{font-style:normal;display:flex;justify-content:space-between;gap:14px}
+  .tip b{display:block;margin-bottom:5px;color:var(--gold-d);font-size:11.5px;font-family:var(--serif)}
+  .tip i{font-style:normal;display:flex;justify-content:space-between;gap:16px}
 
-  .drawer{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:70}
+  .drawer{position:fixed;inset:0;background:rgba(10,8,6,.55);display:none;z-index:70}
   .drawer.on{display:block}
-  .drawer-panel{position:absolute;right:0;top:0;bottom:0;width:min(620px,100%);background:var(--bg);border-left:1px solid var(--line);overflow-y:auto;padding:22px 24px}
-  .drawer-close{position:absolute;right:18px;top:16px;font-size:22px;color:var(--ink-3);line-height:1}
+  /* surface, not bg - in the dark theme a panel painted the same colour as the
+     page behind it reads as a hole rather than a sheet slid over the top. */
+  .drawer-panel{position:absolute;right:0;top:0;bottom:0;width:min(640px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:-18px 0 44px rgba(0,0,0,.22);overflow-y:auto;padding:26px 28px}
+  .drawer-close{position:absolute;right:20px;top:18px;font-size:24px;color:var(--ink-3);line-height:1}
   .drawer-close:hover{color:var(--ink)}
-  .kv{display:grid;grid-template-columns:130px 1fr;gap:7px 14px;font-size:13px;margin-top:12px}
+  .kv{display:grid;grid-template-columns:132px 1fr;gap:8px 16px;font-size:13px;margin-top:14px}
   .kv dt{color:var(--ink-3)}
-  .stack{display:flex;flex-direction:column;gap:14px}
-  .statrow{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  .statrow>div{flex:1;padding:12px 14px;border-right:1px solid var(--line);min-width:0}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .statrow{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .statrow>div{flex:1;padding:13px 15px;border-right:1px solid var(--line);min-width:0}
   .statrow>div:last-child{border-right:0}
-  .statrow .tile-value{font-size:21px;margin-top:5px}
+  .statrow .tile-value{font-size:22px;margin-top:5px}
 </style>
 </head>
 <body>
 <div class="shell">
   <aside class="side">
-    <div>
-      <div class="brand">Divya Bajaj</div>
-      <div class="brand-sub">Admin</div>
+    <div class="brand">
+      <img src="/admin/divya-bajaj-monogram.svg" alt="">
+      <div>
+        <div class="brand-name">Divya Bajaj</div>
+        <div class="brand-sub">Admin</div>
+      </div>
     </div>
     <nav class="side-nav" id="nav"></nav>
+    <div class="side-foot">
+      <button class="theme-btn" id="themeBtn" type="button"></button>
+    </div>
   </aside>
 
   <main class="main">
@@ -141,7 +209,8 @@
         <div class="seg" id="daySeg" role="group" aria-label="Time range"></div>
       </div>
     </div>
-    <div id="envNote" class="env-note" style="margin:-10px 0 16px"></div>
+    <div id="envNote" class="env-note" style="margin:8px 0 0"></div>
+    <div class="rule"></div>
     <div id="view"></div>
   </main>
 </div>
@@ -296,7 +365,7 @@
       tip.innerHTML = '<b>' + esc(new Date(d.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })) + '</b>' +
         '<i><span>Paid</span><span class="mono">' + d.paid + '</span></i>' +
         '<i><span>Free</span><span class="mono">' + d.free + '</span></i>' +
-        (d.failed ? '<i><span style="color:#f08a8a">Failed</span><span class="mono">' + d.failed + '</span></i>' : '') +
+        (d.failed ? '<i><span style="color:var(--danger)">Failed</span><span class="mono">' + d.failed + '</span></i>' : '') +
         '<i class="dim"><span>New leads</span><span class="mono">' + d.leads + '</span></i>';
       tip.classList.add('on');
       var rect = tip.getBoundingClientRect();
@@ -330,7 +399,7 @@
       var gen = d.generation_time_seconds.all;
       var paidGen = d.generation_time_seconds.paid;
       var successMeta = d.reports.failed
-        ? '<span style="color:#f08a8a">' + d.reports.failed + ' failed</span>'
+        ? '<span style="color:var(--danger)">' + d.reports.failed + ' failed</span>'
         : 'no failures';
 
       var html = '<div class="grid tiles">' +
@@ -452,7 +521,7 @@
               '<td style="font-size:12px">' + esc(l.email || '') + '<div class="dim">' + esc(l.phone || '') + '</div></td>' +
               '<td class="mono nowrap">' + l.reports.total +
                 (l.reports.paid ? ' <span class="dim">(' + l.reports.paid + ' paid)</span>' : '') +
-                (l.reports.failed ? ' <span style="color:#f08a8a">' + l.reports.failed + ' failed</span>' : '') + '</td>' +
+                (l.reports.failed ? ' <span style="color:var(--danger)">' + l.reports.failed + ' failed</span>' : '') + '</td>' +
               '<td><span class="pill">' + esc(l.status || '—') + '</span></td>' +
               '<td class="nowrap" title="' + esc(exactWhen(l.created_at)) + '">' + esc(when(l.created_at)) + '</td>' +
               '</tr>';
@@ -735,6 +804,25 @@
   window.addEventListener('hashchange', function () {
     var id = location.hash.replace('#', '');
     if (SECTIONS.some(function (s) { return s.id === id; }) && id !== state.section) go(id);
+  });
+
+  // Theme. Light is the default because the cream and gold is the brand's
+  // signature look, the same one the report and the public site use; dark is
+  // there because the site offers it too and this panel gets long sessions.
+  function applyTheme(name) {
+    document.documentElement.setAttribute('data-theme', name);
+    var button = $('themeBtn');
+    if (button) {
+      button.textContent = name === 'dark' ? 'Light mode' : 'Dark mode';
+      button.setAttribute('aria-label', 'Switch to ' + (name === 'dark' ? 'light' : 'dark') + ' mode');
+    }
+    try { localStorage.setItem('db-admin-theme', name); } catch (e) {}
+  }
+  var savedTheme = 'light';
+  try { savedTheme = localStorage.getItem('db-admin-theme') || 'light'; } catch (e) {}
+  applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
+  $('themeBtn').addEventListener('click', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
 
   $('drawerClose').addEventListener('click', function () { $('drawer').classList.remove('on'); });

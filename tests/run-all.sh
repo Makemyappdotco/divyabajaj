@@ -54,6 +54,7 @@ run() {
 # Pure unit suites: no harness needed.
 run availability.test.js
 run pricing.test.js
+run pdf-download.test.js
 
 # Integration suites: fresh harness each.
 for suite in schedule-api.test.js booking-api.test.js payment-api.test.js pricing-e2e.test.js paid-report.test.js; do

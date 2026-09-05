@@ -110,12 +110,22 @@ async function renderReportPdfBuffer(args) {
   try {
     await printPage.setContent(html, { waitUntil: 'networkidle0' });
     await printPage.evaluate(() => document.fonts.ready);
-    const buffer = await printPage.pdf({
+    const rendered = await printPage.pdf({
       format: 'A4',
       printBackground: true,
       margin: { top: '0px', bottom: '0px', left: '0px', right: '0px' }
     });
-    return buffer;
+
+    // Puppeteer 23+ returns a Uint8Array here, not a Buffer. Express's
+    // res.send() treats a non-Buffer object as JSON, so the download became
+    // {"0":37,"1":80,"2":68,"3":70,...} - the PDF's own bytes, spelled out as
+    // JSON. It still arrived named .pdf, still had a PDF content type, and no
+    // reader on earth could open it. It also made a 3MB report a 41MB file.
+    //
+    // Buffer.from copies nothing meaningful here (it wraps the same memory for
+    // a Uint8Array view) and makes every caller safe regardless of which
+    // renderer or Puppeteer version produced it.
+    return Buffer.isBuffer(rendered) ? rendered : Buffer.from(rendered);
   } finally {
     await printPage.close();
   }

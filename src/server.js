@@ -18,6 +18,7 @@ const adminScheduleRoutes = require('./adminScheduleRoutes');
 const adminPricingRoutes = require('./adminPricingRoutes');
 const paidReportRoutes = require('./paidReportRoutes');
 const adminReportRoutes = require('./adminReportRoutes');
+const adminPaymentStatusRoutes = require('./adminPaymentStatusRoutes');
 const reportSweep = require('./services/reportSweep');
 const pricing = require('./services/pricing');
 const pricingPatch = require('./services/pricingPatch');
@@ -273,6 +274,7 @@ app.get('/api/pricing', async (req, res) => {
 app.use('/api/admin/schedule', adminAuth, adminScheduleRoutes);
 app.use('/api/admin/pricing', adminAuth, adminPricingRoutes);
 app.use('/api/admin/paid-reports', adminAuth, adminReportRoutes);
+app.use('/api/admin/payments', adminAuth, adminPaymentStatusRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 

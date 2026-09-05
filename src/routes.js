@@ -274,10 +274,21 @@ router.get('/reports/:id/pdf', async (req, res) => {
       reportText: report.ai_report || 'Report content is not available.'
     });
     const safeName = String(lead.name || 'Divya-Bajaj-Report').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
+
+    // res.send() was used here, and res.send() JSON-encodes anything that is
+    // not a Buffer or a string. Puppeteer hands back a Uint8Array, so Divya's
+    // downloads became a 41MB file of {"0":37,"1":80,...} that no reader could
+    // open - the PDF's bytes, written out as JSON, under a .pdf filename.
+    //
+    // res.end() with an explicit Content-Length, the same way the customer's
+    // own download already did it. That route was never affected, which is why
+    // this only ever broke the admin panel copy.
+    const body = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}-${report.type && report.type.includes('paid') ? 'full-blueprint' : 'numerology'}-report.pdf"`);
+    res.setHeader('Content-Length', String(body.length));
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    return res.send(pdfBuffer);
+    return res.end(body);
   } catch (error) {
     console.error('[PDF error]', error);
     return res.status(500).json({ error: error.message });

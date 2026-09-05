@@ -110,6 +110,15 @@ function verifyWebhookSignature({ rawBody, signature }) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/**
+ * Cheapest authenticated call there is, used only to answer "do these keys
+ * work". Creates nothing and charges nothing; a 401 means the credentials are
+ * wrong rather than that anything is broken here.
+ */
+async function ping() {
+  return call('/orders?count=1');
+}
+
 /** Authoritative status, straight from Razorpay. Used when a callback is doubted. */
 async function fetchPayment(paymentId) {
   return call(`/payments/${encodeURIComponent(paymentId)}`);
@@ -123,6 +132,6 @@ async function createRefund(paymentId, amountPaise) {
 }
 
 module.exports = {
-  isConfigured, isLiveMode, publicKeyId: keyId,
+  isConfigured, isLiveMode, publicKeyId: keyId, ping,
   createOrder, verifyCheckoutSignature, verifyWebhookSignature, fetchPayment, createRefund
 };

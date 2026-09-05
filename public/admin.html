@@ -190,6 +190,16 @@
     .sf:last-child{grid-column:1/-1}
   }
 
+  /* ---- paid reports ---- */
+  .pr-warn{font-size:12.5px;border-radius:8px;padding:10px 13px;margin-bottom:12px;
+           background:rgba(214,138,58,.09);border:1px solid rgba(214,138,58,.3);color:var(--ink)}
+  .pr-warn b{color:var(--gold-d)}
+  .attn{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--failed);margin-right:7px;vertical-align:middle}
+  .state{font-size:11.5px;white-space:nowrap}
+  .state.ready{color:var(--gold-d)}
+  .state.waiting{color:var(--ink-3)}
+  .state.bad{color:var(--danger)}
+
   /* ---- pricing ---- */
   .price-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr);
              gap:12px;align-items:end;padding:14px 0;border-bottom:1px solid var(--line-soft)}
@@ -609,6 +619,114 @@
     }).catch(function (error) { view.innerHTML = fail(error.message); });
   }
 
+  /* ---------------- paid blueprints (money already taken) ---------------- */
+
+  function apiPaidReports(path, method) {
+    return fetch('/api/admin/paid-reports' + (path || ''), {
+      method: method || 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store'
+    }).then(function (response) {
+      return response.text().then(function (raw) {
+        var parsed;
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch (e) { parsed = { error: raw }; }
+        if (!response.ok) throw new Error(parsed.error || ('Request failed (' + response.status + ')'));
+        return parsed;
+      });
+    });
+  }
+
+  function stateClass(item) {
+    if (item.status === 'generated') return 'ready';
+    if (item.status === 'failed' || item.status === 'refunded') return 'bad';
+    return 'waiting';
+  }
+
+  /**
+   * Everyone who has paid, and what they actually got.
+   *
+   * This is the card that makes "took the money, delivered nothing" visible
+   * instead of silent.
+   */
+  function paidReportsCard(d) {
+    if (!d) return '';
+
+    var warn = '';
+    if (!d.can_deliver) {
+      warn = '<div class="pr-warn">No WhatsApp or email provider is connected yet, so finished reports are <b>not being sent</b>. ' +
+        'Customers see their report on screen and can download it. ' +
+        (d.counts.undelivered ? '<b>' + d.counts.undelivered + '</b> finished report' + (d.counts.undelivered > 1 ? 's have' : ' has') + ' never been sent to anyone.' : '') +
+        '</div>';
+    }
+
+    if (!d.items.length) {
+      return '<div class="card" style="margin-bottom:14px">' +
+        '<div class="section-head"><div class="section-title">Paid blueprints</div>' +
+        '<div class="section-note">' + esc(d.price_formatted) + ' each &middot; ' + esc(d.environment_label) + '</div></div>' +
+        warn + '<div class="dim" style="font-size:13px">Nobody has paid for a blueprint yet.</div></div>';
+    }
+
+    var rows = d.items.map(function (i) {
+      var actions = '';
+      if (i.status === 'failed' || i.status === 'queued') actions += '<button class="dl" data-retry="' + esc(i.id) + '">Retry</button> ';
+      if (i.status === 'generated' && d.can_deliver) actions += '<button class="dl" data-resend="' + esc(i.id) + '">Resend</button> ';
+      if (i.status === 'failed') actions += '<button class="btn quiet" data-refund="' + esc(i.id) + '">Refund</button>';
+
+      return '<tr>' +
+        '<td>' + (i.needs_attention ? '<span class="attn" title="Needs your attention"></span>' : '') + esc(i.name || '—') +
+          (i.phone ? '<div class="dim" style="font-size:11.5px">' + esc(i.phone) + '</div>' : '') +
+          (i.email ? '<div class="dim" style="font-size:11.5px">' + esc(i.email) + '</div>' : '') + '</td>' +
+        '<td class="nowrap" title="' + esc(exactWhen(i.paid_at)) + '">' + esc(when(i.paid_at)) + '</td>' +
+        '<td><span class="state ' + stateClass(i) + '">' + esc(i.state_label) + '</span>' +
+          (i.attempts > 1 && i.status !== 'generated' ? '<div class="dim" style="font-size:11px">attempt ' + i.attempts + ' of ' + i.max_attempts + '</div>' : '') +
+          (i.last_error ? '<div class="dim" style="font-size:11px">' + esc(i.last_error.slice(0, 60)) + '</div>' : '') + '</td>' +
+        '<td class="nowrap"><span class="state ' + (i.delivered ? 'ready' : 'waiting') + '">' +
+          (i.status !== 'generated' ? '—' : i.delivered ? 'Sent' : 'Not sent') + '</span></td>' +
+        '<td style="font-size:12px">' + esc(i.question) + '</td>' +
+        '<td class="nowrap" style="text-align:right">' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+
+    return '<div class="card" style="padding:0;margin-bottom:14px">' +
+      '<div class="section-head" style="padding:17px 19px 0;margin-bottom:8px">' +
+      '<div class="section-title">Paid blueprints</div>' +
+      '<div class="section-note">' + d.counts.ready + ' ready &middot; ' + d.counts.waiting + ' waiting &middot; ' +
+        d.counts.failed + ' failed &middot; ' + d.counts.refunded + ' refunded</div></div>' +
+      (warn ? '<div style="padding:0 19px">' + warn + '</div>' : '') +
+      '<div class="t-wrap"><table>' +
+      '<thead><tr><th>Customer</th><th>Paid</th><th>Report</th><th>Sent</th><th>Question</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></div>';
+  }
+
+  function wirePaidReports() {
+    var run = function (button, path, working) {
+      var original = button.textContent;
+      button.disabled = true;
+      button.textContent = working;
+      apiPaidReports(path, 'POST')
+        .then(function () { renderReports(); })
+        .catch(function (error) {
+          button.textContent = 'Failed';
+          button.title = error.message;
+          setTimeout(function () { button.textContent = original; button.disabled = false; }, 3000);
+        });
+    };
+
+    document.querySelectorAll('[data-retry]').forEach(function (b) {
+      b.addEventListener('click', function () { run(b, '/' + b.getAttribute('data-retry') + '/retry', 'Writing...'); });
+    });
+    document.querySelectorAll('[data-resend]').forEach(function (b) {
+      b.addEventListener('click', function () { run(b, '/' + b.getAttribute('data-resend') + '/resend', 'Sending...'); });
+    });
+    document.querySelectorAll('[data-refund]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        // Money leaving is the one action in this panel that cannot be undone.
+        if (!window.confirm('Refund this payment in full? This cannot be undone.')) return;
+        run(b, '/' + b.getAttribute('data-refund') + '/refund', 'Refunding...');
+      });
+    });
+  }
+
   function renderReports() {
     var head =
       '<div class="controls" style="margin-bottom:14px">' +
@@ -627,8 +745,14 @@
       '</div>';
     view.innerHTML = head + loading(1);
 
-    api('reports', { days: state.days, category: state.reportCategory, status: state.reportStatus, page: state.reportPage })
-      .then(function (d) {
+    Promise.all([
+      api('reports', { days: state.days, category: state.reportCategory, status: state.reportStatus, page: state.reportPage }),
+      // Must never take the tab down: on a deployment without Supabase this
+      // answers 503, and the report list still needs to show.
+      apiPaidReports().catch(function (error) { console.error('[paid-reports]', error.message); return null; })
+    ])
+      .then(function (both) {
+        var d = both[0], paid = both[1];
         var body = !d.rows.length
           ? empty('No reports here', 'Nothing matches these filters in this environment.')
           : '<div class="card" style="padding:0"><div class="t-wrap"><table>' +
@@ -648,8 +772,9 @@
             }).join('') +
             '</tbody></table></div></div>' + pager(d, 'reportPage');
 
-        view.innerHTML = head + body;
+        view.innerHTML = head + paidReportsCard(paid) + body;
         wireSegs();
+        wirePaidReports();
         wirePager('reportPage', renderReports);
         wireRowDrawer();
         wireDownloads();

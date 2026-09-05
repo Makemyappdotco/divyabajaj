@@ -15,14 +15,18 @@
     }
   }
 
+  // Deliberately does NOT cover /blueprint/verify or /blueprint/run. Those sit
+  // on the other side of a payment, and a blind retry of a call that may have
+  // already succeeded is the wrong instinct there - the server's own webhook
+  // and sweep are what make those safe, not a second attempt from the browser.
   function shouldRetryNetworkRequest(input) {
     var path = requestPath(input);
-    return path === '/api/reports/paid-test-v2' || path === '/api/locations/search';
+    return path === '/api/reports/blueprint/checkout' || path === '/api/locations/search';
   }
 
   function retryMessage(input) {
-    return requestPath(input) === '/api/reports/paid-test-v2'
-      ? 'The connection was interrupted while your report was being prepared. Please try once more. Your entered details are still here.'
+    return requestPath(input) === '/api/reports/blueprint/checkout'
+      ? 'The connection was interrupted before payment could open. Please try once more. Your entered details are still here.'
       : 'The location search connection was interrupted. Please type the place again.';
   }
 

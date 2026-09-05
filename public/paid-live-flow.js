@@ -10,7 +10,14 @@
     locationTimer: null,
     locationRequest: 0,
     progressTimer: null,
-    pdfPayload: null
+    pdfPayload: null,
+    // The paid flow. config carries the price and, more importantly,
+    // can_deliver - whether we are able to message the customer at all, which
+    // decides whether they may safely close this page.
+    config: null,
+    jobId: null,
+    pollTimer: null,
+    paid: false
   };
 
   function qs(selector, root) { return (root || document).querySelector(selector); }
@@ -217,12 +224,30 @@
     var overlay = ensureModal();
     overlay.classList.add('is-open');
     document.body.classList.add('dbp-lock');
+    // The button should say what it does before it does it: the customer is
+    // paying at this step now, and finding that out only after filling seven
+    // fields would feel like a trap.
+    loadConfig().then(function () {
+      if (!state.paid) setSubmitLabel(defaultSubmitLabel());
+    });
     setTimeout(function () { var el = qs('#dbp-name', overlay); if (el) el.focus({ preventScroll:true }); }, 80);
   }
 
   function closeModal() {
+    // Once paid, whether they may leave depends entirely on whether we can
+    // send the report to them.
+    if (state.paid && state.generating) {
+      if (state.config && state.config.can_deliver) {
+        var overlay = document.getElementById('dbpOverlay');
+        if (overlay) overlay.classList.remove('is-open');
+        document.body.classList.remove('dbp-lock');
+        return;
+      }
+      setStatus('Your report is still being written, and we cannot message it to you yet. Please keep this page open a little longer.', '');
+      return;
+    }
     if (state.generating) {
-      setStatus('Your report is still being prepared. Please wait until it finishes.', '');
+      setStatus('Please wait a moment.', '');
       return;
     }
     var overlay = document.getElementById('dbpOverlay');
@@ -427,14 +452,21 @@
     };
   }
 
+  // Only disables the button. The label is set by whoever changed the state,
+  // because "Preparing your report" and "Opening secure payment" are now two
+  // different moments and one function cannot guess which.
   function setGenerating(value) {
     state.generating = value;
     var button = qs('#dbpSubmit', ensureModal());
-    button.disabled = value;
-    button.textContent = value ? 'Preparing Your Full Blueprint...' : 'Generate My Full Blueprint';
+    if (button) button.disabled = value;
   }
 
   function startProgress() {
+    // The tail of the message is the part that matters after payment, so it is
+    // repeated on every step rather than shown once and scrolled away.
+    var tail = (state.config && state.config.can_deliver)
+      ? '\n\nYou can close this page. Your report will reach your WhatsApp and email.'
+      : '\n\nPlease keep this page open until your report appears.';
     var messages = [
       'Verifying your birthplace and historical timezone...',
       'Calculating planetary positions and divisional charts...',
@@ -442,7 +474,7 @@
       'Calculating your numerology profile...',
       'Connecting the patterns with your main concern...',
       'Writing and checking your personalised report...'
-    ];
+    ].map(function (line) { return line + tail; });
     var index = 0;
     setStatus(messages[0], '');
     clearInterval(state.progressTimer);
@@ -454,6 +486,52 @@
 
   function stopProgress() { clearInterval(state.progressTimer); state.progressTimer = null; }
 
+  // --------------------------------------------------------------- payment
+
+  /** Price and whether we can message the customer. Fetched once per page. */
+  async function loadConfig() {
+    if (state.config) return state.config;
+    try {
+      var response = await fetch('/api/reports/blueprint/config', { cache:'no-store' });
+      state.config = await response.json();
+    } catch (error) {
+      state.config = { amount_formatted:'', payments_live:false, can_deliver:false };
+    }
+    return state.config;
+  }
+
+  /** Razorpay's script, pulled in only when someone actually reaches checkout. */
+  function loadRazorpay() {
+    if (window.Razorpay) return Promise.resolve(true);
+    return new Promise(function (resolve) {
+      var tag = document.createElement('script');
+      tag.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      tag.onload = function () { resolve(Boolean(window.Razorpay)); };
+      tag.onerror = function () { resolve(false); };
+      document.head.appendChild(tag);
+    });
+  }
+
+  function setSubmitLabel(text) {
+    var button = qs('#dbpSubmit', ensureModal());
+    if (button) button.textContent = text;
+  }
+
+  /**
+   * What the customer is told while they wait.
+   *
+   * The "you can close this page" half is only printed when a delivery channel
+   * is actually configured. Saying it while nothing can send would be telling
+   * someone who just paid that their report is coming, and then sending
+   * nothing.
+   */
+  function waitingCopy() {
+    var canDeliver = state.config && state.config.can_deliver;
+    return canDeliver
+      ? 'Payment received. Your report is being written now, and takes a few minutes.\nYou can close this page. It will reach your WhatsApp and email as soon as it is ready.'
+      : 'Payment received. Your report is being written now, and takes a few minutes.\nPlease keep this page open until it appears below.';
+  }
+
   async function submitReport(event) {
     event.preventDefault();
     if (state.generating) return;
@@ -463,43 +541,162 @@
     var overlay = ensureModal();
     qs('#dbpResult', overlay).classList.remove('show');
     state.pdfPayload = null;
+
+    var config = await loadConfig();
+    if (!config.payments_live) {
+      setStatus('Payments are not switched on yet. Please message us and we will take it from there.', 'error');
+      return;
+    }
+
     setGenerating(true);
-    startProgress();
-    var controller = new AbortController();
-    var timeout = setTimeout(function () { controller.abort(); }, 300000);
+    setSubmitLabel('Opening secure payment...');
+    setStatus('Opening the secure payment window...', '');
 
     try {
-      var response = await fetch('/api/reports/paid-test-v2', {
-        method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', signal:controller.signal,
+      var response = await fetch('/api/reports/blueprint/checkout', {
+        method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
         body:JSON.stringify(payload)
       });
       var raw = await response.text();
       var data;
       try { data = raw ? JSON.parse(raw) : {}; } catch (error) { data = { error:raw || 'Invalid server response' }; }
-      if (!response.ok || data.success === false) throw new Error(data.error || 'Could not generate the report.');
-      if (!data.report_text) throw new Error('The report service returned no report content.');
+      if (!response.ok || data.success === false) throw new Error(data.error || 'Could not start the payment.');
 
-      state.pdfPayload = {
-        lead:payload,
-        numbers:data.numbers || {},
-        astrology_data:data.astrology_data || null,
-        report_text:data.report_text,
-        // carries the Integrated Life Report design; without it the PDF route
-        // falls back to the legacy layout
-        report_json:data.report_json || null,
-        report_type:'paid_blueprint_live'
-      };
-      qs('#dbpReport', overlay).textContent = data.report_text;
-      qs('#dbpResult', overlay).classList.add('show');
-      setStatus('Your verified Full Blueprint is ready.', 'success');
-      setTimeout(function () { qs('#dbpResult', overlay).scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
+      var ready = await loadRazorpay();
+      if (!ready) throw new Error('The payment window could not load. Please check your connection and try again.');
+
+      state.jobId = data.job_id;
+      state.pdfPayload = { lead:payload };
+      openCheckout(data, payload);
     } catch (error) {
-      setStatus(error && error.name === 'AbortError' ? 'The report took longer than expected. Please try again.' : (error.message || 'Could not generate the report.'), 'error');
-    } finally {
-      clearTimeout(timeout);
-      stopProgress();
+      setStatus(error.message || 'Could not start the payment.', 'error');
       setGenerating(false);
+      setSubmitLabel(defaultSubmitLabel());
     }
+  }
+
+  function defaultSubmitLabel() {
+    var amount = state.config && state.config.amount_formatted;
+    return amount ? 'Pay ' + amount + ' and Generate My Blueprint' : 'Generate My Full Blueprint';
+  }
+
+  function openCheckout(order, payload) {
+    var checkout = new window.Razorpay({
+      key: order.key_id,
+      order_id: order.order_id,
+      amount: order.amount,
+      currency: order.currency,
+      name: order.name,
+      description: order.description,
+      prefill: order.prefill,
+      theme: { color: '#c9a96e' },
+      handler: function (result) { confirmPayment(result); },
+      modal: {
+        ondismiss: function () {
+          // Nothing has been charged and nothing generated. The form is intact.
+          setGenerating(false);
+          setSubmitLabel(defaultSubmitLabel());
+          setStatus('Payment was cancelled. Your details are still here whenever you are ready.', '');
+        }
+      }
+    });
+    checkout.on('payment.failed', function (event) {
+      setGenerating(false);
+      setSubmitLabel(defaultSubmitLabel());
+      var reason = event && event.error && event.error.description;
+      setStatus(reason ? 'Payment failed: ' + reason : 'That payment did not go through. You have not been charged.', 'error');
+    });
+    checkout.open();
+  }
+
+  async function confirmPayment(result) {
+    state.paid = true;
+    setStatus(waitingCopy(), 'success');
+    setSubmitLabel('Writing your blueprint...');
+
+    try {
+      var response = await fetch('/api/reports/blueprint/verify', {
+        method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
+        body:JSON.stringify({
+          razorpay_order_id: result.razorpay_order_id,
+          razorpay_payment_id: result.razorpay_payment_id,
+          razorpay_signature: result.razorpay_signature
+        })
+      });
+      var data = await response.json();
+      if (!response.ok || data.success === false) throw new Error(data.error || 'We could not confirm that payment.');
+      if (data.job_id) state.jobId = data.job_id;
+    } catch (error) {
+      // The webhook is the backstop. Money has moved and Razorpay will tell the
+      // server about it even if this call failed, so the customer is told to
+      // wait rather than to pay again.
+      setStatus('Your payment went through. We had trouble confirming it here, but your report is still being prepared. Please keep this page open.', '');
+    }
+
+    startProgress();
+    // Fire and forget: this request generates the report and can run for
+    // minutes. Progress is read from the poll below, not from its response.
+    fetch('/api/reports/blueprint/run', {
+      method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
+      body:JSON.stringify({ job_id: state.jobId })
+    }).catch(function () {});
+
+    pollStatus();
+  }
+
+  function pollStatus() {
+    clearTimeout(state.pollTimer);
+    state.pollTimer = setTimeout(async function () {
+      try {
+        var response = await fetch('/api/reports/blueprint/status?job_id=' + encodeURIComponent(state.jobId), { cache:'no-store' });
+        var data = await response.json();
+
+        if (data.status === 'generated' && data.report_text) return showReport(data);
+
+        if (data.status === 'refunded') {
+          stopProgress();
+          setGenerating(false);
+          setStatus('We could not complete your report, so your payment has been refunded in full. It will be back with you within a few working days. Please message us and Divya will sort this out personally.', 'error');
+          return;
+        }
+
+        if (data.status === 'failed' && data.exhausted) {
+          stopProgress();
+          setStatus('We could not complete your report. Your payment is being refunded in full.', 'error');
+        }
+      } catch (error) { /* keep polling; a dropped poll is not a failed report */ }
+      pollStatus();
+    }, 5000);
+  }
+
+  function showReport(data) {
+    clearTimeout(state.pollTimer);
+    stopProgress();
+    setGenerating(false);
+    var overlay = ensureModal();
+
+    state.pdfPayload = {
+      lead: data.lead || (state.pdfPayload && state.pdfPayload.lead) || {},
+      numbers: data.numbers || {},
+      astrology_data: data.astrology_data || null,
+      report_text: data.report_text,
+      // carries the Integrated Life Report design; without it the PDF route
+      // falls back to the legacy layout
+      report_json: data.report_json || null,
+      report_type: 'paid_blueprint_live'
+    };
+
+    qs('#dbpReport', overlay).textContent = data.report_text;
+    qs('#dbpResult', overlay).classList.add('show');
+
+    // Deliberately left disabled. Re-enabling it would put a live "Pay ₹999"
+    // button under a report the customer has already paid for, and someone
+    // would eventually be charged twice for the same blueprint.
+    var button = qs('#dbpSubmit', overlay);
+    if (button) { button.disabled = true; button.textContent = 'Paid · your blueprint is below'; }
+
+    setStatus('Your verified Full Blueprint is ready.', 'success');
+    setTimeout(function () { qs('#dbpResult', overlay).scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
   }
 
   async function downloadPdf() {

@@ -241,7 +241,20 @@ router.post('/astrology-v2/source-test', previewOnly, async (req, res) => {
   }
 });
 
-router.post('/reports/paid-test-v2', async (req, res) => {
+/**
+ * The old open route: full ₹999 report, no payment, to anyone who asked.
+ *
+ * previewOnly closes it on the live site. It stays available on previews
+ * because it is how the report itself is tested without spending money, and
+ * because /api/reports/blueprint/run shares the same generator - if this
+ * route breaks, the paid one has broken too and it is far cheaper to find out
+ * here.
+ *
+ * Live customers now go through /api/reports/blueprint/checkout, which prices
+ * the report from Divya's panel and will not generate anything until Razorpay
+ * confirms the money.
+ */
+router.post('/reports/paid-test-v2', previewOnly, async (req, res) => {
   const startedAt = Date.now();
   try {
     const payload = normaliseV2Payload(req.body);

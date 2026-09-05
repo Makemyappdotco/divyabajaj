@@ -16,8 +16,12 @@ const bookingRoutes = require('./bookingRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const adminScheduleRoutes = require('./adminScheduleRoutes');
 const adminPricingRoutes = require('./adminPricingRoutes');
+const paidReportRoutes = require('./paidReportRoutes');
+const adminReportRoutes = require('./adminReportRoutes');
+const reportSweep = require('./services/reportSweep');
 const pricing = require('./services/pricing');
 const pricingPatch = require('./services/pricingPatch');
+const { validateReportInput } = require('./services/reportInputValidation');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -121,69 +125,8 @@ function persistentStorageGuard(req, res, next) {
   return next();
 }
 
-function cleanDigits(value) {
-  return String(value || '').replace(/\D/g, '');
-}
-
-function isValidName(value) {
-  return /^[A-Za-zÀ-ž][A-Za-zÀ-ž .'’-]{1,79}$/.test(String(value || '').trim());
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
-}
-
-function isValidPhone(value) {
-  const length = cleanDigits(value).length;
-  return length >= 10 && length <= 15;
-}
-
-function isValidIsoDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return year >= 1900 && date <= new Date() && date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-function isValidTime(value) {
-  const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
-  return Boolean(match) && Number(match[1]) <= 23 && Number(match[2]) <= 59;
-}
-
-function validateReportInput(req, res, next) {
-  const isFree = req.path === '/reports/free';
-  const isPaid = req.path === '/reports/paid-test-v2';
-  if (!isFree && !isPaid) return next();
-
-  const body = req.body || {};
-  const errors = {};
-  if (!isValidName(body.name)) errors.name = 'Enter a valid full name.';
-  if (!isValidEmail(body.email)) errors.email = 'Enter a valid email address.';
-  if (!isValidPhone(body.phone)) errors.phone = 'Enter a valid WhatsApp number with 10 to 15 digits.';
-  if (!isValidIsoDate(body.dob)) errors.dob = 'Enter a valid date of birth.';
-
-  if (isPaid) {
-    if (!['male', 'female'].includes(String(body.gender || '').toLowerCase())) errors.gender = 'Select a valid gender.';
-    if (!isValidTime(body.tob)) errors.tob = 'Enter a valid time of birth.';
-    if (!['exact_record', 'family_confirmed', 'approximate'].includes(String(body.birth_time_accuracy || ''))) errors.birth_time_accuracy = 'Select birth time accuracy.';
-    if (!String(body.pob || '').trim()) errors.pob = 'Select a valid birthplace.';
-    const latitude = Number(body.latitude);
-    const longitude = Number(body.longitude);
-    const timezone = Number(body.timezone);
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) errors.latitude = 'Invalid birthplace latitude.';
-    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) errors.longitude = 'Invalid birthplace longitude.';
-    if (!Number.isFinite(timezone) || timezone < -14 || timezone > 14) errors.timezone = 'Invalid birthplace timezone.';
-    if (String(body.question || '').trim().length < 5) errors.question = 'Add your main concern in a few words.';
-  }
-
-  if (Object.keys(errors).length) {
-    return res.status(400).json({ success: false, error: 'Please correct the submitted information.', fields: errors });
-  }
-  return next();
-}
+// The birth-detail validators now live in services/reportInputValidation.js
+// so the test harness mounts the exact same middleware the live site does.
 
 app.disable('x-powered-by');
 // Razorpay signs the webhook over the exact bytes it sent, so this one route
@@ -277,6 +220,34 @@ app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
 // public booking API - no auth, this is the customer-facing consultation flow
 app.use('/api/booking', bookingRoutes);
 app.use('/api/booking/payment', paymentRoutes);
+// Pay-before-generate for the Full Blueprint. Mounted before the general /api
+// routes so its namespace is unambiguous.
+app.use('/api/reports/blueprint', paidReportRoutes);
+
+/**
+ * The retry-and-refund sweep, for customers who paid and closed the tab.
+ *
+ * Protected by a shared secret rather than the admin password, because Vercel
+ * Cron calls it unattended. Without CRON_SECRET set it refuses to run at all,
+ * rather than leaving a public endpoint that anyone can hammer.
+ */
+app.all('/api/internal/report-sweep', async (req, res) => {
+  const expected = process.env.CRON_SECRET || '';
+  const supplied = req.get('x-cron-secret') ||
+    String(req.get('authorization') || '').replace(/^Bearer\s+/i, '');
+
+  if (!expected) return res.status(503).json({ error: 'CRON_SECRET is not configured' });
+  if (supplied !== expected) return res.status(401).json({ error: 'unauthorised' });
+
+  try {
+    const summary = await reportSweep.sweep({ runJob: paidReportRoutes.runJob });
+    return res.json({ ok: true, ...summary });
+  } catch (error) {
+    console.error('[report-sweep]', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
 // admin panel API - read-only, mounted before the general /api routes so its
@@ -301,6 +272,7 @@ app.get('/api/pricing', async (req, res) => {
 
 app.use('/api/admin/schedule', adminAuth, adminScheduleRoutes);
 app.use('/api/admin/pricing', adminAuth, adminPricingRoutes);
+app.use('/api/admin/paid-reports', adminAuth, adminReportRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 

@@ -15,6 +15,7 @@ const db = require('./database');
 const store = require('./services/booking/store');
 const razorpay = require('./services/razorpay');
 const pricing = require('./services/pricing');
+const reportJobs = require('./services/reportJobs');
 
 const router = express.Router();
 
@@ -275,9 +276,22 @@ router.post('/webhook', async (req, res) => {
       if (gatewayOrderId) {
         const orderRow = await supabase.from('orders').select('*').eq('gateway_order_id', gatewayOrderId).maybeSingle();
         if (orderRow.data) {
-          const appt = await supabase.from('appointments').select('*').eq('order_id', orderRow.data.id).maybeSingle();
-          if (appt.data) {
-            await confirmPaid({ appointment: appt.data, gatewayOrderId, paymentId, source: 'webhook' });
+          if (orderRow.data.product_code === 'paid_blueprint') {
+            // A paid report. This is the ONLY thing that guarantees a customer
+            // who closed their tab still gets what they paid for: the browser
+            // may never come back, but Razorpay retries until we answer 2xx.
+            //
+            // Deliberately only queues. Generation runs for minutes and the
+            // webhook must answer quickly, or Razorpay times out and retries
+            // and we would be generating the same report twice over.
+            await supabase.from('orders').update({ status: 'paid', updated_at: now() }).eq('id', orderRow.data.id);
+            const job = await reportJobs.getByGatewayOrder(gatewayOrderId);
+            if (job) await reportJobs.markPaid(job.id, { paymentId });
+          } else {
+            const appt = await supabase.from('appointments').select('*').eq('order_id', orderRow.data.id).maybeSingle();
+            if (appt.data) {
+              await confirmPaid({ appointment: appt.data, gatewayOrderId, paymentId, source: 'webhook' });
+            }
           }
         }
       }

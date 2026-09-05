@@ -15,9 +15,24 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 function now() { return new Date().toISOString(); }
 
-function scope(req) {
-  const wanted = String(req.query.environment || req.body.environment || 'production').toLowerCase();
-  return ['production', 'test'].includes(wanted) ? wanted : 'production';
+/**
+ * Which environment's hours this deployment reads.
+ *
+ * Deliberately NOT the panel's Live/Test analytics filter. Hours are
+ * configuration of the site you are looking at, not a slice of data: the
+ * booking page always reads store.runtimeEnvironment(), so if the panel let
+ * you edit 'production' while the preview site served 'test', every save
+ * would appear to do nothing. That is exactly what happened. There is now one
+ * answer and the panel states it plainly.
+ */
+function scope() {
+  return store.runtimeEnvironment();
+}
+
+function environmentLabel() {
+  return store.runtimeEnvironment() === 'production'
+    ? 'your live site'
+    : 'this preview site (your live site has its own separate hours)';
 }
 
 function client() {
@@ -100,7 +115,7 @@ function validateDay(day, index) {
 // ------------------------------------------------------------------ read
 
 router.get('/', handle('read', async (req, res) => {
-  const environment = scope(req);
+  const environment = scope();
   const supabase = client();
 
   const [rules, blocked, upcoming] = await Promise.all([
@@ -145,6 +160,7 @@ router.get('/', handle('read', async (req, res) => {
 
   return res.json({
     environment,
+    environment_label: environmentLabel(),
     week,
     configured: rules.data.some(r => r.is_active),
     blocked: blocked.data,
@@ -159,7 +175,7 @@ router.get('/', handle('read', async (req, res) => {
 // ------------------------------------------------------- write weekly hours
 
 router.put('/hours', handle('hours', async (req, res) => {
-  const environment = scope(req);
+  const environment = scope();
   const days = Array.isArray(req.body && req.body.week) ? req.body.week : null;
   if (!days) throw bad('Nothing to save.');
 
@@ -186,7 +202,7 @@ router.put('/hours', handle('hours', async (req, res) => {
 // ----------------------------------------------------------- blocked dates
 
 router.post('/block', handle('block', async (req, res) => {
-  const environment = scope(req);
+  const environment = scope();
   const from = new Date(req.body && req.body.starts_at);
   const to = new Date(req.body && req.body.ends_at);
   if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) throw bad('Pick a start and end date.');

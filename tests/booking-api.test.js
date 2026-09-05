@@ -1,4 +1,5 @@
-const B = 'http://127.0.0.1:4400/api/booking';
+// Run against the local harness in /tmp/bookpreview (node server.js on :4401).
+const B = 'http://127.0.0.1:4401/api/booking';
 const post = (p, body) => fetch(B + p, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
   .then(async r => ({ status: r.status, body: await r.json() }));
 const get = p => fetch(B + p).then(r => r.json());
@@ -10,11 +11,24 @@ const check = (label, ok, detail='') => { ok ? pass++ : fail++; console.log(`${o
   const day = avail.days[2];
   const slot = day.slots[0];
 
-  console.log('--- the slot already booked in the click-through ---');
-  const booked = avail.days.flatMap(d => d.slots).some(s => s.slot_key === '2026-09-06T07:00:00Z_60');
-  check('a booked slot disappears from availability', !booked);
-  const buffered = avail.days.flatMap(d => d.slots).some(s => s.slot_key === '2026-09-06T08:00:00Z_60');
-  check('the 15 min buffer after it does NOT eat the next slot (60min gap)', buffered);
+  console.log('--- booking a slot removes it and only it ---');
+  // Self-contained: this block books a slot itself rather than assuming another
+  // script ran first. The earlier version depended on the click-through test
+  // having booked a specific key, so it passed or failed on run order alone.
+  const firstDay = avail.days.find(d => d.slots.length >= 2);
+  const target = firstDay.slots[0];
+  const neighbour = firstDay.slots[1];
+  const h0 = await post('/hold', { slot_key: target.slot_key, starts_at: target.starts_at, ends_at: target.ends_at });
+  const b0 = await post('/book', { hold_id: h0.body.hold_id, slot_key: target.slot_key,
+    name: 'Buffer Check', phone: '9800000000', email: 'buf@x.com', dob: '1990-01-01', pob: 'Delhi' });
+  check('the booking succeeds', b0.status === 200, JSON.stringify(b0.body));
+
+  const after0 = await get('/availability?days=21');
+  const keys = after0.days.flatMap(d => d.slots).map(s => s.slot_key);
+  check('the booked slot disappears from availability', !keys.includes(target.slot_key));
+  // The rule carries a 15 minute gap; the next slot starts 60 minutes later, so
+  // the gap must not reach it.
+  check('the 15 min gap after it does NOT eat the next slot', keys.includes(neighbour.slot_key), neighbour.slot_key);
 
   console.log('\n--- two people, one slot ---');
   const [a, b] = await Promise.all([

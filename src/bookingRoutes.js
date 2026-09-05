@@ -114,9 +114,20 @@ router.post('/hold', handle('hold', async (req, res) => {
     return fail(res, 400, 'That slot is not valid.');
   }
 
-  // Never trust the slot the browser sends. It is re-derived from Divya's rules
-  // here, so a crafted request cannot book 3am or a day she is not working.
-  const available = await store.listAvailability({ days: store.MAX_DAYS_AHEAD, busy: [] });
+  // Never trust the slot the browser sends: it is re-derived from Divya's rules
+  // before anything is held, so a crafted request cannot book 3am or a day she
+  // is not working.
+  //
+  // Only the slot's OWN day is recomputed, not the whole 45 day window. The
+  // wide version made this the slowest call in the flow - the customer clicked
+  // a time and stared at nothing for two to three seconds - and it bought no
+  // extra safety, because a slot can only ever be validated against the day it
+  // falls on.
+  // `from` narrows the window; the clock stays real, so the minimum notice
+  // period still applies exactly as it does on the availability list.
+  const available = await store.listAvailability({
+    days: 3, busy: [], from: new Date(start.getTime() - 36 * 3600000)
+  });
   const match = available.slots.find(slot => slot.slot_key === slotKey);
   if (!match) return fail(res, 409, 'That slot is no longer available. Please pick another.');
 

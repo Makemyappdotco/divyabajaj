@@ -50,22 +50,39 @@
     '.dbm-hr{height:1px;background:linear-gradient(90deg,var(--gold),transparent);opacity:.4;margin:20px 0}',
 
     '.dbm-lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-s);font-weight:600;margin-bottom:11px}',
-    '.dbm-days{display:flex;gap:8px;overflow-x:auto;padding-bottom:5px;scrollbar-width:thin}',
-    '.dbm-days::-webkit-scrollbar{height:3px}.dbm-days::-webkit-scrollbar-thumb{background:var(--sl);border-radius:3px}',
-    '.dbm-day{flex:none;min-width:76px;text-align:center;border:1px solid var(--sl);background:transparent;',
-    '  border-radius:12px;padding:10px 8px;cursor:pointer;color:var(--text);transition:border-color .16s,background .16s}',
-    '.dbm-day:hover{border-color:var(--gold-d)}',
-    '.dbm-day[aria-pressed="true"]{border-color:var(--gold);background:var(--gold-glow)}',
-    '.dbm-wd{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--text-s)}',
-    '.dbm-dn{font-family:var(--serif);font-size:21px;font-weight:600;color:var(--ivory);line-height:1;margin-top:3px}',
-    '.dbm-mo{font-size:10.5px;color:var(--text-s);margin-top:3px}',
-    '.dbm-free{font-size:10px;color:var(--gold);margin-top:5px}',
+    // The native horizontal scrollbar under the day strip looked like a bug.
+    // It is hidden and replaced with arrows plus a fade at each edge, which is
+    // also the only affordance that reads on a desktop trackpad.
+    '.dbm-strip{position:relative;margin:0 -4px}',
+    '.dbm-days{display:flex;gap:8px;overflow-x:auto;padding:2px 4px 4px;scroll-behavior:smooth;',
+    '  scrollbar-width:none;-ms-overflow-style:none}',
+    '.dbm-days::-webkit-scrollbar{display:none}',
+    '.dbm-arrow{position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;z-index:2;',
+    '  border-radius:50%;border:1px solid var(--sl);background:var(--bg2);color:var(--text-m);',
+    '  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;',
+    '  transition:opacity .2s,color .16s,border-color .16s}',
+    '.dbm-arrow:hover{color:var(--gold);border-color:var(--gold-d)}',
+    '.dbm-arrow.l{left:-6px}.dbm-arrow.r{right:-6px}',
+    '.dbm-arrow[hidden]{opacity:0;pointer-events:none}',
 
-    '.dbm-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-top:16px}',
-    '.dbm-slot{border:1px solid var(--sl);background:transparent;border-radius:10px;padding:11px 6px;',
-    '  font-size:14px;color:var(--text);cursor:pointer;font-variant-numeric:tabular-nums;font-family:var(--sans);transition:border-color .16s,background .16s,color .16s}',
-    '.dbm-slot:hover{border-color:var(--gold-d)}',
+    '.dbm-day{flex:none;min-width:82px;text-align:center;border:1px solid var(--sl);background:transparent;',
+    '  border-radius:14px;padding:12px 10px 11px;cursor:pointer;color:var(--text);position:relative;',
+    '  transition:border-color .18s,background .18s,transform .18s}',
+    '.dbm-day:hover{border-color:var(--gold-d);transform:translateY(-1px)}',
+    '.dbm-day[aria-pressed="true"]{border-color:var(--gold);background:var(--gold-glow)}',
+    '.dbm-day[aria-pressed="true"] .dbm-dn{color:var(--gold)}',
+    '.dbm-wd{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-s)}',
+    '.dbm-dn{font-family:var(--serif);font-size:23px;font-weight:600;color:var(--ivory);line-height:1;margin-top:4px;transition:color .18s}',
+    '.dbm-mo{font-size:10.5px;color:var(--text-s);margin-top:3px}',
+    '.dbm-free{font-size:10px;color:var(--gold);margin-top:6px;opacity:.85}',
+
+    '.dbm-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:9px;margin-top:18px}',
+    '.dbm-slot{border:1px solid var(--sl);background:transparent;border-radius:11px;padding:13px 6px;',
+    '  font-size:14.5px;color:var(--text);cursor:pointer;font-variant-numeric:tabular-nums;',
+    '  font-family:var(--sans);transition:border-color .16s,background .16s,color .16s,transform .16s}',
+    '.dbm-slot:hover{border-color:var(--gold-d);transform:translateY(-1px)}',
     '.dbm-slot[aria-pressed="true"]{border-color:var(--gold);background:var(--gold-glow);color:var(--gold);font-weight:600}',
+    '.dbm-holding{color:var(--gold);opacity:.85}',
 
     '.dbm-picked{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg3);',
     '  border-radius:11px;padding:12px 15px;font-size:14px;color:var(--text)}',
@@ -251,7 +268,10 @@
   }
 
   function renderDays() {
-    var html = '<div class="dbm-days" id="dbmDays">';
+    var html = '<div class="dbm-strip">' +
+      '<button type="button" class="dbm-arrow l" id="dbmL" aria-label="Earlier days" hidden>&#8249;</button>' +
+      '<button type="button" class="dbm-arrow r" id="dbmR" aria-label="Later days">&#8250;</button>' +
+      '<div class="dbm-days" id="dbmDays">';
     state.days.forEach(function (day, i) {
       var t = day.slots[0].starts_at;
       html += '<button type="button" class="dbm-day" data-date="' + esc(day.date) + '" aria-pressed="' + (i === 0) + '">' +
@@ -260,8 +280,18 @@
         '<div class="dbm-mo">' + esc(fmt(t, { month: 'short' })) + '</div>' +
         '<div class="dbm-free">' + day.slots.length + ' free</div></button>';
     });
-    html += '</div><div class="dbm-slots" id="dbmSlots"></div>';
+    html += '</div></div><div class="dbm-slots" id="dbmSlots"></div>';
     $('dbmPicker').innerHTML = html;
+
+    var strip = $('dbmDays');
+    function arrows() {
+      $('dbmL').hidden = strip.scrollLeft < 8;
+      $('dbmR').hidden = strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 8;
+    }
+    $('dbmL').addEventListener('click', function () { strip.scrollBy({ left: -240, behavior: 'smooth' }); });
+    $('dbmR').addEventListener('click', function () { strip.scrollBy({ left: 240, behavior: 'smooth' }); });
+    strip.addEventListener('scroll', arrows);
+    arrows();
 
     $('dbmDays').addEventListener('click', function (e) {
       var b = e.target.closest('[data-date]');
@@ -293,11 +323,36 @@
     }).join('');
   }
 
+  /**
+   * Move to the form IMMEDIATELY and reserve in the background.
+   *
+   * Waiting for the hold before revealing step two meant the customer clicked a
+   * time and then watched nothing happen for two to three seconds, which is the
+   * exact moment they decide the site is broken. The form is theirs to start
+   * filling in at once; the reservation lands a moment later and only the
+   * countdown line waits for it. If the slot turns out to be gone we say so and
+   * hand them back the picker - by which point they have lost nothing but a
+   * keystroke or two.
+   */
   function hold(slot, button) {
     Array.prototype.forEach.call($('dbmSlots').children, function (c) {
       c.setAttribute('aria-pressed', String(c === button));
-      c.disabled = true;
     });
+
+    state.slot = slot;
+    state.hold = null;
+    $('dbmPicked').innerHTML = '<span><strong>' + esc(dateOf(slot.starts_at)) + '</strong> at <strong>' +
+      esc(timeOf(slot.starts_at)) + '</strong> IST</span><button type="button" class="dbm-change" id="dbmChange">Change</button>';
+    $('dbmChange').addEventListener('click', back);
+    $('dbmTimer').innerHTML = '<span class="dbm-holding">Reserving this slot…</span>';
+    $('dbmStep1').hidden = true;
+    $('dbmStep2').hidden = false;
+    // Disabled only until the reservation confirms, so nobody can submit
+    // against a hold that does not exist yet.
+    $('dbmGo').disabled = true;
+    $('dbmBox').scrollTop = 0;
+    setTimeout(function () { $('dbmName').focus(); }, 60);
+
     fetch(API + '/hold', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
@@ -305,20 +360,16 @@
     })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
       .then(function (d) {
-        state.slot = slot; state.hold = d;
-        $('dbmPicked').innerHTML = '<span><strong>' + esc(dateOf(slot.starts_at)) + '</strong> at <strong>' +
-          esc(timeOf(slot.starts_at)) + '</strong> IST</span><button type="button" class="dbm-change" id="dbmChange">Change</button>';
-        $('dbmChange').addEventListener('click', back);
-        $('dbmStep1').hidden = true;
-        $('dbmStep2').hidden = false;
+        // They may have pressed Change while this was in flight.
+        if (state.slot !== slot) return;
+        state.hold = d;
         $('dbmGo').disabled = false;
         countdown(new Date(d.expires_at));
-        $('dbmBox').scrollTop = 0;
-        setTimeout(function () { $('dbmName').focus(); }, 80);
       })
       .catch(function (err) {
+        if (state.slot !== slot) return;
+        back();
         msg('bad', err.message || 'That slot just went. Please pick another.');
-        state.loaded = false; load();
       });
   }
 
@@ -357,7 +408,7 @@
 
   function submit(e) {
     e.preventDefault();
-    if (!state.hold) return;
+    if (!state.hold) return msg('bad', 'Still reserving your slot, one moment.');
     var q = new URLSearchParams(location.search);
     var payload = {
       hold_id: state.hold.hold_id, slot_key: state.slot.slot_key,

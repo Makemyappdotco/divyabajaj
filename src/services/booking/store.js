@@ -100,8 +100,16 @@ async function getTaken(environment, from, to) {
  * caller's decision: if Google is down or not yet connected, availability still
  * works off Divya's own rules instead of the whole page failing.
  */
-async function listAvailability({ environment = runtimeEnvironment(), days = 14, busy = [], now: clock } = {}) {
-  const from = clock ? new Date(clock) : new Date();
+async function listAvailability({
+  environment = runtimeEnvironment(), days = 14, busy = [], now: clock, from: windowStart
+} = {}) {
+  // `now` is the clock (what "too soon to book" is measured against) and
+  // `from` is where the window starts. They are almost always the same, but
+  // validating a single future slot needs a narrow window WITHOUT moving the
+  // clock - collapsing the two would let a caller silently bypass the minimum
+  // notice period by asking about a window that starts in the future.
+  const now = clock ? new Date(clock) : new Date();
+  const from = windowStart ? new Date(windowStart) : now;
   const span = Math.min(Math.max(Number(days) || 14, 1), MAX_DAYS_AHEAD);
   const to = new Date(from.getTime() + span * 86400000);
 
@@ -112,7 +120,7 @@ async function listAvailability({ environment = runtimeEnvironment(), days = 14,
   ]);
 
   const slots = computeSlots({
-    rules, blocked, busy, taken, from, to, now: from, minNoticeMinutes: MIN_NOTICE_MINUTES
+    rules, blocked, busy, taken, from, to, now, minNoticeMinutes: MIN_NOTICE_MINUTES
   });
   return { environment, from: from.toISOString(), to: to.toISOString(), slots, rules_configured: rules.length };
 }

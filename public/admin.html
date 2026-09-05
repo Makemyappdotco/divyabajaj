@@ -143,34 +143,45 @@
   .pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 
   /* ---- schedule manager ---- */
-  /* 118px is not enough for a time input: the browser renders it as 12-hour
-     with an am/pm and a clock icon, and 74px clipped it to "06:(". */
-  .sched-day{display:grid;grid-template-columns:120px 118px 20px 118px 1fr;gap:10px;align-items:center;
-             padding:11px 0;border-bottom:1px solid var(--line-soft)}
+  .sched-scope{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;
+               padding:9px 13px;margin-bottom:12px}
+  .sched-scope b{color:var(--gold-d)}
+  .sched-presets{display:flex;gap:7px;flex-wrap:wrap;align-items:center;font-size:12px;
+                 color:var(--ink-3);margin-bottom:6px}
+  .chip{border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;
+        color:var(--ink-2);background:var(--surface);transition:border-color .13s,color .13s}
+  .chip:hover{border-color:var(--gold-l);color:var(--gold-d)}
+
+  .sched-day{padding:13px 0;border-bottom:1px solid var(--line-soft)}
   .sched-day:last-of-type{border-bottom:0}
-  .sched-day.off .sched-times{opacity:.35;pointer-events:none}
-  .sched-toggle{display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer;user-select:none}
-  .sched-toggle input{width:34px;height:19px;appearance:none;background:var(--surface-2);border:1px solid var(--line);
+  .sched-day.off .sched-body{opacity:.32;pointer-events:none}
+  .sched-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .sched-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;cursor:pointer;user-select:none}
+  .sched-toggle input{width:36px;height:20px;appearance:none;background:var(--surface-2);border:1px solid var(--line);
     border-radius:20px;position:relative;cursor:pointer;flex:none;transition:background .16s,border-color .16s}
-  .sched-toggle input::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+  .sched-toggle input::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
     background:var(--ink-3);transition:transform .16s,background .16s}
   .sched-toggle input:checked{background:var(--gold-l);border-color:var(--gold)}
-  .sched-toggle input:checked::after{transform:translateX(15px);background:#fff}
-  .sched-times{display:contents}
-  .sched-day input[type=time],.sched-day select,.sched-day input[type=number]{
-    background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+  .sched-toggle input:checked::after{transform:translateX(16px);background:#fff}
+  .sched-copy{font-size:11.5px;color:var(--ink-3);border:1px solid transparent;border-radius:6px;padding:4px 9px}
+  .sched-copy:hover{color:var(--gold-d);border-color:var(--line)}
+  .sched-day.off .sched-copy{visibility:hidden}
+
+  .sched-fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+  .sf{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .sf span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  .sf input,.sf select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
     font:inherit;font-size:13px;color:var(--ink);width:100%;font-variant-numeric:tabular-nums}
-  .sched-day input:focus,.sched-day select:focus{outline:2px solid var(--gold-l);outline-offset:1px}
-  .sched-dash{text-align:center;color:var(--ink-3)}
-  .sched-extra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--ink-3)}
-  .sched-extra label{display:flex;align-items:center;gap:5px;white-space:nowrap}
-  .sched-extra input,.sched-extra select{width:78px}
-  @media (max-width:760px){
-    .sched-day{grid-template-columns:1fr 1fr;gap:8px}
-    .sched-toggle{grid-column:1/-1}
-    .sched-dash{display:none}
-    .sched-extra{grid-column:1/-1}
+  .sf input:focus,.sf select:focus{outline:2px solid var(--gold-l);outline-offset:1px;border-color:var(--gold-l)}
+  /* The result of the four fields above, spelled out. Divya should never have
+     to imagine what her settings produce. */
+  .sched-preview{font-size:12.5px;color:var(--gold-d);margin-top:9px;font-variant-numeric:tabular-nums}
+  .sched-preview.bad{color:var(--danger)}
+  @media (max-width:820px){
+    .sched-fields{grid-template-columns:1fr 1fr}
+    .sf:last-child{grid-column:1/-1}
   }
+
   .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 15px;
        font-size:13px;color:var(--ink);transition:border-color .13s,background .13s}
   .btn:hover{border-color:var(--gold-l)}
@@ -179,7 +190,7 @@
   .btn.quiet{color:var(--ink-3);border-color:transparent}
   .btn.quiet:hover{color:var(--danger);border-color:var(--danger)}
   .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  .btn-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:18px}
   .save-note{font-size:12.5px;color:var(--ink-3)}
   .save-note.ok{color:var(--gold-d)}
   .save-note.bad{color:var(--danger)}
@@ -621,38 +632,110 @@
 
   var DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+  /**
+   * Live preview of what one row actually produces. Divya was being asked to
+   * imagine the result of four fields; now she just reads it.
+   */
+  function previewTimes(from, to, length, cap) {
+    var parse = function (v) { var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; };
+    var open = parse(from), close = parse(to), n = Number(length) || 60;
+    if (open == null || close == null || close <= open || n <= 0) return { text: 'set a valid start and end', bad: true };
+    var times = [];
+    for (var t = open; t + n <= close; t += n) {
+      if (cap && times.length >= cap) break;
+      var h = Math.floor(t / 60), m = t % 60;
+      var ampm = h >= 12 ? 'pm' : 'am', h12 = h % 12 === 0 ? 12 : h % 12;
+      times.push(h12 + (m ? ':' + String(m).padStart(2, '0') : '') + ' ' + ampm);
+    }
+    if (!times.length) return { text: 'too short for one ' + n + ' minute call', bad: true };
+    return { text: times.join(', ') + '  ·  ' + times.length + ' slot' + (times.length > 1 ? 's' : ''), bad: false };
+  }
+
   function scheduleCard(sched) {
     var rows = sched.week.map(function (day) {
+      var p = previewTimes(day.start_time, day.end_time, day.slot_duration_minutes, day.max_bookings);
       return '<div class="sched-day' + (day.is_active ? '' : ' off') + '" data-weekday="' + day.weekday + '">' +
-        '<label class="sched-toggle"><input type="checkbox" class="s-on"' + (day.is_active ? ' checked' : '') + '>' +
-          esc(DAY_LABELS[day.weekday]) + '</label>' +
-        '<div class="sched-times">' +
-          '<input type="time" class="s-from" value="' + esc(day.start_time) + '">' +
-          '<div class="sched-dash">to</div>' +
-          '<input type="time" class="s-to" value="' + esc(day.end_time) + '">' +
-          '<div class="sched-extra">' +
-            '<label>call <select class="s-len">' +
+        '<div class="sched-head">' +
+          '<label class="sched-toggle"><input type="checkbox" class="s-on"' + (day.is_active ? ' checked' : '') + '>' +
+            '<span>' + esc(DAY_LABELS[day.weekday]) + '</span></label>' +
+          '<button class="sched-copy" data-copy="' + day.weekday + '" title="Use these settings for every day that is switched on">Copy to all</button>' +
+        '</div>' +
+        '<div class="sched-body">' +
+          '<div class="sched-fields">' +
+            '<label class="sf"><span>From</span><input type="time" class="s-from" value="' + esc(day.start_time) + '"></label>' +
+            '<label class="sf"><span>Until</span><input type="time" class="s-to" value="' + esc(day.end_time) + '"></label>' +
+            '<label class="sf"><span>Each call</span><select class="s-len">' +
               [30, 45, 60, 90, 120].map(function (m) {
-                return '<option value="' + m + '"' + (Number(day.slot_duration_minutes) === m ? ' selected' : '') + '>' + m + 'm</option>';
+                return '<option value="' + m + '"' + (Number(day.slot_duration_minutes) === m ? ' selected' : '') + '>' + m + ' min</option>';
               }).join('') + '</select></label>' +
-            '<label>break <select class="s-gap">' +
+            '<label class="sf"><span>Gap after</span><select class="s-gap">' +
               [0, 10, 15, 30].map(function (m) {
-                return '<option value="' + m + '"' + (Number(day.buffer_after_minutes) === m ? ' selected' : '') + '>' + m + 'm</option>';
+                return '<option value="' + m + '"' + (Number(day.buffer_after_minutes) === m ? ' selected' : '') + '>' +
+                  (m === 0 ? 'none' : m + ' min') + '</option>';
               }).join('') + '</select></label>' +
-            '<label>max <input type="number" class="s-cap" min="1" max="20" placeholder="any" value="' +
-              (day.max_bookings == null ? '' : esc(day.max_bookings)) + '"></label>' +
+            '<label class="sf"><span>Limit per day</span><select class="s-cap">' +
+              ['', 1, 2, 3, 4, 5, 6, 8, 10].map(function (v) {
+                var label = v === '' ? 'no limit' : v + ' call' + (v > 1 ? 's' : '');
+                var chosen = String(day.max_bookings == null ? '' : day.max_bookings) === String(v);
+                return '<option value="' + v + '"' + (chosen ? ' selected' : '') + '>' + label + '</option>';
+              }).join('') + '</select></label>' +
           '</div>' +
+          '<div class="sched-preview' + (p.bad ? ' bad' : '') + '">' + esc(p.text) + '</div>' +
         '</div></div>';
     }).join('');
 
     return '<div class="card">' +
-      '<div class="section-head"><div class="section-title">Weekly hours</div>' +
-      '<div class="section-note">India Standard Time' + (sched.configured ? '' : ' &middot; nothing published yet') + '</div></div>' +
+      '<div class="section-head"><div class="section-title">When Divya takes calls</div>' +
+      '<div class="section-note">India Standard Time</div></div>' +
+      '<div class="sched-scope">These hours control <b>' + esc(sched.environment_label) + '</b>.</div>' +
+      '<div class="sched-presets">Quick start:' +
+        '<button class="chip" data-preset="weekday-eve">Weekday evenings</button>' +
+        '<button class="chip" data-preset="weekend-morning">Weekend mornings</button>' +
+        '<button class="chip" data-preset="everyday-eve">Every evening</button>' +
+        '<button class="chip" data-preset="clear">Clear all</button>' +
+      '</div>' +
       rows +
       '<div class="btn-row"><button class="btn primary" id="saveHours">Save hours</button>' +
-      '<span class="save-note" id="hoursNote">Customers can book from ' +
-        Math.round(sched.min_notice_minutes / 60) + 'h ahead. A slot is held ' + sched.hold_minutes + ' minutes while they pay.</span></div>' +
-      '</div>';
+      '<span class="save-note" id="hoursNote">Nobody can book less than ' +
+        Math.round(sched.min_notice_minutes / 60) + 'h ahead. A slot is held ' + sched.hold_minutes +
+        ' minutes while they pay.</span></div></div>';
+  }
+
+  var PRESETS = {
+    'weekday-eve':     { days: [1, 2, 3, 4, 5], from: '18:00', to: '21:00' },
+    'weekend-morning': { days: [0, 6],          from: '10:00', to: '13:00' },
+    'everyday-eve':    { days: [0, 1, 2, 3, 4, 5, 6], from: '18:00', to: '21:00' },
+    'clear':           { days: [],              from: '18:00', to: '20:00' }
+  };
+
+  function rowOf(weekday) { return document.querySelector('.sched-day[data-weekday="' + weekday + '"]'); }
+
+  function paintPreview(row) {
+    var out = row.querySelector('.sched-preview');
+    var cap = row.querySelector('.s-cap').value;
+    var p = previewTimes(
+      row.querySelector('.s-from').value, row.querySelector('.s-to').value,
+      row.querySelector('.s-len').value, cap === '' ? null : Number(cap)
+    );
+    out.textContent = p.text;
+    out.classList.toggle('bad', p.bad);
+  }
+
+  function readWeek() {
+    return Array.prototype.map.call(document.querySelectorAll('.sched-day'), function (row) {
+      var pick = function (sel) { return row.querySelector(sel); };
+      var cap = pick('.s-cap').value;
+      return {
+        weekday: Number(row.getAttribute('data-weekday')),
+        is_active: pick('.s-on').checked,
+        start_time: pick('.s-from').value,
+        end_time: pick('.s-to').value,
+        slot_duration_minutes: Number(pick('.s-len').value),
+        buffer_after_minutes: Number(pick('.s-gap').value),
+        buffer_before_minutes: 0,
+        max_bookings: cap === '' ? null : Number(cap)
+      };
+    });
   }
 
   function blocksCard(sched) {
@@ -706,22 +789,6 @@
       '<span class="save-note">Needs the Google project set up first.</span></div></div>';
   }
 
-  function readWeek() {
-    return Array.prototype.map.call(document.querySelectorAll('.sched-day'), function (row) {
-      var pick = function (sel) { return row.querySelector(sel); };
-      return {
-        weekday: Number(row.getAttribute('data-weekday')),
-        is_active: pick('.s-on').checked,
-        start_time: pick('.s-from').value,
-        end_time: pick('.s-to').value,
-        slot_duration_minutes: Number(pick('.s-len').value),
-        buffer_after_minutes: Number(pick('.s-gap').value),
-        buffer_before_minutes: 0,
-        max_bookings: pick('.s-cap').value === '' ? null : Number(pick('.s-cap').value)
-      };
-    });
-  }
-
   function note(id, kind, text) {
     var el = $(id);
     if (!el) return;
@@ -730,9 +797,55 @@
   }
 
   function wireSchedule() {
-    document.querySelectorAll('.sched-day .s-on').forEach(function (box) {
-      box.addEventListener('change', function () {
-        box.closest('.sched-day').classList.toggle('off', !box.checked);
+    document.querySelectorAll('.sched-day').forEach(function (row) {
+      row.querySelector('.s-on').addEventListener('change', function (e) {
+        row.classList.toggle('off', !e.target.checked);
+      });
+      // Every field repaints the preview, so the result of a change is visible
+      // the moment it is made rather than after a save.
+      ['.s-from', '.s-to', '.s-len', '.s-cap'].forEach(function (sel) {
+        row.querySelector(sel).addEventListener('input', function () { paintPreview(row); });
+        row.querySelector(sel).addEventListener('change', function () { paintPreview(row); });
+      });
+    });
+
+    // Copy one day's settings onto every day that is switched on. This is the
+    // difference between setting up a week in four clicks and in twenty-eight.
+    document.querySelectorAll('[data-copy]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var source = rowOf(Number(button.getAttribute('data-copy')));
+        var values = ['.s-from', '.s-to', '.s-len', '.s-gap', '.s-cap'].map(function (sel) {
+          return source.querySelector(sel).value;
+        });
+        var copied = 0;
+        document.querySelectorAll('.sched-day').forEach(function (row) {
+          if (row === source || !row.querySelector('.s-on').checked) return;
+          ['.s-from', '.s-to', '.s-len', '.s-gap', '.s-cap'].forEach(function (sel, i) {
+            row.querySelector(sel).value = values[i];
+          });
+          paintPreview(row);
+          copied++;
+        });
+        note('hoursNote', copied ? 'ok' : 'bad', copied
+          ? 'Copied to ' + copied + ' other open day' + (copied > 1 ? 's' : '') + '. Save to apply.'
+          : 'No other days are switched on to copy to.');
+      });
+    });
+
+    document.querySelectorAll('[data-preset]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var preset = PRESETS[button.getAttribute('data-preset')];
+        document.querySelectorAll('.sched-day').forEach(function (row) {
+          var on = preset.days.indexOf(Number(row.getAttribute('data-weekday'))) >= 0;
+          row.querySelector('.s-on').checked = on;
+          row.classList.toggle('off', !on);
+          if (on) {
+            row.querySelector('.s-from').value = preset.from;
+            row.querySelector('.s-to').value = preset.to;
+          }
+          paintPreview(row);
+        });
+        note('hoursNote', 'ok', 'Filled in. Adjust anything, then save.');
       });
     });
 

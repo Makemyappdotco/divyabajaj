@@ -1,6 +1,6 @@
 // Run against the local harness in /tmp/bookpreview (node server.js). Each suite
 // resets the harness first, so they are order independent.
-const B = 'http://127.0.0.1:4402/api/booking';
+const B = 'http://127.0.0.1:4403/api/booking';
 const post = (p, body) => fetch(B + p, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
   .then(async r => ({ status: r.status, body: await r.json() }));
 const get = p => fetch(B + p).then(r => r.json());
@@ -8,7 +8,7 @@ let pass = 0, fail = 0;
 const check = (label, ok, detail='') => { ok ? pass++ : fail++; console.log(`${ok?'PASS':'FAIL'}  ${label}${ok?'':'  <- '+detail}`); };
 
 (async () => {
-  await fetch('http://127.0.0.1:4402/__reset',{method:'POST'});
+  await fetch('http://127.0.0.1:4403/__reset',{method:'POST'});
   const avail = await get('/availability?days=21');
   const day = avail.days[2];
   const slot = day.slots[0];
@@ -52,7 +52,7 @@ const check = (label, ok, detail='') => { ok ? pass++ : fail++; console.log(`${o
   console.log('\n--- tampering ---');
   const tampered = await post('/book', {
     hold_id: winner.hold_id, slot_key: 'i-made-this-up',
-    name:'Hacker', phone:'9999999999', email:'h@x.com', dob:'1990-01-01', pob:'X'
+    name:'Hacker', phone:'9999999999', email:'h@x.com', dob:'1990-01-01', pob:'Delhi'
   });
   check('a slot_key that does not match the hold is rejected', tampered.status === 409, JSON.stringify(tampered.body));
 
@@ -67,6 +67,29 @@ const check = (label, ok, detail='') => { ok ? pass++ : fail++; console.log(`${o
 
   const noHold = await post('/book', { name:'Someone', phone:'9876543210', email:'a@b.com', dob:'1990-01-01', pob:'Delhi' });
   check('booking with no hold at all is rejected', noHold.status === 400, JSON.stringify(noHold.body));
+
+  console.log('\n--- optional fields left blank (the bug that broke the first live booking) ---');
+  const blankDay = (await get('/availability?days=21')).days.find(d => d.slots.length);
+  const bslot = blankDay.slots[0];
+  const bh = await post('/hold', { slot_key: bslot.slot_key, starts_at: bslot.starts_at, ends_at: bslot.ends_at });
+  const blank = await post('/book', {
+    hold_id: bh.body.hold_id, slot_key: bslot.slot_key,
+    name: 'No Question', phone: '9700000000', email: 'nq@x.com',
+    dob: '1991-02-03', pob: 'Delhi'
+    // question and tob deliberately absent - both optional in the form
+  });
+  check('booking succeeds with no question and no time of birth', blank.status === 200, JSON.stringify(blank.body));
+
+  console.log('\n--- required fields the browser checks must also be checked here ---');
+  const d2 = (await get('/availability?days=21')).days.find(d => d.slots.length);
+  const s2 = d2.slots[0];
+  const h2 = await post('/hold', { slot_key: s2.slot_key, starts_at: s2.starts_at, ends_at: s2.ends_at });
+  const noDob = await post('/book', { hold_id: h2.body.hold_id, slot_key: s2.slot_key,
+    name: 'No Dob', phone: '9700000001', email: 'nd@x.com', pob: 'Delhi' });
+  check('a missing date of birth is a message, not a 500', noDob.status === 400 && /date of birth/i.test(noDob.body.error), JSON.stringify(noDob.body));
+  const noPob = await post('/book', { hold_id: h2.body.hold_id, slot_key: s2.slot_key,
+    name: 'No Pob', phone: '9700000002', email: 'np@x.com', dob: '1991-02-03' });
+  check('a missing place of birth is a message, not a 500', noPob.status === 400 && /place of birth/i.test(noPob.body.error), JSON.stringify(noPob.body));
 
   console.log('\n--- unknown / stale hold ---');
   const ghost = await post('/book', { hold_id:'hold_doesnotexist', slot_key: slot.slot_key, name:'Ghost', phone:'9876543210', email:'g@x.com', dob:'1990-01-01', pob:'Delhi' });

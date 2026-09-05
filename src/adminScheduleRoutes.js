@@ -212,7 +212,8 @@ router.post('/block', handle('block', async (req, res) => {
   const insert = await supabase.from('blocked_dates').insert({
     id: id('blk'), environment,
     starts_at: from.toISOString(), ends_at: to.toISOString(),
-    reason: String((req.body && req.body.reason) || '').trim().slice(0, 200) || null,
+    // NOT NULL with a '' default, so an omitted reason must be '' not null.
+    reason: String((req.body && req.body.reason) || '').trim().slice(0, 200),
     source: 'admin', created_at: now()
   }).select().single();
   if (insert.error) throw new Error(insert.error.message);

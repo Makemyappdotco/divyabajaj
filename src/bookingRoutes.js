@@ -187,9 +187,17 @@ router.post('/book', handle('book', async (req, res) => {
   const slotKey = cleanText(body.slot_key, 100);
 
   if (!holdId || !slotKey) return fail(res, 400, 'Your slot reservation expired. Please pick a slot again.');
+  const dob = cleanText(body.dob, 20);
+  const pob = cleanText(body.pob, 200);
+
   if (name.length < 2) return fail(res, 400, 'Please enter your name.');
   if (!phone) return fail(res, 400, 'Please enter a valid WhatsApp number.');
   if (!email) return fail(res, 400, 'Please enter a valid email address.');
+  // leads.dob is NOT NULL with no default, so a missing one is a 500 rather
+  // than a message. It was only ever checked in the browser, which is not a
+  // check at all for anything that posts directly.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return fail(res, 400, 'Please enter your date of birth.');
+  if (pob.length < 2) return fail(res, 400, 'Please enter your place of birth.');
 
   // The hold is the authority on what is being booked - not the request body -
   // so a tampered slot_key cannot move the appointment to a different time.
@@ -204,9 +212,9 @@ router.post('/book', handle('book', async (req, res) => {
 
   const lead = await db.createLead({
     name, phone, email,
-    dob: cleanText(body.dob, 20) || null,
+    dob,
     tob: cleanText(body.tob, 20),
-    pob: cleanText(body.pob, 200),
+    pob,
     question: cleanText(body.question, 1000),
     source: 'consultation_booking',
     utm_source: cleanText(body.utm_source, 100),

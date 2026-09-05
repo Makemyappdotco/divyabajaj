@@ -175,9 +175,12 @@ async function recordStatus(appointmentId, fromStatus, toStatus, reason, changed
   const { error } = await client().from('appointment_status_history').insert({
     id: id('apst'),
     appointment_id: appointmentId,
-    from_status: fromStatus,
+    // Both NOT NULL with '' defaults. The first record of an appointment has no
+    // previous status, and most transitions carry no reason, so both were being
+    // written as null - which meant every audit row was silently rejected.
+    from_status: fromStatus || '',
     to_status: toStatus,
-    reason: reason || null,
+    reason: reason || '',
     changed_by: changedBy,
     created_at: now()
   });
@@ -206,7 +209,10 @@ async function createAppointment({
     timezone_id: timezoneId,
     mode,
     status: 'pending_payment',
-    customer_question: question || null,
+    // '' not null: customer_question is NOT NULL in the schema (default ''),
+    // so writing null when the optional question is left blank fails the whole
+    // insert. This is what broke the first real booking.
+    customer_question: question || '',
     created_at: now(),
     updated_at: now()
   };

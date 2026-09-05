@@ -142,6 +142,53 @@
   .pill.bad{color:var(--danger);border-color:var(--danger)}
   .pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
 
+  /* ---- schedule manager ---- */
+  /* 118px is not enough for a time input: the browser renders it as 12-hour
+     with an am/pm and a clock icon, and 74px clipped it to "06:(". */
+  .sched-day{display:grid;grid-template-columns:120px 118px 20px 118px 1fr;gap:10px;align-items:center;
+             padding:11px 0;border-bottom:1px solid var(--line-soft)}
+  .sched-day:last-of-type{border-bottom:0}
+  .sched-day.off .sched-times{opacity:.35;pointer-events:none}
+  .sched-toggle{display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer;user-select:none}
+  .sched-toggle input{width:34px;height:19px;appearance:none;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:20px;position:relative;cursor:pointer;flex:none;transition:background .16s,border-color .16s}
+  .sched-toggle input::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+    background:var(--ink-3);transition:transform .16s,background .16s}
+  .sched-toggle input:checked{background:var(--gold-l);border-color:var(--gold)}
+  .sched-toggle input:checked::after{transform:translateX(15px);background:#fff}
+  .sched-times{display:contents}
+  .sched-day input[type=time],.sched-day select,.sched-day input[type=number]{
+    background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 8px;
+    font:inherit;font-size:13px;color:var(--ink);width:100%;font-variant-numeric:tabular-nums}
+  .sched-day input:focus,.sched-day select:focus{outline:2px solid var(--gold-l);outline-offset:1px}
+  .sched-dash{text-align:center;color:var(--ink-3)}
+  .sched-extra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--ink-3)}
+  .sched-extra label{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .sched-extra input,.sched-extra select{width:78px}
+  @media (max-width:760px){
+    .sched-day{grid-template-columns:1fr 1fr;gap:8px}
+    .sched-toggle{grid-column:1/-1}
+    .sched-dash{display:none}
+    .sched-extra{grid-column:1/-1}
+  }
+  .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 15px;
+       font-size:13px;color:var(--ink);transition:border-color .13s,background .13s}
+  .btn:hover{border-color:var(--gold-l)}
+  .btn.primary{background:var(--ink);color:var(--surface);border-color:var(--ink);font-weight:600}
+  .btn.primary:hover{opacity:.88}
+  .btn.quiet{color:var(--ink-3);border-color:transparent}
+  .btn.quiet:hover{color:var(--danger);border-color:var(--danger)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:16px}
+  .save-note{font-size:12.5px;color:var(--ink-3)}
+  .save-note.ok{color:var(--gold-d)}
+  .save-note.bad{color:var(--danger)}
+  .block-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13px}
+  .block-row:last-child{border-bottom:0}
+  .block-add{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
+  .block-add .f{display:flex;flex-direction:column;gap:4px}
+  .block-add label{font-size:11.5px;color:var(--ink-3)}
+  .block-add input{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-size:13px;color:var(--ink)}
   .empty{text-align:center;padding:42px 20px;color:var(--ink-3);font-size:13px}
   .empty strong{display:block;font-family:var(--serif);color:var(--ink-2);font-size:16px;margin-bottom:6px;font-weight:600}
   .err{background:var(--surface);border:1px solid var(--danger);color:var(--danger);padding:12px 15px;border-radius:10px;font-size:13px;margin-bottom:14px}
@@ -283,6 +330,31 @@
     return isFinite(d.getTime())
       ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : '';
+  }
+
+  /**
+   * Writes to /api/admin/schedule. Kept separate from api() so it is obvious at
+   * every call site which requests can change something.
+   */
+  function apiWrite(path, method, body) {
+    return fetch('/api/admin/schedule' + path + '?environment=' + encodeURIComponent(state.environment), {
+      method: method,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (response) {
+      return response.text().then(function (raw) {
+        var parsed;
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch (e) { parsed = { error: raw }; }
+        if (!response.ok) throw new Error(parsed.error || ('Request failed (' + response.status + ')'));
+        return parsed;
+      });
+    });
+  }
+
+  function apiSchedule() {
+    return fetch('/api/admin/schedule?environment=' + encodeURIComponent(state.environment),
+      { headers: { Accept: 'application/json' }, cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); });
   }
 
   function api(path, params) {
@@ -545,7 +617,202 @@
     }).catch(function (error) { view.innerHTML = head + fail(error.message); });
   }
 
+  /* ---------------- schedule manager ---------------- */
+
+  var DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  function scheduleCard(sched) {
+    var rows = sched.week.map(function (day) {
+      return '<div class="sched-day' + (day.is_active ? '' : ' off') + '" data-weekday="' + day.weekday + '">' +
+        '<label class="sched-toggle"><input type="checkbox" class="s-on"' + (day.is_active ? ' checked' : '') + '>' +
+          esc(DAY_LABELS[day.weekday]) + '</label>' +
+        '<div class="sched-times">' +
+          '<input type="time" class="s-from" value="' + esc(day.start_time) + '">' +
+          '<div class="sched-dash">to</div>' +
+          '<input type="time" class="s-to" value="' + esc(day.end_time) + '">' +
+          '<div class="sched-extra">' +
+            '<label>call <select class="s-len">' +
+              [30, 45, 60, 90, 120].map(function (m) {
+                return '<option value="' + m + '"' + (Number(day.slot_duration_minutes) === m ? ' selected' : '') + '>' + m + 'm</option>';
+              }).join('') + '</select></label>' +
+            '<label>break <select class="s-gap">' +
+              [0, 10, 15, 30].map(function (m) {
+                return '<option value="' + m + '"' + (Number(day.buffer_after_minutes) === m ? ' selected' : '') + '>' + m + 'm</option>';
+              }).join('') + '</select></label>' +
+            '<label>max <input type="number" class="s-cap" min="1" max="20" placeholder="any" value="' +
+              (day.max_bookings == null ? '' : esc(day.max_bookings)) + '"></label>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+
+    return '<div class="card">' +
+      '<div class="section-head"><div class="section-title">Weekly hours</div>' +
+      '<div class="section-note">India Standard Time' + (sched.configured ? '' : ' &middot; nothing published yet') + '</div></div>' +
+      rows +
+      '<div class="btn-row"><button class="btn primary" id="saveHours">Save hours</button>' +
+      '<span class="save-note" id="hoursNote">Customers can book from ' +
+        Math.round(sched.min_notice_minutes / 60) + 'h ahead. A slot is held ' + sched.hold_minutes + ' minutes while they pay.</span></div>' +
+      '</div>';
+  }
+
+  function blocksCard(sched) {
+    var rows = sched.blocked.length
+      ? sched.blocked.map(function (b) {
+          return '<div class="block-row"><span>' + esc(exactWhen(b.starts_at)) + ' &rarr; ' + esc(exactWhen(b.ends_at)) + '</span>' +
+            (b.reason ? '<span class="dim">' + esc(b.reason) + '</span>' : '') +
+            '<button class="btn quiet" data-unblock="' + esc(b.id) + '" style="margin-left:auto">Remove</button></div>';
+        }).join('')
+      : '<div class="dim" style="font-size:13px;padding:6px 0">Nothing blocked. Add a holiday or a day off below.</div>';
+
+    return '<div class="card" style="margin-top:14px">' +
+      '<div class="section-head"><div class="section-title">Time off</div>' +
+      '<div class="section-note">holidays, travel, anything that overrides the weekly hours</div></div>' +
+      rows +
+      '<div class="block-add">' +
+        '<div class="f"><label for="blkFrom">From</label><input type="date" id="blkFrom"></div>' +
+        '<div class="f"><label for="blkTo">To (inclusive)</label><input type="date" id="blkTo"></div>' +
+        '<div class="f"><label for="blkWhy">Reason</label><input type="text" id="blkWhy" placeholder="optional"></div>' +
+        '<button class="btn" id="addBlock">Block these dates</button>' +
+      '</div><div class="save-note" id="blockNote" style="margin-top:9px"></div></div>';
+  }
+
+  function upcomingCard(sched) {
+    if (!sched.upcoming.length) {
+      return '<div class="card" style="margin-top:14px">' +
+        '<div class="section-head"><div class="section-title">Upcoming calls</div></div>' +
+        '<div class="dim" style="font-size:13px">Nothing booked yet.</div></div>';
+    }
+    var rows = sched.upcoming.map(function (a) {
+      var lead = a.lead || {};
+      return '<tr><td>' + esc(lead.name || '—') +
+        (lead.phone ? '<div class="dim" style="font-size:11.5px">' + esc(lead.phone) + '</div>' : '') + '</td>' +
+        '<td class="nowrap">' + esc(exactWhen(a.starts_at)) + '</td>' +
+        '<td><span class="pill ' + (a.status === 'confirmed' ? 'ok' : '') + '">' + esc(a.status.replace(/_/g, ' ')) + '</span></td>' +
+        '<td style="font-size:12px">' + esc((a.customer_question || '').slice(0, 90)) + '</td>' +
+        '<td style="text-align:right"><button class="btn quiet" data-cancel="' + esc(a.id) + '">Cancel</button></td></tr>';
+    }).join('');
+    return '<div class="card" style="padding:0;margin-top:14px"><div class="t-wrap"><table>' +
+      '<thead><tr><th>Customer</th><th>When</th><th>Status</th><th>Question</th><th></th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></div>';
+  }
+
+  function calendarCard(sched) {
+    return '<div class="card" style="margin-top:14px">' +
+      '<div class="section-head"><div class="section-title">Google Calendar</div>' +
+      '<div class="section-note">' + (sched.calendar_connected ? 'connected' : 'not connected') + '</div></div>' +
+      '<div class="dim" style="font-size:13px;line-height:1.6">' + esc(sched.calendar_note) +
+      ' Once it is, every booking lands in Divya\'s calendar with a Google Meet link, and anything already in her calendar blocks that time automatically.</div>' +
+      '<div class="btn-row"><button class="btn" disabled>Connect Google Calendar</button>' +
+      '<span class="save-note">Needs the Google project set up first.</span></div></div>';
+  }
+
+  function readWeek() {
+    return Array.prototype.map.call(document.querySelectorAll('.sched-day'), function (row) {
+      var pick = function (sel) { return row.querySelector(sel); };
+      return {
+        weekday: Number(row.getAttribute('data-weekday')),
+        is_active: pick('.s-on').checked,
+        start_time: pick('.s-from').value,
+        end_time: pick('.s-to').value,
+        slot_duration_minutes: Number(pick('.s-len').value),
+        buffer_after_minutes: Number(pick('.s-gap').value),
+        buffer_before_minutes: 0,
+        max_bookings: pick('.s-cap').value === '' ? null : Number(pick('.s-cap').value)
+      };
+    });
+  }
+
+  function note(id, kind, text) {
+    var el = $(id);
+    if (!el) return;
+    el.className = 'save-note' + (kind ? ' ' + kind : '');
+    el.textContent = text;
+  }
+
+  function wireSchedule() {
+    document.querySelectorAll('.sched-day .s-on').forEach(function (box) {
+      box.addEventListener('change', function () {
+        box.closest('.sched-day').classList.toggle('off', !box.checked);
+      });
+    });
+
+    $('saveHours').addEventListener('click', function () {
+      var button = $('saveHours');
+      button.disabled = true;
+      note('hoursNote', '', 'Saving…');
+      apiWrite('/hours', 'PUT', { week: readWeek() })
+        .then(function (d) {
+          note('hoursNote', 'ok', d.active_days
+            ? 'Saved. ' + d.active_days + ' day' + (d.active_days > 1 ? 's' : '') + ' open for booking.'
+            : 'Saved. No days are open, so the booking page will say booking opens shortly.');
+        })
+        .catch(function (e) { note('hoursNote', 'bad', e.message); })
+        .then(function () { button.disabled = false; });
+    });
+
+    $('addBlock').addEventListener('click', function () {
+      var from = $('blkFrom').value, to = $('blkTo').value;
+      if (!from || !to) return note('blockNote', 'bad', 'Pick both dates.');
+      // "To" is inclusive in Divya's head, so the range runs to the END of that
+      // day rather than to midnight at its start.
+      apiWrite('/block', 'POST', {
+        starts_at: from + 'T00:00:00+05:30',
+        ends_at: to + 'T23:59:59+05:30',
+        reason: $('blkWhy').value
+      })
+        .then(function (d) {
+          if (d.warning) { note('blockNote', 'bad', d.warning); setTimeout(renderConsultations, 2600); }
+          else renderConsultations();
+        })
+        .catch(function (e) { note('blockNote', 'bad', e.message); });
+    });
+
+    document.querySelectorAll('[data-unblock]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        apiWrite('/block/' + button.getAttribute('data-unblock'), 'DELETE')
+          .then(renderConsultations)
+          .catch(function (e) { note('blockNote', 'bad', e.message); });
+      });
+    });
+
+    document.querySelectorAll('[data-cancel]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        // Deliberately two taps rather than a confirm() dialog: a native dialog
+        // inside an iframe-able admin page is easy to mis-tap on a phone.
+        if (button.getAttribute('data-armed') !== '1') {
+          button.setAttribute('data-armed', '1');
+          button.textContent = 'Tap again to cancel';
+          setTimeout(function () {
+            button.removeAttribute('data-armed');
+            button.textContent = 'Cancel';
+          }, 4000);
+          return;
+        }
+        button.disabled = true;
+        apiWrite('/appointment/' + button.getAttribute('data-cancel') + '/cancel', 'POST', { reason: 'cancelled from the admin panel' })
+          .then(renderConsultations)
+          .catch(function (e) { button.disabled = false; alert(e.message); });
+      });
+    });
+  }
+
   function renderConsultations() {
+    view.innerHTML = loading(3);
+    Promise.all([api('consultations'), apiSchedule()]).then(function (both) {
+      var d = both[0], sched = both[1];
+      var html = '<div class="grid tiles">' +
+        tile('Upcoming', num(d.upcoming), 'scheduled ahead') +
+        tile('Completed', num(d.past), 'already happened') +
+        tile('Held slots', num(d.active_holds), 'awaiting payment') +
+        '</div>' +
+        '<div style="margin-top:14px">' + scheduleCard(sched) + '</div>' +
+        blocksCard(sched) + upcomingCard(sched) + calendarCard(sched);
+      view.innerHTML = html;
+      wireSchedule();
+    }).catch(function (error) { view.innerHTML = fail(error.message); });
+  }
+
+  function renderConsultationsLegacy() {
     view.innerHTML = loading(3);
     api('consultations').then(function (d) {
       var html = '<div class="grid tiles">' +

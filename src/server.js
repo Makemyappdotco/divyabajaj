@@ -13,6 +13,7 @@ const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const adminRoutes = require('./adminRoutes');
 const bookingRoutes = require('./bookingRoutes');
+const adminScheduleRoutes = require('./adminScheduleRoutes');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -59,6 +60,7 @@ function sendLandingWithPatches(res) {
   const profileRepairScript = '<script src="/paid-profile-repair.js?v=paid-profile-repair-6"></script>';
   const freeDownloadFixScript = '<script src="/free-download-top-fix.js?v=free-download-position-3"></script>';
   const revealFailsafeScript = '<script src="/reveal-failsafe.js?v=reveal-failsafe-1"></script>';
+  const bookingModalScript = '<script src="/booking-modal.js?v=booking-modal-1"></script>';
 
   html = html.replace(/<script src="\/paid-test-flow\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-v2-live-conversion\.js[^>]*><\/script>/g, '');
@@ -71,9 +73,10 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/free-download-top-fix\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/light-mode-live-fixes\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/reveal-failsafe\.js[^>]*><\/script>/g, '');
+  html = html.replace(/<script src="\/booking-modal\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
-  html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n</body>`);
+  html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n${bookingModalScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -256,6 +259,9 @@ app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
 // admin panel API - read-only, mounted before the general /api routes so its
 // own namespace is unambiguous; shares the same Basic auth
+// schedule WRITES live in their own module so adminRoutes stays read-only;
+// mounted first so /schedule is not swallowed by the analytics router
+app.use('/api/admin/schedule', adminAuth, adminScheduleRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 

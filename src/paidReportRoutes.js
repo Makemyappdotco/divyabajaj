@@ -24,6 +24,8 @@ const router = express.Router();
 
 const CURRENCY = 'INR';
 const PRODUCT = 'paid_blueprint';
+// Same number the consultation flow and the landing page already use.
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
 
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 function now() { return new Date().toISOString(); }
@@ -77,6 +79,12 @@ function describeMissing(missing) {
  */
 router.get('/config', handle('config', async (req, res) => {
   const price = await pricing.priceOf(PRODUCT);
+  const text = [
+    'Hi Divya, I would like to order the Full Blueprint report.',
+    '',
+    'Please send me the payment link.'
+  ].join('\n');
+
   return res.json({
     success: true,
     amount_inr: price.amount_inr,
@@ -85,6 +93,11 @@ router.get('/config', handle('config', async (req, res) => {
     saving_percent: pricing.savingPercent(price),
     payments_live: razorpay.isConfigured(),
     live_mode: razorpay.isLiveMode(),
+    // Where a customer goes when checkout is not available. Until Razorpay is
+    // approved for live payments, this IS the sales path for the blueprint,
+    // so it must be a way through rather than a dead end - the same handoff
+    // the consultation already falls back to.
+    whatsapp_handoff: `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`,
     // False today. Uomox has no key and there is no email provider.
     can_deliver: delivery.isConfigured(),
     delivery_channels: delivery.channels()

@@ -544,7 +544,10 @@
 
     var config = await loadConfig();
     if (!config.payments_live) {
-      setStatus('Payments are not switched on yet. Please message us and we will take it from there.', 'error');
+      // Not an error state. Until Razorpay is live this is how the blueprint
+      // is actually sold, so the customer gets a way through to Divya with
+      // their details already typed, not a red message and a dead end.
+      showWhatsappFallback(config, payload);
       return;
     }
 
@@ -575,9 +578,55 @@
     }
   }
 
+  /**
+   * Checkout is unavailable, so hand the customer to Divya on WhatsApp with
+   * their birth details already written out. She takes the payment herself and
+   * runs the report from the panel.
+   */
+  function showWhatsappFallback(config, payload) {
+    var lines = [
+      'Hi Divya, I would like to order the Full Blueprint report' +
+        (config.amount_formatted ? ' (' + config.amount_formatted + ')' : '') + '.',
+      '',
+      'Name: ' + payload.name,
+      'Date of birth: ' + payload.dob,
+      'Time of birth: ' + payload.tob,
+      'Place of birth: ' + payload.pob,
+      'Email: ' + payload.email,
+      '',
+      'Main concern: ' + payload.question,
+      '',
+      'Please send me the payment link.'
+    ].join('\n');
+
+    var link = 'https://wa.me/' + String(config.whatsapp_handoff || '')
+      .replace(/^https:\/\/wa\.me\//, '').split('?')[0] + '?text=' + encodeURIComponent(lines);
+
+    var box = qs('#dbpStatus', ensureModal());
+    box.className = 'dbp-status show';
+    box.innerHTML = '';
+
+    var text = document.createElement('div');
+    text.textContent = 'Card payment is being switched on. Send these details to Divya on WhatsApp and she will take it from there personally.';
+    box.appendChild(text);
+
+    var button = document.createElement('a');
+    button.className = 'dbp-download';
+    button.style.cssText = 'display:block;margin-top:12px;text-align:center;text-decoration:none';
+    button.href = link;
+    button.target = '_blank';
+    button.rel = 'noopener';
+    button.textContent = 'Send my details on WhatsApp';
+    box.appendChild(button);
+  }
+
   function defaultSubmitLabel() {
-    var amount = state.config && state.config.amount_formatted;
-    return amount ? 'Pay ' + amount + ' and Generate My Blueprint' : 'Generate My Full Blueprint';
+    var config = state.config || {};
+    var amount = config.amount_formatted;
+    if (!amount) return 'Generate My Full Blueprint';
+    // Do not promise a card payment the site cannot currently take.
+    if (config.payments_live === false) return 'Order My Full Blueprint · ' + amount;
+    return 'Pay ' + amount + ' and Generate My Blueprint';
   }
 
   function openCheckout(order, payload) {

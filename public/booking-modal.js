@@ -142,6 +142,24 @@
 
   // ---------------------------------------------------------------- helpers
 
+  /**
+   * Razorpay's script is loaded only when someone is about to pay, not on every
+   * landing page view. It is a third-party script on the critical path of a
+   * 5.6MB page; nobody who never opens the modal should pay for it.
+   */
+  function loadCheckout() {
+    if (window.Razorpay) return Promise.resolve(true);
+    if (state.checkoutPromise) return state.checkoutPromise;
+    state.checkoutPromise = new Promise(function (resolve, reject) {
+      var tag = document.createElement('script');
+      tag.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      tag.onload = function () { resolve(true); };
+      tag.onerror = function () { state.checkoutPromise = null; reject(new Error('Could not load the payment window.')); };
+      document.head.appendChild(tag);
+    });
+    return state.checkoutPromise;
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -446,29 +464,108 @@
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
       .then(function (d) {
         if (state.tick) clearInterval(state.tick);
-        $('dbmMain').hidden = true;
-        $('dbmDone').hidden = false;
-        $('dbmWhen').textContent = dateOf(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
-        $('dbmNote').textContent = d.next_step === 'payment'
-          ? 'Payment confirmed. Your call is booked and the joining link is on its way to your email and WhatsApp.'
-          : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
-        // Until notifications exist, this is what actually tells Divya a
-        // booking happened. The slot is reserved either way.
-        var wa = $('dbmWa');
-        if (d.whatsapp_handoff) {
-          wa.href = d.whatsapp_handoff;
-          wa.hidden = false;
-          $('dbmWaNote').hidden = false;
-        } else {
-          wa.hidden = true;
-          $('dbmWaNote').hidden = true;
-        }
-        $('dbmBox').scrollTop = 0;
+        // The slot is reserved either way. If payments are on, checkout opens
+        // now; if the customer dismisses it the booking is still held and they
+        // are told how to finish, rather than being dumped back to an empty
+        // screen having lost their slot.
+        if (d.next_step === 'payment') return pay(d);
+        showDone(d);
       })
       .catch(function (err) {
         $('dbmGo').disabled = false;
         $('dbmGo').textContent = 'Confirm this slot';
         msg('bad', err.message || 'Could not complete the booking. Please try again.');
+      });
+  }
+
+  function showDone(d, paid) {
+    $('dbmMain').hidden = true;
+    $('dbmDone').hidden = false;
+    $('dbmDone').querySelector('h3').textContent = paid ? 'Your call is booked' : 'Your slot is reserved';
+    $('dbmWhen').textContent = dateOf(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
+    $('dbmNote').textContent = paid
+      ? 'Payment received. Divya will send the joining link before your call.'
+      : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
+    var wa = $('dbmWa');
+    if (!paid && d.whatsapp_handoff) {
+      wa.href = d.whatsapp_handoff;
+      wa.hidden = false;
+      $('dbmWaNote').hidden = false;
+    } else {
+      wa.hidden = true;
+      $('dbmWaNote').hidden = true;
+    }
+    $('dbmBox').scrollTop = 0;
+  }
+
+  /**
+   * Razorpay Standard Checkout.
+   *
+   * The browser never says what the price is - it sends the appointment id and
+   * the server decides. The three fields Razorpay hands back go to /verify,
+   * which is the only thing that can mark the booking confirmed.
+   */
+  function pay(booking) {
+    $('dbmGo').textContent = 'Opening payment…';
+    return loadCheckout()
+      .then(function () {
+        return fetch(API + '/payment/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ appointment_id: booking.appointment_id })
+        }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); });
+      })
+      .then(function (order) {
+        var checkout = new window.Razorpay({
+          key: order.key_id,
+          amount: order.amount,
+          currency: order.currency,
+          name: order.name,
+          description: order.description,
+          order_id: order.order_id,
+          prefill: order.prefill,
+          theme: { color: '#C9A96E' },
+          handler: function (response) {
+            $('dbmGo').textContent = 'Confirming…';
+            fetch(API + '/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            })
+              .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
+              .then(function () { showDone(booking, true); })
+              .catch(function (err) {
+                // Money may well have left their account, so never imply it did
+                // not. Tell them to talk to a human instead of paying twice.
+                showDone(booking, false);
+                msg('bad', err.message || 'Your payment went through but we could not confirm it here. Please message us and we will sort it out - do not pay again.');
+              });
+          },
+          modal: {
+            ondismiss: function () {
+              // Dismissing is not a failure: the slot is still held.
+              showDone(booking, false);
+            }
+          }
+        });
+
+        checkout.on('payment.failed', function (response) {
+          var reason = (response && response.error && response.error.description) || 'The payment did not go through.';
+          showDone(booking, false);
+          msg('bad', reason + ' Your slot is still held - you can try again from the message below.');
+        });
+
+        checkout.open();
+      })
+      .catch(function (err) {
+        // Could not even open checkout. The booking exists; fall back to the
+        // WhatsApp handoff rather than losing it.
+        showDone(booking, false);
+        msg('bad', err.message || 'Could not open the payment window. Your slot is held - message us to finish.');
       });
   }
 

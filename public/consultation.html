@@ -412,20 +412,8 @@
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
       .then(function (d) {
         if (state.tick) clearInterval(state.tick);
-        show($('flow'), false);
-        show($('doneCard'), true);
-        $('doneWhen').textContent = longDate(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
-        $('doneNote').textContent = d.next_step === 'payment'
-          ? 'Payment confirmed. Your call is booked and the joining link is on its way to your email and WhatsApp.'
-          : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
-        // Until notifications are wired up this is what actually tells Divya a
-        // booking happened; the slot is reserved either way.
-        if (d.whatsapp_handoff) {
-          $('doneWa').href = d.whatsapp_handoff;
-          $('doneWa').hidden = false;
-          $('doneWaNote').hidden = false;
-        }
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (d.next_step === 'payment') return pay(d);
+        showDone(d, false);
       })
       .catch(function (e) {
         $('submit').disabled = false;
@@ -433,6 +421,89 @@
         message($('formMsg'), 'bad', e.message || 'Could not complete the booking. Please try again.');
       });
   });
+
+  function showDone(d, paid) {
+    show($('flow'), false);
+    show($('doneCard'), true);
+    $('doneCard').querySelector('h2').textContent = paid ? 'Your call is booked' : 'Your slot is reserved';
+    $('doneWhen').textContent = longDate(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
+    $('doneNote').textContent = paid
+      ? 'Payment received. Divya will send the joining link before your call.'
+      : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
+    if (!paid && d.whatsapp_handoff) {
+      $('doneWa').href = d.whatsapp_handoff;
+      $('doneWa').hidden = false;
+      $('doneWaNote').hidden = false;
+    } else {
+      $('doneWa').hidden = true;
+      $('doneWaNote').hidden = true;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Loaded only when a payment is actually needed.
+  function loadCheckout() {
+    if (window.Razorpay) return Promise.resolve(true);
+    return new Promise(function (resolve, reject) {
+      var tag = document.createElement('script');
+      tag.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      tag.onload = function () { resolve(true); };
+      tag.onerror = function () { reject(new Error('Could not load the payment window.')); };
+      document.head.appendChild(tag);
+    });
+  }
+
+  /**
+   * The browser never sends a price. It sends the appointment id; the server
+   * looks up what that booking costs.
+   */
+  function pay(booking) {
+    $('submit').textContent = 'Opening payment…';
+    return loadCheckout()
+      .then(function () {
+        return fetch('/api/booking/payment/order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ appointment_id: booking.appointment_id })
+        }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); });
+      })
+      .then(function (order) {
+        var checkout = new window.Razorpay({
+          key: order.key_id, amount: order.amount, currency: order.currency,
+          name: order.name, description: order.description, order_id: order.order_id,
+          prefill: order.prefill, theme: { color: '#B08D4A' },
+          handler: function (response) {
+            fetch('/api/booking/payment/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            })
+              .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
+              .then(function () { showDone(booking, true); })
+              .catch(function (err) {
+                // Money may have moved. Never suggest paying again.
+                showDone(booking, false);
+                message($('formMsg'), 'bad', err.message || 'Your payment went through but we could not confirm it here. Please message us - do not pay again.');
+              });
+          },
+          modal: { ondismiss: function () { showDone(booking, false); } }
+        });
+        checkout.on('payment.failed', function (response) {
+          var reason = (response && response.error && response.error.description) || 'The payment did not go through.';
+          showDone(booking, false);
+          message($('formMsg'), 'bad', reason + ' Your slot is still held.');
+        });
+        checkout.open();
+      })
+      .catch(function (err) {
+        showDone(booking, false);
+        message($('formMsg'), 'bad', err.message || 'Could not open the payment window. Your slot is held - message us to finish.');
+      });
+  }
 
   load();
 })();

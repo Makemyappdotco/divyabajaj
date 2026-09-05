@@ -13,6 +13,7 @@ const routes = require('./routes');
 const publicPaidRoutes = require('./publicPaidRoutes');
 const adminRoutes = require('./adminRoutes');
 const bookingRoutes = require('./bookingRoutes');
+const paymentRoutes = require('./paymentRoutes');
 const adminScheduleRoutes = require('./adminScheduleRoutes');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
@@ -177,6 +178,9 @@ function validateReportInput(req, res, next) {
 }
 
 app.disable('x-powered-by');
+// Razorpay signs the webhook over the exact bytes it sent, so this one route
+// needs the raw body and must be mounted BEFORE the global JSON parser.
+app.post('/api/booking/payment/webhook', express.raw({ type: '*/*', limit: '1mb' }), paymentRoutes);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use('/api', persistentStorageGuard);
@@ -264,6 +268,7 @@ app.get('/api/astrology-v2/kp-access-test', async (req, res) => {
 
 // public booking API - no auth, this is the customer-facing consultation flow
 app.use('/api/booking', bookingRoutes);
+app.use('/api/booking/payment', paymentRoutes);
 app.use('/api', personalBlueprintPreviewRoutes);
 app.use('/api', publicPaidRoutes);
 // admin panel API - read-only, mounted before the general /api routes so its

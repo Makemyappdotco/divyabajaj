@@ -8,10 +8,10 @@
 const express = require('express');
 const store = require('./services/booking/store');
 const db = require('./database');
+const pricing = require('./services/pricing');
 
 const router = express.Router();
 
-const CONSULTATION_FEE_INR = Number(process.env.CONSULTATION_FEE_INR) || 4999;
 const CONSULTATION_MINUTES = Number(process.env.CONSULTATION_MINUTES) || 60;
 const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
 
@@ -94,10 +94,14 @@ router.get('/availability', handle('availability', async (req, res) => {
   // Passing an empty list means availability falls back to Divya's own rules
   // rather than the whole page failing when Google is unreachable.
   const result = await store.listAvailability({ days, busy: [] });
+  // Same source as the charge, so the page can never advertise one price and
+  // take another.
+  const price = await pricing.priceOf('consultation');
 
   return res.json({
     success: true,
-    fee_inr: CONSULTATION_FEE_INR,
+    fee_inr: price.amount_inr,
+    fee_formatted: pricing.formatInr(price.amount_inr),
     duration_minutes: CONSULTATION_MINUTES,
     hold_minutes: store.HOLD_MINUTES,
     payments_live: paymentsLive(),
@@ -252,7 +256,7 @@ router.post('/book', handle('book', async (req, res) => {
     ends_at: created.appointment.ends_at,
     status: created.appointment.status,
     payments_live: paymentsLive(),
-    fee_inr: CONSULTATION_FEE_INR,
+    fee_inr: (await pricing.priceOf('consultation')).amount_inr,
     next_step: paymentsLive() ? 'payment' : 'divya_will_confirm',
     whatsapp_handoff: paymentsLive() ? null : handoffLink({
       name, startsAt: created.appointment.starts_at, mode: created.appointment.mode

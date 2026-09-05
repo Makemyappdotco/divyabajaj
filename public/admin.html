@@ -190,6 +190,30 @@
     .sf:last-child{grid-column:1/-1}
   }
 
+  /* ---- pricing ---- */
+  .price-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr);
+             gap:12px;align-items:end;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+  .price-row:last-of-type{border-bottom:0}
+  .price-name{font-size:14px;font-weight:600;min-width:0}
+  .price-name small{display:block;font-weight:400;font-size:11.5px;color:var(--ink-3);margin-top:3px}
+  .price-in{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);
+            border-radius:8px;padding:8px 10px}
+  .price-in span{color:var(--ink-3);font-size:13px}
+  .price-in input{border:0;background:transparent;font:inherit;font-size:13px;color:var(--ink);
+                  width:100%;min-width:0;font-variant-numeric:tabular-nums}
+  .price-in input:focus{outline:none}
+  .price-in:focus-within{outline:2px solid var(--gold-l);outline-offset:1px;border-color:var(--gold-l)}
+  /* What the customer will actually see, spelled out - same idea as the slot
+     preview, so a price is never saved on trust. */
+  .price-preview{font-size:12.5px;color:var(--gold-d);font-variant-numeric:tabular-nums;padding-bottom:9px}
+  .price-preview s{color:var(--ink-3);margin-left:5px}
+  .price-preview b{color:var(--gold-d);margin-left:5px;font-weight:600}
+  .price-preview.bad{color:var(--danger)}
+  @media (max-width:820px){
+    .price-row{grid-template-columns:1fr 1fr}
+    .price-name,.price-preview{grid-column:1/-1}
+  }
+
   .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 15px;
        font-size:13px;color:var(--ink);transition:border-color .13s,background .13s}
   .btn:hover{border-color:var(--gold-l)}
@@ -373,6 +397,27 @@
     return fetch('/api/admin/schedule' + path + '?environment=' + encodeURIComponent(state.environment), {
       method: method,
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (response) {
+      return response.text().then(function (raw) {
+        var parsed;
+        try { parsed = raw ? JSON.parse(raw) : {}; } catch (e) { parsed = { error: raw }; }
+        if (!response.ok) throw new Error(parsed.error || ('Request failed (' + response.status + ')'));
+        return parsed;
+      });
+    });
+  }
+
+  /**
+   * Prices. No environment parameter: like the hours, a price belongs to the
+   * site you are looking at, not to the Live/Test analytics filter, so changing
+   * one on a preview can never alter what the live site charges.
+   */
+  function apiPricing(method, body) {
+    return fetch('/api/admin/pricing', {
+      method: method || 'GET',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      cache: 'no-store',
       body: body ? JSON.stringify(body) : undefined
     }).then(function (response) {
       return response.text().then(function (raw) {
@@ -681,6 +726,128 @@
     }
     if (!times.length) return { text: 'too short for one ' + n + ' minute call', bad: true };
     return { text: times.join(', ') + '  ·  ' + times.length + ' slot' + (times.length > 1 ? 's' : ''), bad: false };
+  }
+
+  /* ---------------- pricing ---------------- */
+
+  // Cards on the landing page read left to right in this order; the panel
+  // matches so the two are read the same way.
+  var PRICE_ORDER = ['paid_blueprint', 'consultation'];
+  var PRICE_WHERE = {
+    paid_blueprint: 'Landing page card, and the report window',
+    consultation: 'Landing page card, the booking form, and what Razorpay charges'
+  };
+
+  function rupees(n) { return '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 }); }
+
+  /**
+   * Exactly what a customer will see, and the same rules the server enforces,
+   * so a price is never rejected after the fact.
+   */
+  function pricePreview(amount, compareAt) {
+    var price = Number(amount);
+    if (!isFinite(price) || price < 1) return { html: 'enter a price of at least ₹1', bad: true };
+    if (Math.round(price) !== price) return { html: 'whole rupees only, no paise', bad: true };
+    if (price > 500000) return { html: 'that looks like a slip — the most allowed is ₹5,00,000', bad: true };
+
+    var raw = String(compareAt == null ? '' : compareAt).trim();
+    if (raw === '') return { html: esc(rupees(price)), bad: false };
+
+    var was = Number(raw);
+    if (!isFinite(was)) return { html: 'the "was" price is not a number', bad: true };
+    if (was <= price) return { html: 'the "was" price has to be higher than the price, or left empty', bad: true };
+
+    var percent = Math.round(((was - price) / was) * 100);
+    return { html: esc(rupees(price)) + '<s>' + esc(rupees(was)) + '</s><b>Save ' + percent + '%</b>', bad: false };
+  }
+
+  function pricingCard(pr) {
+    var products = PRICE_ORDER
+      .map(function (code) {
+        return pr.products.filter(function (p) { return p.product_code === code; })[0];
+      })
+      .filter(Boolean);
+
+    var rows = products.map(function (p) {
+      var compare = p.compare_at_inr == null ? '' : p.compare_at_inr;
+      var preview = pricePreview(p.amount_inr, compare);
+      return '<div class="price-row" data-price="' + esc(p.product_code) + '">' +
+        '<div class="price-name">' + esc(p.label) +
+          '<small>' + esc(PRICE_WHERE[p.product_code] || '') + '</small></div>' +
+        '<label class="sf"><span>Price</span>' +
+          '<div class="price-in"><span>₹</span>' +
+          '<input type="number" class="p-amount" min="1" step="1" value="' + esc(p.amount_inr) + '"></div></label>' +
+        '<label class="sf"><span>Was (optional)</span>' +
+          '<div class="price-in"><span>₹</span>' +
+          '<input type="number" class="p-compare" min="0" step="1" placeholder="none" value="' + esc(compare) + '"></div></label>' +
+        '<div class="price-preview' + (preview.bad ? ' bad' : '') + '">' + preview.html + '</div>' +
+      '</div>';
+    }).join('');
+
+    return '<div class="card" style="margin-top:14px">' +
+      '<div class="section-head"><div class="section-title">What each package costs</div>' +
+      '<div class="section-note">shown on the site and charged at checkout</div></div>' +
+      '<div class="sched-scope">These prices control <b>' + esc(pr.environment_label) + '</b>.</div>' +
+      rows +
+      '<div class="btn-row"><button class="btn primary" id="savePrices">Save prices</button>' +
+      '<span class="save-note" id="priceNote">The "was" price is the struck-through one. Leave it empty to show no discount.' +
+      '</span></div></div>';
+  }
+
+  function paintPricePreview(row) {
+    var out = row.querySelector('.price-preview');
+    var p = pricePreview(row.querySelector('.p-amount').value, row.querySelector('.p-compare').value);
+    out.innerHTML = p.html;
+    out.classList.toggle('bad', p.bad);
+  }
+
+  function wirePricing() {
+    var rows = Array.prototype.slice.call(document.querySelectorAll('.price-row'));
+    if (!rows.length) return;
+
+    rows.forEach(function (row) {
+      row.addEventListener('input', function () { paintPricePreview(row); });
+    });
+
+    var button = $('savePrices');
+    var note = $('priceNote');
+    if (!button) return;
+
+    button.addEventListener('click', function () {
+      var bad = rows.filter(function (row) {
+        return pricePreview(row.querySelector('.p-amount').value, row.querySelector('.p-compare').value).bad;
+      });
+      if (bad.length) {
+        note.textContent = 'Fix the highlighted price first.';
+        note.className = 'save-note bad';
+        bad[0].querySelector('.p-amount').focus();
+        return;
+      }
+
+      var products = rows.map(function (row) {
+        var compare = String(row.querySelector('.p-compare').value).trim();
+        return {
+          product_code: row.getAttribute('data-price'),
+          amount_inr: Number(row.querySelector('.p-amount').value),
+          compare_at_inr: compare === '' ? null : Number(compare)
+        };
+      });
+
+      button.disabled = true;
+      note.textContent = 'Saving…';
+      note.className = 'save-note';
+
+      apiPricing('PUT', { products: products })
+        .then(function () {
+          note.textContent = 'Saved. The site and checkout are using these prices now.';
+          note.className = 'save-note ok';
+        })
+        .catch(function (error) {
+          note.textContent = error.message;
+          note.className = 'save-note bad';
+        })
+        .then(function () { button.disabled = false; });
+    });
   }
 
   function scheduleCard(sched) {
@@ -1055,8 +1222,14 @@
 
   function renderConsultations() {
     view.innerHTML = loading(3);
-    Promise.all([api('consultations'), apiSchedule()]).then(function (both) {
-      var d = both[0], sched = both[1];
+    // Pricing must never be able to take the tab down: on a deployment without
+    // Supabase the endpoint answers 503, and the bookings still need to show.
+    Promise.all([
+      api('consultations'),
+      apiSchedule(),
+      apiPricing().catch(function (error) { console.error('[pricing]', error.message); return null; })
+    ]).then(function (both) {
+      var d = both[0], sched = both[1], prices = both[2];
       var html = '<div class="grid tiles">' +
         // Clickable: Dhruv expected the tile to take him to the bookings it counts.
         '<div id="upcomingTile" class="clickable" title="Show the bookings">' +
@@ -1064,9 +1237,11 @@
         tile('Completed', num(d.past), 'already happened') +
         tile('Held slots', num(d.active_holds), 'awaiting payment') +
         '</div>' +
+        (prices ? pricingCard(prices) : '') +
         '<div style="margin-top:14px">' + scheduleCard(sched) + '</div>' +
         blocksCard(sched) + upcomingCard(sched) + calendarCard(sched);
       view.innerHTML = html;
+      wirePricing();
       wireSchedule();
       wireReschedule();
       var tileButton = $('upcomingTile');

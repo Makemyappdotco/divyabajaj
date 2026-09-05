@@ -1,3 +1,4 @@
+const { BASE } = require('./base');
 // Run against the local harness in /tmp/bookpreview, which stubs Razorpay's
 // outbound call but keeps the real signature maths. Needs RAZORPAY_KEY_SECRET
 // and RAZORPAY_WEBHOOK_SECRET set to whatever the harness uses.
@@ -5,7 +6,7 @@
 // REAL paymentRoutes.js with Razorpay's HTTP call stubbed - the point is the
 // trust boundary, not Razorpay's own API.
 const crypto = require('crypto');
-const B = 'http://127.0.0.1:4407';
+const B = `${BASE}`;
 const post = (p, body, headers) => fetch(B + p, { method:'POST',
   headers: Object.assign({'Content-Type':'application/json'}, headers||{}),
   body: typeof body === 'string' ? body : JSON.stringify(body) })

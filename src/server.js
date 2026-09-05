@@ -15,6 +15,9 @@ const adminRoutes = require('./adminRoutes');
 const bookingRoutes = require('./bookingRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const adminScheduleRoutes = require('./adminScheduleRoutes');
+const adminPricingRoutes = require('./adminPricingRoutes');
+const pricing = require('./services/pricing');
+const pricingPatch = require('./services/pricingPatch');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -51,7 +54,7 @@ const browserScriptsValid = validateBrowserScriptsSafely();
 // Divya's real WhatsApp number, as already used by public/consultation.html.
 const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
 
-function sendLandingWithPatches(res) {
+async function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
@@ -85,6 +88,11 @@ function sendLandingWithPatches(res) {
   // the SVC_WA_NUMBER constant - so every one of those buttons currently goes
   // nowhere. Patched on the way out rather than by editing the 5.6MB source.
   html = html.split('91XXXXXXXXXX').join(CONTACT_WHATSAPP);
+
+  // Prices come from the panel. getPrices() never throws - on a database blip
+  // it returns what the page has always advertised - so this cannot be the
+  // reason the landing page fails to render.
+  html = pricingPatch.patchLandingPrices(html, await pricing.getPrices());
 
   html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n${bookingModalScript}\n</body>`);
 
@@ -275,7 +283,24 @@ app.use('/api', publicPaidRoutes);
 // own namespace is unambiguous; shares the same Basic auth
 // schedule WRITES live in their own module so adminRoutes stays read-only;
 // mounted first so /schedule is not swallowed by the analytics router
+// What every surface quotes. Public and read-only: the consultation page, the
+// booking modal and the report modal all render from this, so there is exactly
+// one number in play and it is the one the charge is built from.
+app.get('/api/pricing', async (req, res) => {
+  const rows = await pricing.getPrices();
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({
+    success: true,
+    products: rows.map(r => Object.assign({}, r, {
+      formatted: pricing.formatInr(r.amount_inr),
+      compare_at_formatted: r.compare_at_inr == null ? null : pricing.formatInr(r.compare_at_inr),
+      saving_percent: pricing.savingPercent(r)
+    }))
+  });
+});
+
 app.use('/api/admin/schedule', adminAuth, adminScheduleRoutes);
+app.use('/api/admin/pricing', adminAuth, adminPricingRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
 app.use('/api', adminAuth, routes);
 
@@ -284,9 +309,33 @@ app.get('/admin', adminAuth, (req, res) => {
 });
 
 app.use('/admin', adminAuth, express.static(publicDir));
-app.get('/', (req, res) => sendLandingWithPatches(res));
-app.get('/landing.html', (req, res) => sendLandingWithPatches(res));
-app.get(['/full-blueprint', '/paid-report'], (req, res) => sendLandingWithPatches(res));
+function serveLanding(req, res) {
+  return sendLandingWithPatches(res).catch(error => {
+    console.error('[landing]', error);
+    if (!res.headersSent) res.status(500).send('Landing page unavailable');
+  });
+}
+
+app.get('/', serveLanding);
+app.get('/landing.html', serveLanding);
+app.get(['/full-blueprint', '/paid-report'], serveLanding);
+
+// paid-live-flow.js builds the report modal from a template literal with the
+// blueprint and consultation prices written into it, so it is served through a
+// patch rather than as a static file. Registered before express.static below,
+// which would otherwise answer first.
+app.get('/paid-live-flow.js', async (req, res) => {
+  const scriptPath = path.join(publicDir, 'paid-live-flow.js');
+  try {
+    const source = fs.readFileSync(scriptPath, 'utf8');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    return res.send(pricingPatch.patchPaidFlowScript(source, await pricing.getPrices()));
+  } catch (error) {
+    console.error('[paid-live-flow]', error);
+    return res.sendFile(scriptPath);
+  }
+});
 
 app.get(['/book-consultation', '/private-consultation', '/consultation/book'], (req, res) => {
   const queryIndex = req.originalUrl.indexOf('?');

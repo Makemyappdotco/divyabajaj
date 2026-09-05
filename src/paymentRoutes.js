@@ -14,10 +14,10 @@ const crypto = require('crypto');
 const db = require('./database');
 const store = require('./services/booking/store');
 const razorpay = require('./services/razorpay');
+const pricing = require('./services/pricing');
 
 const router = express.Router();
 
-const CONSULTATION_FEE_INR = Number(process.env.CONSULTATION_FEE_INR) || 4999;
 const CURRENCY = 'INR';
 
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
@@ -68,7 +68,10 @@ router.post('/order', handle('order', async (req, res) => {
   }
 
   const lead = appointment.lead_id ? await db.getLead(appointment.lead_id) : null;
-  const amountPaise = Math.round(CONSULTATION_FEE_INR * 100);
+  // Priced from the database at the moment the order is created, so whatever
+  // Divya has set in the panel is what gets charged.
+  const price = await pricing.priceOf('consultation', appointment.environment);
+  const amountPaise = Math.round(price.amount_inr * 100);
 
   // One order per appointment. Re-opening checkout after an abandoned attempt
   // must reuse it rather than litter Razorpay with orders for one booking,
@@ -96,7 +99,7 @@ router.post('/order', handle('order', async (req, res) => {
       environment: appointment.environment,
       lead_id: appointment.lead_id || null,
       product_code: 'consultation',
-      amount: CONSULTATION_FEE_INR,
+      amount: price.amount_inr,
       currency: CURRENCY,
       status: 'pending',
       gateway: 'razorpay',
@@ -116,12 +119,18 @@ router.post('/order', handle('order', async (req, res) => {
     await supabase.from('appointments').update({ order_id: order.id, updated_at: now() }).eq('id', appointment.id);
   }
 
+  // If Divya changed the price while this customer was mid-checkout, the order
+  // already created keeps its original amount - Razorpay orders are immutable,
+  // and charging someone a number they never saw would be worse than honouring
+  // the one they did.
+  const chargedPaise = Math.round(Number(order.amount) * 100) || amountPaise;
+
   return res.json({
     success: true,
     // The publishable key. The secret never leaves the server.
     key_id: razorpay.publicKeyId(),
     order_id: order.gateway_order_id,
-    amount: amountPaise,
+    amount: chargedPaise,
     currency: CURRENCY,
     live_mode: razorpay.isLiveMode(),
     name: 'Divya Bajaj',

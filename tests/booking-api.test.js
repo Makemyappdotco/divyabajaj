@@ -1,6 +1,7 @@
+const { BASE } = require('./base');
 // Run against the local harness in /tmp/bookpreview (node server.js). Each suite
 // resets the harness first, so they are order independent.
-const B = 'http://127.0.0.1:4403/api/booking';
+const B = `${BASE}/api/booking`;
 const post = (p, body) => fetch(B + p, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
   .then(async r => ({ status: r.status, body: await r.json() }));
 const get = p => fetch(B + p).then(r => r.json());
@@ -8,7 +9,7 @@ let pass = 0, fail = 0;
 const check = (label, ok, detail='') => { ok ? pass++ : fail++; console.log(`${ok?'PASS':'FAIL'}  ${label}${ok?'':'  <- '+detail}`); };
 
 (async () => {
-  await fetch('http://127.0.0.1:4403/__reset',{method:'POST'});
+  await fetch(`${BASE}/__reset`,{method:'POST'});
   const avail = await get('/availability?days=21');
   const day = avail.days[2];
   const slot = day.slots[0];

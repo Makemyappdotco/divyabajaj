@@ -261,8 +261,7 @@ router.get('/reports/:id/pdf', async (req, res) => {
       return res.status(403).json({ success: false, error: 'This report download link is invalid or has expired.' });
     }
 
-    const reports = await db.getReports({});
-    const report = reports.find(item => item.id === req.params.id);
+    const report = await db.getReport(req.params.id);
     if (!report || report.status !== 'completed') return res.status(404).json({ error: 'Report not found' });
 
     const lead = await db.getLead(report.lead_id) || {};
@@ -301,8 +300,7 @@ router.get('/reports', adminAuth, async (req, res) => {
 
 router.get('/reports/:id', adminAuth, async (req, res) => {
   try {
-    const reports = await db.getReports({});
-    const report = reports.find(item => item.id === req.params.id);
+    const report = await db.getReport(req.params.id);
     if (!report) return res.status(404).json({ error: 'Report not found' });
     return res.json({ success: true, report });
   } catch (error) { return res.status(500).json({ error: error.message }); }
@@ -372,3 +370,8 @@ router.get('/export/leads', adminAuth, async (req, res) => {
 });
 
 module.exports = router;
+// Exposed so the admin panel can mint a fresh download link. The pdf_url stored
+// on a report row is not reusable: for paid V2 rows it is the literal string
+// '/api/reports/pdf-direct', and for free rows it is a signature that expires 30
+// days after the report was generated.
+module.exports.signedPdfUrl = signedPdfUrl;

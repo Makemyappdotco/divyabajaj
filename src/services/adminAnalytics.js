@@ -231,9 +231,22 @@ async function listCustomers({ environment = 'production', search = '', page = 1
       )).data
     : [];
 
+  // Consultations live in their own table, so a customer who has only ever
+  // booked a call would otherwise show as having nothing.
+  const consultRows = ids.length
+    ? (await unwrap(
+        applyEnvironment(
+          supabase.from('appointments').select('lead_id, status').in('lead_id', ids),
+          environment
+        ),
+        'customer consultation counts'
+      )).data
+    : [];
+
+  const blank = () => ({ total: 0, free: 0, paid: 0, failed: 0, consultations: 0, last: null });
   const byLead = new Map();
   reportRows.forEach(r => {
-    const entry = byLead.get(r.lead_id) || { total: 0, free: 0, paid: 0, failed: 0, last: null };
+    const entry = byLead.get(r.lead_id) || blank();
     entry.total += 1;
     if (r.status === 'failed') entry.failed += 1;
     else if (r.category === 'free') entry.free += 1;
@@ -241,10 +254,16 @@ async function listCustomers({ environment = 'production', search = '', page = 1
     if (!entry.last || r.created_at > entry.last) entry.last = r.created_at;
     byLead.set(r.lead_id, entry);
   });
+  consultRows.forEach(a => {
+    if (a.status === 'cancelled') return;
+    const entry = byLead.get(a.lead_id) || blank();
+    entry.consultations += 1;
+    byLead.set(a.lead_id, entry);
+  });
 
   return {
     page: Number(page) || 1, page_size: size, total: count,
-    rows: data.map(l => ({ ...l, reports: byLead.get(l.id) || { total: 0, free: 0, paid: 0, failed: 0, last: null } }))
+    rows: data.map(l => ({ ...l, reports: byLead.get(l.id) || blank() }))
   };
 }
 

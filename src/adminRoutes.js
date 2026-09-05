@@ -7,6 +7,7 @@
 const express = require('express');
 const analytics = require('./services/adminAnalytics');
 const db = require('./database');
+const { signedPdfUrl } = require('./routes');
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ function handle(name, fn) {
       return res.json(data);
     } catch (error) {
       console.error(`[admin:${name}]`, error);
-      return res.status(500).json({ error: error.message || `${name} failed` });
+      return res.status(error.status || 500).json({ error: error.message || `${name} failed` });
     }
   };
 }
@@ -87,5 +88,31 @@ router.get('/health', handle('health', req =>
 router.get('/activity', handle('activity', req =>
   analytics.getActivity({ limit: req.query.limit })
 ));
+
+/**
+ * A fresh, short-lived download link for any report.
+ *
+ * Read-only in spirit: it mints a signature, it does not render or store
+ * anything. The PDF itself is regenerated on demand from the stored row, which
+ * costs nothing but CPU - no AI call, no astrology API call - so there is no
+ * archive to keep and nothing to expire.
+ *
+ * Two hours rather than the customer-facing thirty days: this link is for Divya
+ * clicking a button, not for an email that has to survive a month.
+ */
+router.get('/report/:id/download', handle('download', async req => {
+  const report = await db.getReport(String(req.params.id));
+  if (!report) {
+    const error = new Error('That report no longer exists.');
+    error.status = 404;
+    throw error;
+  }
+  if (report.status !== 'completed') {
+    const error = new Error(`This report is "${report.status}", so there is nothing to download yet.`);
+    error.status = 409;
+    throw error;
+  }
+  return { url: signedPdfUrl(report.id, 2 * 60 * 60), report_id: report.id, category: report.category };
+}));
 
 module.exports = router;

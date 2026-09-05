@@ -196,6 +196,22 @@ async function createReport(data) {
   return created;
 }
 
+/**
+ * One report by id, fetched directly.
+ *
+ * The download route used to call getReports({}) and filter in JS, which pulls
+ * every column of every row - roughly 60kB each - to find one. Fine at 30
+ * reports, ruinous at 3,000, and it is now on a path Divya uses by hand.
+ */
+async function getReport(reportId) {
+  if (!supabase) {
+    const all = await localDb.getReports({});
+    return all.find(r => r.id === reportId) || null;
+  }
+  const result = await supabase.from('reports').select('*').eq('id', reportId).maybeSingle();
+  return throwIfError(result, 'Fetch report failed');
+}
+
 async function updateReport(reportId, updates) {
   if (!supabase) return localDb.updateReport(reportId, updates);
   const result = await supabase.from('reports').update({ ...updates, updated_at: now() }).eq('id', reportId).select().maybeSingle();
@@ -309,7 +325,7 @@ module.exports = {
   // above; nothing in the report or PDF path uses this.
   getSupabaseClient: () => supabase,
   getLeads, createLead, getLead, updateLead,
-  getReports, createReport, updateReport,
+  getReports, getReport, createReport, updateReport,
   getPayments, createPayment, updatePayment,
   getBookings, createBooking, updateBooking,
   getEvents, getStats, logEvent

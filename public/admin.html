@@ -133,8 +133,16 @@
   .nowrap{white-space:nowrap}
 
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--ink-2);white-space:nowrap}
-  .pill.paid{color:var(--gold-d);border-color:var(--gold-l)}
-  .pill.free{color:var(--free);border-color:var(--free)}
+  /* The three product lines read at a glance rather than as three near-identical
+     outlines: paid is filled gold, free is a blue outline, a consultation is a
+     filled ink chip. Shape and weight differ too, so they are still tellable
+     apart in greyscale or by anyone who does not separate these hues. */
+  .pill.paid{color:#3d2c07;background:var(--gold-l);border-color:var(--gold);font-weight:600}
+  .pill.free{color:var(--free);border-color:var(--free);background:transparent}
+  .pill.consultation{color:var(--surface);background:var(--ink);border-color:var(--ink);font-weight:600}
+  :root[data-theme="dark"] .pill.paid{color:#1a1206}
+  :root[data-theme="dark"] .pill.consultation{color:var(--bg);background:var(--ink);border-color:var(--ink)}
+  .tag-row{display:flex;gap:5px;flex-wrap:wrap}
   /* Success is the overwhelming majority of rows, so it is deliberately quiet:
      a green ring on 29 of 30 rows carries no information and fights the cream
      and gold. Only failures are allowed to be loud. */
@@ -191,6 +199,10 @@
   .btn.quiet:hover{color:var(--danger);border-color:var(--danger)}
   .btn:disabled{opacity:.45;cursor:not-allowed}
   .btn-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:18px}
+  .dl{font-size:12px;color:var(--gold-d);border:1px solid var(--line);border-radius:7px;
+      padding:5px 11px;white-space:nowrap;transition:border-color .13s,background .13s}
+  .dl:hover{border-color:var(--gold);background:var(--surface-2)}
+  .dl:disabled{opacity:.45;cursor:not-allowed}
   .save-note{font-size:12.5px;color:var(--ink-3)}
   .save-note.ok{color:var(--gold-d)}
   .save-note.bad{color:var(--danger)}
@@ -332,15 +344,25 @@
     if (mins < 1440) return Math.floor(mins / 60) + 'h ago';
     var days = Math.floor(mins / 1440);
     if (days < 30) return days + 'd ago';
-    return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-IN', { timeZone: IST, day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  function exactWhen(iso) {
+  // Divya works in IST and every customer confirmation quotes IST, so the panel
+  // must too. Without this the browser's own timezone decides: on a laptop set
+  // to UTC an 11:30 am IST call renders as 06:00 am, which is exactly how
+  // someone misses their own appointment. Pinning it also means the panel reads
+  // the same from anywhere she happens to be.
+  var IST = 'Asia/Kolkata';
+
+  function exactWhen(iso, withZone) {
     if (!iso) return '';
     var d = new Date(iso);
-    return isFinite(d.getTime())
-      ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : '';
+    if (!isFinite(d.getTime())) return '';
+    var text = d.toLocaleString('en-IN', {
+      timeZone: IST, day: 'numeric', month: 'short', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+    return withZone ? text + ' IST' : text;
   }
 
   /**
@@ -565,16 +587,18 @@
         var body = !d.rows.length
           ? empty('No reports here', 'Nothing matches these filters in this environment.')
           : '<div class="card" style="padding:0"><div class="t-wrap"><table>' +
-            '<thead><tr><th>Customer</th><th>Type</th><th>Status</th><th>Took</th><th>Generated</th></tr></thead><tbody>' +
+            '<thead><tr><th>Customer</th><th>Type</th><th>Status</th><th>Took</th><th>Generated</th><th>Report</th></tr></thead><tbody>' +
             d.rows.map(function (r) {
               return '<tr class="clickable" data-lead="' + esc(r.lead_id) + '">' +
                 '<td>' + esc(r.lead_name || '—') + '<div class="dim" style="font-size:11.5px">' + esc(r.lead_email || '') + '</div></td>' +
-                '<td><span class="pill ' + esc(r.category) + '">' + (r.category === 'paid' ? 'Paid' : 'Free') + '</span>' +
+                '<td>' + productTag(r.category) +
                   '<div class="dim nowrap" style="font-size:11px;margin-top:3px">' + esc(r.type) + '</div></td>' +
                 '<td><span class="pill ' + (r.status === 'failed' ? 'bad' : 'ok') + '">' + esc(r.status) + '</span>' +
                   (r.failure_code ? '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(r.failure_code) + '</div>' : '') + '</td>' +
                 '<td class="mono nowrap">' + duration(r.generation_seconds) + '</td>' +
                 '<td class="nowrap" title="' + esc(exactWhen(r.created_at)) + '">' + esc(when(r.created_at)) + '</td>' +
+                // Stop the row-click drawer firing when the button is pressed.
+                '<td onclick="event.stopPropagation()">' + downloadButton(r) + '</td>' +
                 '</tr>';
             }).join('') +
             '</tbody></table></div></div>' + pager(d, 'reportPage');
@@ -583,6 +607,7 @@
         wireSegs();
         wirePager('reportPage', renderReports);
         wireRowDrawer();
+        wireDownloads();
       })
       .catch(function (error) { view.innerHTML = head + fail(error.message); });
   }
@@ -597,14 +622,21 @@
       var body = !d.rows.length
         ? empty('No customers found', state.customerSearch ? 'Nothing matches that search.' : 'No one in this environment yet.')
         : '<div class="card" style="padding:0"><div class="t-wrap"><table>' +
-          '<thead><tr><th>Name</th><th>Contact</th><th>Reports</th><th>Status</th><th>Joined</th></tr></thead><tbody>' +
+          '<thead><tr><th>Name</th><th>Contact</th><th>Has bought</th><th>Status</th><th>Joined</th></tr></thead><tbody>' +
           d.rows.map(function (l) {
             return '<tr class="clickable" data-lead="' + esc(l.id) + '">' +
               '<td>' + esc(l.name || '—') + '<div class="dim" style="font-size:11.5px">' + esc(l.pob || '') + '</div></td>' +
               '<td style="font-size:12px">' + esc(l.email || '') + '<div class="dim">' + esc(l.phone || '') + '</div></td>' +
-              '<td class="mono nowrap">' + l.reports.total +
-                (l.reports.paid ? ' <span class="dim">(' + l.reports.paid + ' paid)</span>' : '') +
-                (l.reports.failed ? ' <span style="color:var(--danger)">' + l.reports.failed + ' failed</span>' : '') + '</td>' +
+              // What they have actually bought, as tags rather than a number nobody
+              // can decode. A repeat paid customer reads differently at a glance
+              // from someone who only ever pulled the free report.
+              '<td><div class="tag-row">' +
+                (l.reports.paid ? '<span class="pill paid">' + (l.reports.paid > 1 ? l.reports.paid + '&times; ' : '') + 'Paid report</span>' : '') +
+                (l.reports.consultations ? '<span class="pill consultation">' + (l.reports.consultations > 1 ? l.reports.consultations + '&times; ' : '') + 'Consultation</span>' : '') +
+                (l.reports.free ? '<span class="pill free">' + (l.reports.free > 1 ? l.reports.free + '&times; ' : '') + 'Free report</span>' : '') +
+                (l.reports.failed ? '<span class="pill bad">' + l.reports.failed + ' failed</span>' : '') +
+                (!l.reports.total && !l.reports.consultations ? '<span class="dim" style="font-size:12px">nothing yet</span>' : '') +
+              '</div></td>' +
               '<td><span class="pill">' + esc(l.status || '—') + '</span></td>' +
               '<td class="nowrap" title="' + esc(exactWhen(l.created_at)) + '">' + esc(when(l.created_at)) + '</td>' +
               '</tr>';
@@ -761,22 +793,91 @@
 
   function upcomingCard(sched) {
     if (!sched.upcoming.length) {
-      return '<div class="card" style="margin-top:14px">' +
+      return '<div class="card" id="upcomingCard" style="margin-top:14px">' +
         '<div class="section-head"><div class="section-title">Upcoming calls</div></div>' +
         '<div class="dim" style="font-size:13px">Nothing booked yet.</div></div>';
     }
     var rows = sched.upcoming.map(function (a) {
       var lead = a.lead || {};
-      return '<tr><td>' + esc(lead.name || '—') +
-        (lead.phone ? '<div class="dim" style="font-size:11.5px">' + esc(lead.phone) + '</div>' : '') + '</td>' +
-        '<td class="nowrap">' + esc(exactWhen(a.starts_at)) + '</td>' +
-        '<td><span class="pill ' + (a.status === 'confirmed' ? 'ok' : '') + '">' + esc(a.status.replace(/_/g, ' ')) + '</span></td>' +
+      return '<tr data-appt="' + esc(a.id) + '">' +
+        '<td>' + esc(lead.name || '—') +
+          (lead.phone ? '<div class="dim" style="font-size:11.5px">' + esc(lead.phone) + '</div>' : '') +
+          (lead.email ? '<div class="dim" style="font-size:11.5px">' + esc(lead.email) + '</div>' : '') + '</td>' +
+        '<td class="nowrap">' + esc(exactWhen(a.starts_at, true)) + '</td>' +
+        '<td>' + productTag('consultation') +
+          '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(a.status.replace(/_/g, ' ')) + '</div></td>' +
         '<td style="font-size:12px">' + esc((a.customer_question || '').slice(0, 90)) + '</td>' +
-        '<td style="text-align:right"><button class="btn quiet" data-cancel="' + esc(a.id) + '">Cancel</button></td></tr>';
+        '<td class="nowrap" style="text-align:right">' +
+          '<button class="dl" data-move="' + esc(a.id) + '">Reschedule</button> ' +
+          '<button class="btn quiet" data-cancel="' + esc(a.id) + '">Cancel</button></td></tr>' +
+        // The slot picker unfolds under its own booking rather than in a dialog,
+        // so it is always obvious which call is being moved.
+        '<tr class="move-row" id="move_' + esc(a.id) + '" hidden><td colspan="5"></td></tr>';
     }).join('');
-    return '<div class="card" style="padding:0;margin-top:14px"><div class="t-wrap"><table>' +
-      '<thead><tr><th>Customer</th><th>When</th><th>Status</th><th>Question</th><th></th></tr></thead>' +
+    return '<div class="card" id="upcomingCard" style="padding:0;margin-top:14px">' +
+      '<div class="section-head" style="padding:17px 19px 0;margin-bottom:8px">' +
+      '<div class="section-title">Upcoming calls</div>' +
+      '<div class="section-note">' + sched.upcoming.length + ' booked</div></div>' +
+      '<div class="t-wrap"><table>' +
+      '<thead><tr><th>Customer</th><th>When</th><th>Type</th><th>Question</th><th></th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></div>';
+  }
+
+  /**
+   * Reschedule: show the same slots a customer would see, and move the booking
+   * onto the one Divya picks. Uses the public availability endpoint so she can
+   * never place a call outside her own hours or on top of another booking.
+   */
+  function wireReschedule() {
+    document.querySelectorAll('[data-move]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var id = button.getAttribute('data-move');
+        var row = $('move_' + id);
+        if (!row.hidden) { row.hidden = true; button.textContent = 'Reschedule'; return; }
+        button.textContent = 'Cancel move';
+        row.hidden = false;
+        row.querySelector('td').innerHTML = '<div class="dim" style="font-size:13px;padding:4px 0">Loading free slots…</div>';
+
+        fetch('/api/booking/availability?days=30', { headers: { Accept: 'application/json' }, cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d.success || !d.days.length) {
+              row.querySelector('td').innerHTML = '<div class="dim" style="font-size:13px;padding:4px 0">' +
+                'No free slots in the next 30 days. Free some time up first, or cancel this booking.</div>';
+              return;
+            }
+            var html = '<div style="padding:6px 0 10px"><div class="dim" style="font-size:12px;margin-bottom:8px">' +
+              'Pick the new time. The customer is not notified automatically yet, so message them after.</div>' +
+              '<div style="display:flex;gap:7px;flex-wrap:wrap">';
+            d.days.slice(0, 8).forEach(function (day) {
+              day.slots.forEach(function (slot) {
+                html += '<button class="dl" data-slot="' + esc(slot.starts_at) + '" data-for="' + esc(id) + '">' +
+                  esc(new Date(slot.starts_at).toLocaleString('en-IN', {
+                    timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short',
+                    hour: 'numeric', minute: '2-digit', hour12: true
+                  })) + '</button>';
+              });
+            });
+            row.querySelector('td').innerHTML = html + '</div><div class="save-note" id="moveNote_' + esc(id) + '" style="margin-top:9px"></div></div>';
+
+            row.querySelectorAll('[data-slot]').forEach(function (pick) {
+              pick.addEventListener('click', function () {
+                pick.disabled = true;
+                pick.textContent = 'Moving…';
+                apiWrite('/appointment/' + id + '/reschedule', 'POST', { starts_at: pick.getAttribute('data-slot') })
+                  .then(renderConsultations)
+                  .catch(function (e) {
+                    pick.disabled = false;
+                    note('moveNote_' + id, 'bad', e.message);
+                  });
+              });
+            });
+          })
+          .catch(function (e) {
+            row.querySelector('td').innerHTML = '<div class="save-note bad">' + esc(e.message) + '</div>';
+          });
+      });
+    });
   }
 
   function calendarCard(sched) {
@@ -909,12 +1010,57 @@
     });
   }
 
+  /**
+   * One place that decides how a product line looks, so the Reports tab, the
+   * Customers tab and the drawer can never drift into three different vocabularies.
+   */
+  function productTag(category) {
+    if (category === 'consultation') return '<span class="pill consultation">Consultation</span>';
+    if (category === 'paid') return '<span class="pill paid">Paid report</span>';
+    return '<span class="pill free">Free report</span>';
+  }
+
+  function downloadButton(report) {
+    if (report.status !== 'completed') {
+      return '<button class="dl" disabled title="Only finished reports can be downloaded">Download</button>';
+    }
+    return '<button class="dl" data-download="' + esc(report.id) + '">Download</button>';
+  }
+
+  /**
+   * Mints a fresh signed link and opens it. The pdf_url stored on the row is not
+   * reusable - paid rows hold a literal placeholder and free rows hold a
+   * signature that expired 30 days after generation - so it is always re-signed.
+   */
+  function wireDownloads() {
+    document.querySelectorAll('[data-download]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var original = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Preparing…';
+        api('report/' + button.getAttribute('data-download') + '/download')
+          .then(function (d) {
+            window.open(d.url, '_blank', 'noopener');
+            button.textContent = original;
+            button.disabled = false;
+          })
+          .catch(function (e) {
+            button.textContent = 'Failed';
+            button.title = e.message;
+            setTimeout(function () { button.textContent = original; button.disabled = false; }, 2500);
+          });
+      });
+    });
+  }
+
   function renderConsultations() {
     view.innerHTML = loading(3);
     Promise.all([api('consultations'), apiSchedule()]).then(function (both) {
       var d = both[0], sched = both[1];
       var html = '<div class="grid tiles">' +
-        tile('Upcoming', num(d.upcoming), 'scheduled ahead') +
+        // Clickable: Dhruv expected the tile to take him to the bookings it counts.
+        '<div id="upcomingTile" class="clickable" title="Show the bookings">' +
+          tile('Upcoming', num(d.upcoming), 'scheduled ahead &middot; click to view') + '</div>' +
         tile('Completed', num(d.past), 'already happened') +
         tile('Held slots', num(d.active_holds), 'awaiting payment') +
         '</div>' +
@@ -922,6 +1068,17 @@
         blocksCard(sched) + upcomingCard(sched) + calendarCard(sched);
       view.innerHTML = html;
       wireSchedule();
+      wireReschedule();
+      var tileButton = $('upcomingTile');
+      if (tileButton) tileButton.addEventListener('click', function () {
+        var card = $('upcomingCard');
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          card.style.transition = 'box-shadow .3s';
+          card.style.boxShadow = '0 0 0 2px var(--gold)';
+          setTimeout(function () { card.style.boxShadow = ''; }, 1400);
+        }
+      });
     }).catch(function (error) { view.innerHTML = fail(error.message); });
   }
 
@@ -1041,18 +1198,19 @@
         html += '<div><div class="section-title" style="margin-bottom:8px">Reports (' + d.reports.length + ')</div>' +
           (d.reports.length
             ? '<div class="card" style="padding:0"><div class="t-wrap"><table><tbody>' + d.reports.map(function (r) {
-                return '<tr><td><span class="pill ' + esc(r.category) + '">' + (r.category === 'paid' ? 'Paid' : 'Free') + '</span></td>' +
+                return '<tr><td>' + productTag(r.category) + '</td>' +
                   '<td><span class="pill ' + (r.status === 'failed' ? 'bad' : 'ok') + '">' + esc(r.status) + '</span>' +
                   (r.failure_message ? '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(r.failure_message.slice(0, 120)) + '</div>' : '') + '</td>' +
                   '<td class="mono nowrap">' + duration(r.generation_seconds) + '</td>' +
-                  '<td class="nowrap dim">' + esc(when(r.created_at)) + '</td></tr>';
+                  '<td class="nowrap dim">' + esc(when(r.created_at)) + '</td>' +
+                  '<td style="text-align:right">' + downloadButton(r) + '</td></tr>';
               }).join('') + '</tbody></table></div></div>'
             : '<div class="empty">No reports yet.</div>') + '</div>';
 
         if (d.appointments.length || d.bookings.length) {
           html += '<div><div class="section-title" style="margin-bottom:8px">Consultations</div><div class="card" style="padding:0"><div class="t-wrap"><table><tbody>' +
             d.appointments.map(function (a) {
-              return '<tr><td>' + esc(exactWhen(a.starts_at)) + '</td><td><span class="pill">' + esc(a.status) + '</span></td></tr>';
+              return '<tr><td>' + esc(exactWhen(a.starts_at, true)) + '</td><td><span class="pill">' + esc(a.status) + '</span></td></tr>';
             }).join('') +
             d.bookings.map(function (b) {
               return '<tr><td>' + esc(b.date) + ' ' + esc(b.time_slot) + '</td><td><span class="pill">' + esc(b.status) + '</span></td></tr>';
@@ -1078,6 +1236,7 @@
 
         html += '</div>';
         body.innerHTML = html;
+        wireDownloads();
       })
       .catch(function (error) { body.innerHTML = fail(error.message); });
   }

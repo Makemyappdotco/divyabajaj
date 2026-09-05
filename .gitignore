@@ -4,3 +4,8 @@ node_modules/
 .vercel
 *.log
 .DS_Store
+
+# Local fallback store written by src/database.local.js when Supabase is not
+# configured. Runtime scratch, and it would put customer records in git if the
+# fallback ever ran against real traffic.
+data/

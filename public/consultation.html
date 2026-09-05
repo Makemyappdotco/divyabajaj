@@ -107,6 +107,10 @@
   .done h2{font-family:var(--serif);font-size:23px;font-weight:600}
   .done .when{font-family:var(--serif);font-size:18px;margin-top:12px}
   .done p{color:var(--ink-2);margin-top:10px;font-size:14px;max-width:46ch;margin-left:auto;margin-right:auto}
+  .wa{display:inline-flex;align-items:center;gap:9px;margin-top:20px;padding:14px 26px;border-radius:11px;
+      background:var(--ink);color:var(--surface);font-weight:600;font-size:14.5px;text-decoration:none;transition:opacity .16s}
+  .wa:hover{opacity:.88}
+  .wa-note{font-size:12.5px;color:var(--ink-3);margin-top:10px}
   .foot{text-align:center;font-size:12.5px;color:var(--ink-3);margin-top:26px}
   .foot a{color:var(--gold-d)}
   [hidden]{display:none !important}
@@ -194,6 +198,8 @@
       <h2>Your slot is reserved</h2>
       <div class="when" id="doneWhen"></div>
       <p id="doneNote"></p>
+      <a class="wa" id="doneWa" target="_blank" rel="noopener" hidden>Message Divya on WhatsApp</a>
+      <div class="wa-note" id="doneWaNote" hidden>Your details are already filled in.</div>
     </div>
   </div>
 
@@ -411,7 +417,14 @@
         $('doneWhen').textContent = longDate(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
         $('doneNote').textContent = d.next_step === 'payment'
           ? 'Payment confirmed. Your call is booked and the joining link is on its way to your email and WhatsApp.'
-          : 'We have reserved this time for you. Divya will message you on WhatsApp shortly with the payment link, and your slot is confirmed the moment it is paid.';
+          : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
+        // Until notifications are wired up this is what actually tells Divya a
+        // booking happened; the slot is reserved either way.
+        if (d.whatsapp_handoff) {
+          $('doneWa').href = d.whatsapp_handoff;
+          $('doneWa').hidden = false;
+          $('doneWaNote').hidden = false;
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(function (e) {

@@ -47,6 +47,9 @@ function validateBrowserScriptsSafely() {
 
 const browserScriptsValid = validateBrowserScriptsSafely();
 
+// Divya's real WhatsApp number, as already used by public/consultation.html.
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
+
 function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
@@ -76,6 +79,12 @@ function sendLandingWithPatches(res) {
   html = html.replace(/<script src="\/booking-modal\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-background-patch\.js[^>]*><\/script>/g, '');
   html = html.replace(/<script src="\/paid-fast-patch\.js[^>]*><\/script>/g, '');
+  // The landing page ships a literal placeholder WhatsApp number in five
+  // places - the float button, the booking CTA, the footer, the sticky bar and
+  // the SVC_WA_NUMBER constant - so every one of those buttons currently goes
+  // nowhere. Patched on the way out rather than by editing the 5.6MB source.
+  html = html.split('91XXXXXXXXXX').join(CONTACT_WHATSAPP);
+
   html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n${bookingModalScript}\n</body>`);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

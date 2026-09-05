@@ -1,15 +1,17 @@
-// Run against the local harness in /tmp/bookpreview (node server.js on :4400).
-const B='http://127.0.0.1:4400/api/admin/schedule?environment=test';
-const S='http://127.0.0.1:4400/api/admin/schedule';
+// Run against the local harness in /tmp/bookpreview (node server.js). Each suite
+// resets the harness first, so they are order independent.
+const B='http://127.0.0.1:4402/api/admin/schedule?environment=test';
+const S='http://127.0.0.1:4402/api/admin/schedule';
 const req=(p,m,b)=>fetch(S+p+'?environment=test',{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined})
   .then(async r=>({status:r.status, body:await r.json()}));
-const avail=()=>fetch('http://127.0.0.1:4400/api/booking/availability?days=21').then(r=>r.json());
+const avail=()=>fetch('http://127.0.0.1:4402/api/booking/availability?days=21').then(r=>r.json());
 let pass=0,fail=0;
 const check=(l,ok,d='')=>{ok?pass++:fail++;console.log(`${ok?'PASS':'FAIL'}  ${l}${ok?'':'  <- '+d}`)};
 const week=(over={})=>[0,1,2,3,4,5,6].map(w=>Object.assign(
   {weekday:w,is_active:false,start_time:'18:00',end_time:'20:00',slot_duration_minutes:60,buffer_after_minutes:15,buffer_before_minutes:0,max_bookings:null}, over[w]||{}));
 
 (async()=>{
+  await fetch('http://127.0.0.1:4402/__reset',{method:'POST'});
   console.log('--- validation rejects nonsense with a readable sentence ---');
   let r = await req('/hours','PUT',{week:week({1:{is_active:true,start_time:'20:00',end_time:'18:00'}})});
   check('end before start rejected', r.status===400 && /after the start/.test(r.body.error), JSON.stringify(r.body));
@@ -58,9 +60,9 @@ const week=(over={})=>[0,1,2,3,4,5,6].map(w=>Object.assign(
 
   console.log('\n--- blocking a day that already has a booking warns instead of silently hiding it ---');
   const slot = restored.days[0].slots[0];
-  const h = await fetch('http://127.0.0.1:4400/api/booking/hold',{method:'POST',headers:{'Content-Type':'application/json'},
+  const h = await fetch('http://127.0.0.1:4402/api/booking/hold',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({slot_key:slot.slot_key,starts_at:slot.starts_at,ends_at:slot.ends_at})}).then(r=>r.json());
-  await fetch('http://127.0.0.1:4400/api/booking/book',{method:'POST',headers:{'Content-Type':'application/json'},
+  await fetch('http://127.0.0.1:4402/api/booking/book',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({hold_id:h.hold_id,slot_key:slot.slot_key,name:'Booked Person',phone:'9876543210',email:'b@x.com',dob:'1990-01-01',pob:'Delhi'})}).then(r=>r.json());
   r = await req('/block','POST',{starts_at:restored.days[0].date+'T00:00:00+05:30', ends_at:restored.days[0].date+'T23:59:59+05:30'});
   check('warns about the existing booking', r.body.existing_bookings_in_range===1 && /does not cancel/.test(r.body.warning||''), JSON.stringify(r.body));

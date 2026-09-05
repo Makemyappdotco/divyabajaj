@@ -13,6 +13,35 @@ const router = express.Router();
 
 const CONSULTATION_FEE_INR = Number(process.env.CONSULTATION_FEE_INR) || 4999;
 const CONSULTATION_MINUTES = Number(process.env.CONSULTATION_MINUTES) || 60;
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
+
+/**
+ * Until email and WhatsApp notifications are wired up, nothing tells Divya a
+ * booking happened - she would have to notice it in the admin panel. That is
+ * the one way this flow is WORSE than the WhatsApp link it replaces, where the
+ * message at least landed on her phone.
+ *
+ * So the confirmation hands the customer a one-tap message to her, pre-filled
+ * with the booking. The slot is already reserved and the lead already recorded
+ * either way; this just makes sure a human hears about it. It is replaced by
+ * real notifications, not kept alongside them.
+ */
+function handoffLink({ name, startsAt, mode }) {
+  const when = new Date(startsAt).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long',
+    hour: 'numeric', minute: '2-digit', hour12: true
+  });
+  const text = [
+    `Hi Divya, I have just booked a private consultation.`,
+    '',
+    `Name: ${name}`,
+    `Slot: ${when} IST`,
+    `Format: ${mode === 'phone_call' ? 'Audio call' : 'Video call'}`,
+    '',
+    'Please send me the payment link to confirm.'
+  ].join('\n');
+  return `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
 
 /**
  * Razorpay is not live yet. Until it is, a booking is created and held as
@@ -73,6 +102,7 @@ router.get('/availability', handle('availability', async (req, res) => {
     hold_minutes: store.HOLD_MINUTES,
     payments_live: paymentsLive(),
     timezone: 'Asia/Kolkata',
+    whatsapp: CONTACT_WHATSAPP,
     // Says "she has not set her hours yet" rather than "no slots", so an
     // unconfigured environment is distinguishable from a fully booked one.
     configured: result.rules_configured > 0,
@@ -215,7 +245,10 @@ router.post('/book', handle('book', async (req, res) => {
     status: created.appointment.status,
     payments_live: paymentsLive(),
     fee_inr: CONSULTATION_FEE_INR,
-    next_step: paymentsLive() ? 'payment' : 'divya_will_confirm'
+    next_step: paymentsLive() ? 'payment' : 'divya_will_confirm',
+    whatsapp_handoff: paymentsLive() ? null : handoffLink({
+      name, startsAt: created.appointment.starts_at, mode: created.appointment.mode
+    })
   });
 }));
 

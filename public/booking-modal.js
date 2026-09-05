@@ -125,6 +125,10 @@
     '.dbm-done h3{font-family:var(--serif);font-size:23px;font-weight:600;color:var(--ivory)}',
     '.dbm-when{font-family:var(--serif);font-size:19px;color:var(--gold);margin-top:12px}',
     '.dbm-done p{color:var(--text-m);font-size:14px;margin-top:12px;line-height:1.6;max-width:44ch;margin-left:auto;margin-right:auto}',
+    '.dbm-wa{display:inline-flex;align-items:center;gap:9px;margin-top:20px;padding:14px 26px;border-radius:11px;',
+    '  background:var(--gold);color:#100D08;font-weight:600;font-size:14.5px;text-decoration:none;transition:opacity .16s,transform .16s}',
+    '.dbm-wa:hover{opacity:.9;transform:translateY(-1px)}',
+    '.dbm-wa-note{font-size:12.5px;color:var(--text-s);margin-top:11px}',
 
     '@media (max-width:600px){',
     '  .dbm-veil{padding:0;align-items:flex-end}',
@@ -207,6 +211,8 @@
           '<h3>Your slot is reserved</h3>' +
           '<div class="dbm-when" id="dbmWhen"></div>' +
           '<p id="dbmNote"></p>' +
+          '<a class="dbm-wa" id="dbmWa" target="_blank" rel="noopener" hidden>Message Divya on WhatsApp</a>' +
+          '<div class="dbm-wa-note" id="dbmWaNote" hidden>Your details are already filled in.</div>' +
         '</div>' +
       '</div>';
     document.body.appendChild(veil);
@@ -251,10 +257,11 @@
           '<span class="dbm-fact">' + esc(d.duration_minutes) + ' minutes</span>' +
           '<span class="dbm-fact">' + esc(money(d.fee_inr)) + '</span>' +
           '<span class="dbm-fact">Video or audio</span>';
+        state.whatsapp = d.whatsapp;
         if (!d.configured) return emptyState('Booking opens shortly',
-          'Divya has not published her hours for this period yet. Message us on WhatsApp and we will sort a time out personally.');
+          'Divya has not published her hours for this period yet. Message her directly and she will sort a time out personally.');
         if (!state.days.length) return emptyState('No times free right now',
-          'Every slot in the next three weeks is taken. Message us on WhatsApp and we will find you one.');
+          'Every slot in the next three weeks is taken. Message her directly and she will find you one.');
         renderDays();
       })
       .catch(function (err) {
@@ -263,8 +270,15 @@
       });
   }
 
+  // An empty state must never be a dead end: whatever the reason there are no
+  // slots, the visitor still gets a way to reach Divya.
   function emptyState(title, body) {
-    $('dbmPicker').innerHTML = '<div class="dbm-empty"><b>' + esc(title) + '</b>' + esc(body) + '</div>';
+    var wa = state.whatsapp
+      ? '<div style="margin-top:18px"><a class="dbm-wa" target="_blank" rel="noopener" href="https://wa.me/' +
+        esc(state.whatsapp) + '?text=' + encodeURIComponent('Hi Divya, I would like to book a private consultation.') +
+        '">Message Divya on WhatsApp</a></div>'
+      : '';
+    $('dbmPicker').innerHTML = '<div class="dbm-empty"><b>' + esc(title) + '</b>' + esc(body) + wa + '</div>';
   }
 
   function renderDays() {
@@ -437,7 +451,18 @@
         $('dbmWhen').textContent = dateOf(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
         $('dbmNote').textContent = d.next_step === 'payment'
           ? 'Payment confirmed. Your call is booked and the joining link is on its way to your email and WhatsApp.'
-          : 'We have reserved this time for you. Divya will message you on WhatsApp shortly with the payment link, and your slot is confirmed the moment it is paid.';
+          : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
+        // Until notifications exist, this is what actually tells Divya a
+        // booking happened. The slot is reserved either way.
+        var wa = $('dbmWa');
+        if (d.whatsapp_handoff) {
+          wa.href = d.whatsapp_handoff;
+          wa.hidden = false;
+          $('dbmWaNote').hidden = false;
+        } else {
+          wa.hidden = true;
+          $('dbmWaNote').hidden = true;
+        }
         $('dbmBox').scrollTop = 0;
       })
       .catch(function (err) {

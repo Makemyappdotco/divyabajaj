@@ -7,6 +7,7 @@ const { generateDeliverablePdf } = require('./services/reportPdf');
 const { buildCombinedCsv, buildExcelWorkbook } = require('./services/export');
 
 const delivery = require('./services/delivery');
+const reportStorage = require('./services/reportStorage');
 
 const router = express.Router();
 const PDF_LINK_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -202,6 +203,12 @@ router.post('/reports/free', async (req, res) => {
           reportText: result.report_text || ''
         });
         pdf = rendered.buffer;
+        // Stored now, so the WhatsApp document link resolves instantly later
+        // rather than re-rendering while Meta's fetcher waits.
+        await reportStorage.store({
+          reportId: report.id, reportType: 'free_numerology_awareness',
+          pdf, templateVersion: 'legacy-free-v1'
+        });
       } catch (pdfError) {
         console.error('[free report] could not render the PDF for email:', pdfError.message);
       }

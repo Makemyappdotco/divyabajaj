@@ -355,7 +355,38 @@ a{color:#c9a96e}div{max-width:30rem}</style>
 <p>Report links stay active for 30 days. Message Divya and she will send yours again.</p>
 <p><a href="https://wa.me/${CONTACT_WHATSAPP}">Message Divya on WhatsApp</a></p></div>`);
   }
-  return res.redirect(302, routes.signedPdfUrl(reportId));
+  // Serve the stored bytes, not a redirect.
+  //
+  // WhatsApp attaches a document by having Meta's servers FETCH this URL, and a
+  // fetcher that has to follow a redirect and then wait through a render is a
+  // fetcher that gives up. Stored PDFs come back in one hop, immediately.
+  return (async () => {
+    try {
+      const report = await db.getReport(reportId);
+      if (!report) return res.status(404).json({ error: 'Report not found' });
+
+      const stored = await reportStorage.fetch({ reportId, reportType: report.type });
+      if (stored) {
+        const name = String(report.type || '').includes('paid')
+          ? 'Divya-Bajaj-Full-Blueprint.pdf'
+          : 'Divya-Bajaj-Numerology-Reading.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${name}"`);
+        res.setHeader('Content-Length', String(stored.length));
+        // Safe to cache: the URL is single-purpose and expires on its own.
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        return res.end(stored);
+      }
+
+      // Nothing stored - an older report, or storage was down when it was
+      // made. Fall back to the route that renders on demand. Slow, but a
+      // customer in a browser will wait where a fetcher will not.
+      return res.redirect(302, routes.signedPdfUrl(reportId));
+    } catch (error) {
+      console.error('[report link]', error);
+      return res.redirect(302, routes.signedPdfUrl(reportId));
+    }
+  })();
 });
 
 app.get('/consultation', (req, res) => {

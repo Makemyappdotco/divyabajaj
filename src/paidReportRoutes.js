@@ -20,6 +20,7 @@ const jobs = require('./services/reportJobs');
 const blueprint = require('./services/paidBlueprint');
 const delivery = require('./services/delivery');
 const { generateDeliverablePdf } = require('./services/reportPdf');
+const reportStorage = require('./services/reportStorage');
 
 const router = express.Router();
 
@@ -272,6 +273,12 @@ async function runJob(jobId) {
         reportText: result.report_text || ''
       });
       pdf = rendered.buffer;
+      // The important one. This report takes minutes to render, so a document
+      // URL that rendered on demand would time out on Meta's side every time.
+      await reportStorage.store({
+        reportId: saved.report_id, reportType: 'paid_blueprint',
+        pdf, templateVersion: 'integrated-life-report-v1'
+      });
     } catch (error) {
       console.error('[blueprint:run] could not render the PDF for email, sending the link only:', error.message);
     }

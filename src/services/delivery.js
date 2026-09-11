@@ -15,6 +15,7 @@ const whatsapp = require('./transports/whatsapp');
 const email = require('./transports/email');
 const messages = require('./messages');
 const reportLinks = require('./reportLinks');
+const reportStorage = require('./reportStorage');
 
 function now() { return new Date().toISOString(); }
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
@@ -110,13 +111,21 @@ async function deliverReport({ environment, jobId, reportId, name, email: to, ph
 
   if (whatsappConfigured()) {
     const vars = messages.reportReadyWhatsapp({ name, reportToken: linkToken });
+    // A signed storage URL, valid a week - long enough for Meta to fetch and
+    // for the customer to open, short enough that a forwarded link dies.
+    const documentUrl = reportId
+      ? await reportStorage.signedUrl({ reportId, reportType: 'paid_blueprint' })
+      : null;
+
     result.whatsapp = await attempt({
       environment, jobId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('report_ready'),
         bodyParams: vars.body,
-        buttonUrlSuffix: vars.buttonUrlSuffix
+        buttonUrlSuffix: vars.buttonUrlSuffix,
+        documentUrl,
+        documentName: 'Divya-Bajaj-Full-Blueprint.pdf'
       })
     });
   }
@@ -164,13 +173,19 @@ async function deliverFreeReport({ environment, reportId, name, email: to, phone
 
   if (whatsappConfigured()) {
     const vars = messages.freeReportWhatsapp({ name, reportToken: linkToken });
+    const documentUrl = reportId
+      ? await reportStorage.signedUrl({ reportId, reportType: 'free_numerology_awareness' })
+      : null;
+
     result.whatsapp = await attempt({
       environment, jobId: reportId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('free_report_ready'),
         bodyParams: vars.body,
-        buttonUrlSuffix: vars.buttonUrlSuffix
+        buttonUrlSuffix: vars.buttonUrlSuffix,
+        documentUrl,
+        documentName: 'Divya-Bajaj-Numerology-Reading.pdf'
       })
     });
   }

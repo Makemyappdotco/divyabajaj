@@ -118,6 +118,33 @@ test('a JSON-encoded PDF can be recognised, so this is caught next time', () => 
   assert.ok(recovered.equals(PDF_BYTES), 'a broken download is fully recoverable');
 });
 
+test('the sample PDFs Meta fetches at approval exist and are real', () => {
+  const fs = require('fs');
+  const path = require('path');
+  // Meta downloads these when a template with a document header is submitted.
+  // A 404 or an HTML error page is an instant rejection.
+  ['free-numerology-reading-sample.pdf', 'full-blueprint-sample.pdf'].forEach(name => {
+    const file = path.join(__dirname, '..', 'public', 'samples', name);
+    assert.ok(fs.existsSync(file), `${name} is missing`);
+    const bytes = fs.readFileSync(file);
+    assert.strictEqual(bytes.subarray(0, 5).toString('latin1'), '%PDF-', `${name} is not a PDF`);
+    assert.ok(bytes.length > 2000, `${name} is suspiciously small`);
+    // WhatsApp caps documents at 100MB; well under is the point.
+    assert.ok(bytes.length < 15 * 1024 * 1024, `${name} is too large to attach`);
+  });
+});
+
+test('a stored report is served in one hop, not a redirect', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'server.js'), 'utf8');
+  const route = source.slice(source.indexOf("app.get('/r/:token'"));
+  const body = route.slice(0, route.indexOf("app.get('/consultation'"));
+  assert.ok(/reportStorage\.fetch/.test(body), 'the link route does not read stored bytes');
+  assert.ok(/application\/pdf/.test(body), 'the link route does not serve a PDF content type');
+  assert.ok(/res\.end\(stored\)/.test(body), 'the link route does not stream the stored bytes');
+});
+
 (async () => {
   for (const run of queue) await run();
   console.log(`\n${passed} passed, ${failed} failed\n`);

@@ -76,12 +76,27 @@ function authHeaders() {
 }
 
 /** Meta Cloud API body: components, numbered parameters, optional URL button. */
-function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text }) {
+function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
   if (text) {
     return { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } };
   }
 
   const components = [];
+
+  // The PDF itself, as a document header. Meta fetches this URL server-side
+  // and attaches what comes back, so it has to answer fast and with a real
+  // application/pdf - which is why reports are stored rather than rendered on
+  // demand. The template must have been APPROVED with a document header for
+  // this to be accepted at all.
+  if (documentUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{
+        type: 'document',
+        document: { link: documentUrl, filename: documentName || 'report.pdf' }
+      }]
+    });
+  }
   if (bodyParams && bodyParams.length) {
     components.push({
       type: 'body',
@@ -104,7 +119,7 @@ function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text }) {
 }
 
 /** The flatter shape most non-Meta-shaped BSPs use. */
-function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text }) {
+function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
   if (text) return { from: sender(), to, type: 'text', message: text };
   return {
     from: sender(),
@@ -113,7 +128,9 @@ function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text }) {
     template_name: template,
     language: language(),
     params: (bodyParams || []).map(String),
-    button_params: buttonUrlSuffix ? [String(buttonUrlSuffix)] : undefined
+    button_params: buttonUrlSuffix ? [String(buttonUrlSuffix)] : undefined,
+    header_document_url: documentUrl || undefined,
+    header_document_name: documentUrl ? (documentName || 'report.pdf') : undefined
   };
 }
 
@@ -124,7 +141,7 @@ function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text }) {
  * often enough that trusting the status code is how "it says it sent" and "the
  * customer got nothing" coexist for a week.
  */
-async function send({ to, template, bodyParams, buttonUrlSuffix, text }) {
+async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
   if (!isConfigured()) return { sent: false, reason: 'not_configured' };
 
   const number = normalise(to);
@@ -132,7 +149,7 @@ async function send({ to, template, bodyParams, buttonUrlSuffix, text }) {
   if (!template && !text) return { sent: false, reason: 'nothing to send' };
 
   const build = style() === 'simple' ? simpleBody : cloudBody;
-  const payload = build({ to: number, template, bodyParams, buttonUrlSuffix, text });
+  const payload = build({ to: number, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName });
 
   // Meta's own URL carries the sender in the path; most wrappers do not.
   const url = baseUrl().includes('{sender}')

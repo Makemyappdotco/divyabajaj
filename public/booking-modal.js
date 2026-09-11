@@ -127,6 +127,7 @@
     '.dbm-done{text-align:center;padding:16px 4px 6px}',
     '.dbm-tick{width:58px;height:58px;border-radius:50%;background:var(--gold-glow);border:1px solid var(--gold);',
     '  color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:27px;margin:0 auto 16px}',
+    '.dbm-tick.warn{background:rgba(181,101,29,0.15);border-color:#b5651d;color:#e08a3f}',
     '.dbm-done h3{font-family:var(--serif);font-size:23px;font-weight:600;color:var(--ivory)}',
     '.dbm-when{font-family:var(--serif);font-size:19px;color:var(--gold);margin-top:12px}',
     '.dbm-done p{color:var(--text-m);font-size:14px;margin-top:12px;line-height:1.6;max-width:44ch;margin-left:auto;margin-right:auto}',
@@ -238,8 +239,8 @@
           '</div>' +
         '</div>' +
         '<div class="dbm-done" id="dbmDone" hidden>' +
-          '<div class="dbm-tick">&#10003;</div>' +
-          '<h3>Your slot is reserved</h3>' +
+          '<div class="dbm-tick" id="dbmTick">&#10003;</div>' +
+          '<h3 id="dbmHeading">Your slot is reserved</h3>' +
           '<div class="dbm-when" id="dbmWhen"></div>' +
           '<p id="dbmNote"></p>' +
           '<a class="dbm-wa" id="dbmWa" target="_blank" rel="noopener" hidden>Message Divya on WhatsApp</a>' +
@@ -483,7 +484,7 @@
         // are told how to finish, rather than being dumped back to an empty
         // screen having lost their slot.
         if (d.next_step === 'payment') return pay(d);
-        showDone(d);
+        showDone(d, 'held');
       })
       .catch(function (err) {
         $('dbmGo').disabled = false;
@@ -492,13 +493,26 @@
       });
   }
 
-  function showDone(d, paid) {
+  // status: 'paid' (booked), 'held' (nothing failed - reserved, pay later),
+  // or 'failed' (a payment was attempted and did not go through). 'failed'
+  // must never show the same checkmark as 'paid' or 'held' - a customer who
+  // just watched Razorpay say the payment failed and then sees a green tick
+  // reads that as the booking having gone through anyway.
+  function showDone(d, status, note) {
     $('dbmMain').hidden = true;
     $('dbmDone').hidden = false;
-    $('dbmDone').querySelector('h3').textContent = paid ? 'Your call is booked' : 'Your slot is reserved';
+    var failed = status === 'failed';
+    var paid = status === 'paid';
+    $('dbmTick').textContent = failed ? '!' : '✓';
+    $('dbmTick').classList.toggle('warn', failed);
+    $('dbmHeading').textContent = paid ? 'Your call is booked'
+      : failed ? 'Payment not completed'
+      : 'Your slot is reserved';
     $('dbmWhen').textContent = dateOf(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
     $('dbmNote').textContent = paid
       ? 'Payment received. Divya will send the joining link before your call.'
+      : failed
+      ? (note || 'The payment did not go through. Your slot is still held - try again, or message Divya to finish.')
       : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
     var wa = $('dbmWa');
     if (!paid && d.whatsapp_handoff) {
@@ -551,26 +565,26 @@
               })
             })
               .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
-              .then(function () { showDone(booking, true); })
+              .then(function () { showDone(booking, 'paid'); })
               .catch(function (err) {
-                // Money may well have left their account, so never imply it did
-                // not. Tell them to talk to a human instead of paying twice.
-                showDone(booking, false);
-                msg('bad', err.message || 'Your payment went through but we could not confirm it here. Please message us and we will sort it out - do not pay again.');
+                // Money may well have left their account, so never imply it
+                // did not, never invite a retry, and never show this as a
+                // plain success either - tell them to talk to a human.
+                showDone(booking, 'failed', (err.message || 'Your payment went through but we could not confirm it here.') + ' Please message us and we will sort it out - do not pay again.');
               });
           },
           modal: {
             ondismiss: function () {
-              // Dismissing is not a failure: the slot is still held.
-              showDone(booking, false);
+              // Dismissing is not the same as a card being declined, but it is
+              // still not a success - no checkmark for either.
+              showDone(booking, 'failed', 'Payment was not completed. You have not been charged and your slot is still held - try again, or message Divya to finish.');
             }
           }
         });
 
         checkout.on('payment.failed', function (response) {
           var reason = (response && response.error && response.error.description) || 'The payment did not go through.';
-          showDone(booking, false);
-          msg('bad', reason + ' Your slot is still held - you can try again from the message below.');
+          showDone(booking, 'failed', reason + ' You have not been charged and your slot is still held - try again, or message Divya to finish.');
         });
 
         checkout.open();
@@ -578,8 +592,7 @@
       .catch(function (err) {
         // Could not even open checkout. The booking exists; fall back to the
         // WhatsApp handoff rather than losing it.
-        showDone(booking, false);
-        msg('bad', err.message || 'Could not open the payment window. Your slot is held - message us to finish.');
+        showDone(booking, 'failed', (err.message || 'Could not open the payment window.') + ' Your slot is held - message us to finish.');
       });
   }
 

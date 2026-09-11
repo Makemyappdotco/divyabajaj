@@ -104,6 +104,7 @@
   .done{text-align:center;padding:12px 6px 4px}
   .done .tick{width:52px;height:52px;border-radius:50%;background:var(--surface-2);color:var(--gold-d);
               display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px}
+  .done .tick.warn{background:#fdf2ea;color:#b5651d}
   .done h2{font-family:var(--serif);font-size:23px;font-weight:600}
   .done .when{font-family:var(--serif);font-size:18px;margin-top:12px}
   .done p{color:var(--ink-2);margin-top:10px;font-size:14px;max-width:46ch;margin-left:auto;margin-right:auto}
@@ -194,8 +195,8 @@
 
   <div class="card" id="doneCard" hidden>
     <div class="done">
-      <div class="tick">&#10003;</div>
-      <h2>Your slot is reserved</h2>
+      <div class="tick" id="doneTick">&#10003;</div>
+      <h2 id="doneHeading">Your slot is reserved</h2>
       <div class="when" id="doneWhen"></div>
       <p id="doneNote"></p>
       <a class="wa" id="doneWa" target="_blank" rel="noopener" hidden>Message Divya on WhatsApp</a>
@@ -413,7 +414,7 @@
       .then(function (d) {
         if (state.tick) clearInterval(state.tick);
         if (d.next_step === 'payment') return pay(d);
-        showDone(d, false);
+        showDone(d, 'held');
       })
       .catch(function (e) {
         $('submit').disabled = false;
@@ -422,13 +423,27 @@
       });
   });
 
-  function showDone(d, paid) {
+  // status: 'paid' (payment received, call booked), 'held' (nothing failed -
+  // the slot is reserved and a payment link will follow, e.g. no live
+  // gateway), or 'failed' (a payment was attempted and did not go through).
+  // 'failed' must never show the same checkmark as an actual success - a
+  // customer who just watched Razorpay say "Payment failed" and then sees a
+  // green tick reads that as their booking having gone through anyway.
+  function showDone(d, status, note) {
     show($('flow'), false);
     show($('doneCard'), true);
-    $('doneCard').querySelector('h2').textContent = paid ? 'Your call is booked' : 'Your slot is reserved';
+    var failed = status === 'failed';
+    var paid = status === 'paid';
+    $('doneTick').textContent = failed ? '!' : '✓';
+    $('doneTick').classList.toggle('warn', failed);
+    $('doneHeading').textContent = paid ? 'Your call is booked'
+      : failed ? 'Payment not completed'
+      : 'Your slot is reserved';
     $('doneWhen').textContent = longDate(d.starts_at) + ', ' + timeOf(d.starts_at) + ' IST';
     $('doneNote').textContent = paid
       ? 'Payment received. Divya will send the joining link before your call.'
+      : failed
+      ? (note || 'The payment did not go through. Your slot is still held - try again, or message Divya to finish.')
       : 'This time is held for you. Send Divya a quick message to get your payment link, and the slot is confirmed the moment it is paid.';
     if (!paid && d.whatsapp_handoff) {
       $('doneWa').href = d.whatsapp_handoff;
@@ -483,25 +498,24 @@
               })
             })
               .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); return j; }); })
-              .then(function () { showDone(booking, true); })
+              .then(function () { showDone(booking, 'paid'); })
               .catch(function (err) {
-                // Money may have moved. Never suggest paying again.
-                showDone(booking, false);
-                message($('formMsg'), 'bad', err.message || 'Your payment went through but we could not confirm it here. Please message us - do not pay again.');
+                // Money may have moved, so this must never say "not charged"
+                // or invite a retry - only ever "message us", never a plain
+                // success either.
+                showDone(booking, 'failed', (err.message || 'Your payment went through but we could not confirm it here.') + ' Please message us and we will sort it out - do not pay again.');
               });
           },
-          modal: { ondismiss: function () { showDone(booking, false); } }
+          modal: { ondismiss: function () { showDone(booking, 'failed', 'Payment was not completed. You have not been charged and your slot is still held - try again, or message Divya to finish.'); } }
         });
         checkout.on('payment.failed', function (response) {
           var reason = (response && response.error && response.error.description) || 'The payment did not go through.';
-          showDone(booking, false);
-          message($('formMsg'), 'bad', reason + ' Your slot is still held.');
+          showDone(booking, 'failed', reason + ' You have not been charged and your slot is still held - try again, or message Divya to finish.');
         });
         checkout.open();
       })
       .catch(function (err) {
-        showDone(booking, false);
-        message($('formMsg'), 'bad', err.message || 'Could not open the payment window. Your slot is held - message us to finish.');
+        showDone(booking, 'failed', (err.message || 'Could not open the payment window.') + ' Your slot is held - message us to finish.');
       });
   }
 

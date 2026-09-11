@@ -16,6 +16,7 @@ const store = require('./services/booking/store');
 const razorpay = require('./services/razorpay');
 const pricing = require('./services/pricing');
 const reportJobs = require('./services/reportJobs');
+const delivery = require('./services/delivery');
 
 const router = express.Router();
 
@@ -177,11 +178,44 @@ async function confirmPaid({ appointment, gatewayOrderId, paymentId, source }) {
     updated_at: now()
   });
 
-  if (appointment.status !== 'confirmed') {
-    await store.setAppointmentStatus(appointment.id, 'confirmed', {
-      reason: `paid via razorpay (${source})`,
-      changedBy: source === 'webhook' ? 'razorpay-webhook' : 'customer'
+  // onlyFrom makes this a claim, not an overwrite. The browser's /verify and
+  // Razorpay's webhook both arrive for the same payment, usually within a
+  // second of each other; whichever gets here second finds nothing to update
+  // and returns null, so the customer is confirmed once and messaged once.
+  const claimed = await store.setAppointmentStatus(appointment.id, 'confirmed', {
+    reason: `paid via razorpay (${source})`,
+    changedBy: source === 'webhook' ? 'razorpay-webhook' : 'customer',
+    onlyFrom: ['pending_payment']
+  });
+
+  if (!claimed) return;
+
+  // Messaging never fails a confirmed, paid booking. The slot is theirs
+  // whether or not the message lands.
+  try {
+    const lead = appointment.lead_id ? await db.getLead(appointment.lead_id) : null;
+    await delivery.deliverBookingConfirmation({
+      environment: appointment.environment,
+      appointmentId: appointment.id,
+      name: (lead && lead.name) || '',
+      email: (lead && lead.email) || '',
+      phone: (lead && lead.phone) || '',
+      startsAt: appointment.starts_at,
+      mode: appointment.mode
     });
+
+    await delivery.notifyOwner({
+      environment: appointment.environment,
+      event: 'consultation',
+      name: (lead && lead.name) || '',
+      phone: (lead && lead.phone) || '',
+      email: (lead && lead.email) || '',
+      question: appointment.customer_question || '',
+      startsAt: appointment.starts_at,
+      amountInr: order ? Number(order.amount) : null
+    });
+  } catch (error) {
+    console.error('[payment:confirm] booking confirmed but messaging failed', error.message);
   }
 }
 

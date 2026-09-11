@@ -1,68 +1,43 @@
-// Getting a finished report to the customer, over WhatsApp and email.
+// Getting things to the customer, and to Divya.
 //
-// NEITHER CHANNEL IS WIRED YET. Uomox has not given us an API key and there is
-// no email provider on the account, so every send currently returns
-// { sent: false, reason: 'not_configured' }.
+// Two transports underneath (Uomox for WhatsApp, Resend for email), one set of
+// message definitions beside it, and this file to decide who gets what.
 //
-// That is the point of this module existing before either provider does. The
-// rest of the system needs one honest answer to "can we message this person",
-// because the customer-facing copy depends on it: a page that says "you can
-// close this, it will reach your WhatsApp" when nothing can send is a lie that
-// costs someone their report. isConfigured() is what that copy is driven from.
-//
-// When the keys arrive, fill in sendWhatsApp/sendEmail below. Nothing else in
-// the codebase has to change.
+// Nothing here ever throws at its caller. A report that was generated and paid
+// for must not be rolled back because a message failed to send; the failure is
+// recorded, surfaced in the panel, and the report stays delivered by every
+// other means. That is also why every attempt is logged including the skips -
+// "nobody was told" has to be visible, not inferred.
 
 const crypto = require('crypto');
 const db = require('../database');
+const whatsapp = require('./transports/whatsapp');
+const email = require('./transports/email');
+const messages = require('./messages');
+const reportLinks = require('./reportLinks');
 
 function now() { return new Date().toISOString(); }
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 
-// --------------------------------------------------------------- providers
+function ownerPhone() { return process.env.OWNER_WHATSAPP || process.env.CONTACT_WHATSAPP || ''; }
+function ownerEmail() { return process.env.OWNER_EMAIL || ''; }
 
-function whatsappConfigured() {
-  return Boolean(process.env.UOMOX_API_KEY && process.env.UOMOX_SENDER);
-}
+function whatsappConfigured() { return whatsapp.isConfigured(); }
+function emailConfigured() { return email.isConfigured(); }
 
-function emailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
-}
-
-/** Whether ANY channel can actually deliver. Drives what the customer is told. */
-function isConfigured() {
-  return whatsappConfigured() || emailConfigured();
-}
+/** Whether ANY channel can deliver. Drives what the customer is promised. */
+function isConfigured() { return whatsappConfigured() || emailConfigured(); }
 
 function channels() {
   return {
     whatsapp: whatsappConfigured(),
-    email: emailConfigured()
+    email: emailConfigured(),
+    // True while Resend is still on its shared sender, which only delivers to
+    // the account owner. Looks configured, cannot reach a customer.
+    email_sandbox: emailConfigured() && email.isSandboxSender()
   };
 }
 
-/**
- * Uomox. Placeholder until the API key and the endpoint shape are known -
- * deliberately not guessed, because a wrong request shape that returns 200
- * looks exactly like a working integration until a customer says they got
- * nothing.
- */
-async function sendWhatsApp({ to, name, reportUrl }) {
-  if (!whatsappConfigured()) return { sent: false, reason: 'not_configured' };
-  throw new Error('Uomox transport is not implemented yet');
-}
-
-async function sendEmail({ to, name, subject, reportUrl }) {
-  if (!emailConfigured()) return { sent: false, reason: 'not_configured' };
-  throw new Error('Email transport is not implemented yet');
-}
-
-// ----------------------------------------------------------------- logging
-
-/**
- * Every attempt is recorded, successes and skips alike, so Divya's panel can
- * show exactly who is still owed a message rather than inferring it.
- */
 async function record({ environment, jobId, channel, to, status, detail }) {
   const supabase = db.getSupabaseClient();
   if (!supabase) return;
@@ -72,54 +47,166 @@ async function record({ environment, jobId, channel, to, status, detail }) {
       environment: environment || 'test',
       job_id: jobId || '',
       channel,
-      recipient: to || '',
+      recipient: String(to || '').slice(0, 120),
       status,
       detail: String(detail || '').slice(0, 500),
       created_at: now()
     });
   } catch (error) {
-    // Never let bookkeeping fail a delivery, or a report the customer paid for.
     console.error('[delivery] could not record attempt:', error.message);
   }
 }
 
+/** Runs one send, catches everything, and writes down what happened. */
+async function attempt({ environment, jobId, channel, to, run }) {
+  if (!to) {
+    await record({ environment, jobId, channel, to, status: 'skipped', detail: 'no recipient' });
+    return { sent: false, reason: 'no recipient' };
+  }
+  try {
+    const result = await run();
+    await record({
+      environment, jobId, channel, to,
+      status: result.sent ? 'sent' : 'skipped',
+      detail: result.sent ? (result.id || '') : (result.reason || '')
+    });
+    return result;
+  } catch (error) {
+    await record({ environment, jobId, channel, to, status: 'failed', detail: error.message });
+    console.error(`[delivery:${channel}]`, error.message);
+    return { sent: false, reason: error.message };
+  }
+}
+
+// ------------------------------------------------------------ the report
+
 /**
- * Send a finished report on every channel we have a provider for.
+ * The finished blueprint, to the customer, on every channel we have.
  *
- * Never throws. A delivery problem must not roll back a report that was
- * successfully generated and paid for; it is recorded and surfaced instead.
+ * @param {Buffer} [pdf] attached to the email when present. WhatsApp always
+ * gets a link instead - it cannot carry a file of its own.
  */
-async function deliverReport({ environment, jobId, name, email, phone, reportUrl }) {
+async function deliverReport({ environment, jobId, reportId, name, email: to, phone, pdf }) {
   const result = { attempted: false, whatsapp: null, email: null };
 
   if (!isConfigured()) {
-    await record({ environment, jobId, channel: 'none', to: email || phone, status: 'skipped', detail: 'no provider configured' });
+    await record({ environment, jobId, channel: 'none', to: to || phone, status: 'skipped', detail: 'no provider configured' });
     return Object.assign(result, { reason: 'not_configured' });
   }
-
   result.attempted = true;
 
-  if (whatsappConfigured() && phone) {
-    try {
-      result.whatsapp = await sendWhatsApp({ to: phone, name, reportUrl });
-      await record({ environment, jobId, channel: 'whatsapp', to: phone, status: result.whatsapp.sent ? 'sent' : 'skipped', detail: result.whatsapp.reason });
-    } catch (error) {
-      result.whatsapp = { sent: false, reason: error.message };
-      await record({ environment, jobId, channel: 'whatsapp', to: phone, status: 'failed', detail: error.message });
+  // One link, both channels, minted once so they cannot disagree.
+  let link = '';
+  let linkToken = '';
+  try {
+    if (reportId) {
+      linkToken = reportLinks.token(reportId);
+      link = `${reportLinks.siteUrl()}/r/${linkToken}`;
     }
+  } catch (error) {
+    // Signing is not configured. The email can still carry the attachment.
+    console.error('[delivery] could not mint a report link:', error.message);
   }
 
-  if (emailConfigured() && email) {
-    try {
-      result.email = await sendEmail({ to: email, name, subject: 'Your Full Blueprint from Divya Bajaj', reportUrl });
-      await record({ environment, jobId, channel: 'email', to: email, status: result.email.sent ? 'sent' : 'skipped', detail: result.email.reason });
-    } catch (error) {
-      result.email = { sent: false, reason: error.message };
-      await record({ environment, jobId, channel: 'email', to: email, status: 'failed', detail: error.message });
-    }
+  if (whatsappConfigured()) {
+    const vars = messages.reportReadyWhatsapp({ name, reportToken: linkToken });
+    result.whatsapp = await attempt({
+      environment, jobId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone,
+        template: whatsapp.templateName('report_ready'),
+        bodyParams: vars.body,
+        buttonUrlSuffix: vars.buttonUrlSuffix
+      })
+    });
+  }
+
+  if (emailConfigured()) {
+    const mail = messages.reportReadyEmail({ name, reportUrl: link });
+    result.email = await attempt({
+      environment, jobId, channel: 'email', to,
+      run: () => email.send({
+        to,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+        attachment: pdf ? { filename: 'Divya-Bajaj-Full-Blueprint.pdf', content: pdf } : null
+      })
+    });
+  }
+
+  result.delivered = Boolean((result.whatsapp && result.whatsapp.sent) || (result.email && result.email.sent));
+  return result;
+}
+
+// ------------------------------------------------------- the consultation
+
+async function deliverBookingConfirmation({ environment, appointmentId, name, email: to, phone, startsAt, mode }) {
+  const result = { attempted: false, whatsapp: null, email: null };
+  if (!isConfigured()) return Object.assign(result, { reason: 'not_configured' });
+  result.attempted = true;
+
+  if (whatsappConfigured()) {
+    const vars = messages.consultationConfirmedWhatsapp({ name, startsAt });
+    result.whatsapp = await attempt({
+      environment, jobId: appointmentId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone,
+        template: whatsapp.templateName('consultation_confirmed'),
+        bodyParams: vars.body
+      })
+    });
+  }
+
+  if (emailConfigured()) {
+    const mail = messages.consultationConfirmedEmail({ name, startsAt, mode });
+    result.email = await attempt({
+      environment, jobId: appointmentId, channel: 'email', to,
+      run: () => email.send({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    });
+  }
+
+  result.delivered = Boolean((result.whatsapp && result.whatsapp.sent) || (result.email && result.email.sent));
+  return result;
+}
+
+// -------------------------------------------------------------- to Divya
+
+/**
+ * Divya's heads-up.
+ *
+ * Deliberately separate from the customer's message and deliberately
+ * best-effort: this is a convenience so she does not have to watch the panel,
+ * never the thing a customer depends on. Her WhatsApp copy is free text, which
+ * only reaches her if she has messaged the business number in the last 24
+ * hours - so the email carries the same information for when it has not.
+ */
+async function notifyOwner({ environment, event, name, phone, email: customerEmail, question, startsAt, amountInr }) {
+  const result = { whatsapp: null, email: null };
+
+  if (whatsappConfigured() && ownerPhone()) {
+    result.whatsapp = await attempt({
+      environment, jobId: `owner:${event}`, channel: 'whatsapp-owner', to: ownerPhone(),
+      run: () => whatsapp.send({
+        to: ownerPhone(),
+        text: messages.ownerAlertWhatsapp({ event, name, phone, question, startsAt, amountInr })
+      })
+    });
+  }
+
+  if (emailConfigured() && ownerEmail()) {
+    const mail = messages.ownerAlertEmail({ event, name, phone, email: customerEmail, question, startsAt, amountInr });
+    result.email = await attempt({
+      environment, jobId: `owner:${event}`, channel: 'email-owner', to: ownerEmail(),
+      run: () => email.send({ to: ownerEmail(), subject: mail.subject, text: mail.text, html: mail.html })
+    });
   }
 
   return result;
 }
 
-module.exports = { isConfigured, channels, deliverReport, whatsappConfigured, emailConfigured };
+module.exports = {
+  isConfigured, channels, whatsappConfigured, emailConfigured,
+  deliverReport, deliverBookingConfirmation, notifyOwner,
+  ownerPhone, ownerEmail
+};

@@ -19,6 +19,7 @@ const pricing = require('./services/pricing');
 const jobs = require('./services/reportJobs');
 const blueprint = require('./services/paidBlueprint');
 const delivery = require('./services/delivery');
+const { generateDeliverablePdf } = require('./services/reportPdf');
 
 const router = express.Router();
 
@@ -242,17 +243,50 @@ async function runJob(jobId) {
 
     await jobs.markGenerated(claimed.id, { reportId: saved.report_id });
 
-    // Delivery is best effort and never rolls back a generated report. Today
-    // it always reports 'not_configured'.
+    // The PDF, so the email can carry it as an attachment rather than only a
+    // link. Rendering can fail on a cold serverless start; if it does the
+    // email still goes with the link, which is why this is not fatal.
+    let pdf = null;
+    try {
+      const lead = claimed.lead_id ? await db.getLead(claimed.lead_id) : null;
+      const rendered = await generateDeliverablePdf({
+        lead: lead || claimed.payload,
+        report: { report_json: result.report_json, ai_report: result.report_text },
+        reportJson: result.report_json || null,
+        numbers: result.numbers || {},
+        astrologyData: result.astrology_data || null,
+        reportText: result.report_text || ''
+      });
+      pdf = rendered.buffer;
+    } catch (error) {
+      console.error('[blueprint:run] could not render the PDF for email, sending the link only:', error.message);
+    }
+
+    // Delivery is best effort and never rolls back a generated report: the
+    // customer has paid and the report exists either way.
     const sent = await delivery.deliverReport({
       environment: claimed.environment,
       jobId: claimed.id,
+      reportId: saved.report_id,
       name: claimed.payload.name,
       email: claimed.payload.email,
       phone: claimed.payload.phone,
-      reportUrl: ''
+      pdf
     });
     await jobs.recordDelivery(claimed.id, sent);
+
+    // Divya's own heads-up, separately, so a failure to reach her never looks
+    // like a failure to reach the customer.
+    const price = await pricing.priceOf(PRODUCT, claimed.environment).catch(() => null);
+    await delivery.notifyOwner({
+      environment: claimed.environment,
+      event: 'blueprint',
+      name: claimed.payload.name,
+      phone: claimed.payload.phone,
+      email: claimed.payload.email,
+      question: claimed.payload.question,
+      amountInr: price ? price.amount_inr : null
+    });
 
     return { claimed: true, ok: true, report: result, reportId: saved.report_id };
   } catch (error) {

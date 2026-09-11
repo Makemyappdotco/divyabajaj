@@ -226,18 +226,34 @@ async function createAppointment({
   return { ok: true, appointment: data };
 }
 
-async function setAppointmentStatus(appointmentId, toStatus, { reason, changedBy = 'system', patch = {} } = {}) {
+/**
+ * @param {string[]} [opts.onlyFrom] statuses the appointment must currently be
+ * in for this to apply. Supplying it makes the change a claim rather than an
+ * overwrite: the update matches nothing if somebody else moved the row first,
+ * and the caller gets null. That is what lets exactly one of the browser and
+ * the webhook send the confirmation message for a single payment - both arrive
+ * for the same booking, and reading the status first only tells you what it
+ * was a moment ago.
+ */
+async function setAppointmentStatus(appointmentId, toStatus, { reason, changedBy = 'system', patch = {}, onlyFrom = null } = {}) {
   const existing = await client().from('appointments').select('status').eq('id', appointmentId).maybeSingle();
   if (existing.error) throw new Error(`Load appointment failed: ${existing.error.message}`);
   if (!existing.data) return null;
 
-  const { data, error } = await client().from('appointments')
+  let query = client().from('appointments')
     .update({ ...patch, status: toStatus, updated_at: now() })
-    .eq('id', appointmentId).select().single();
+    .eq('id', appointmentId);
+  if (onlyFrom && onlyFrom.length) query = query.in('status', onlyFrom);
+
+  const { data, error } = await query.select();
   if (error) throw new Error(`Update appointment failed: ${error.message}`);
 
+  const row = Array.isArray(data) ? data[0] : data;
+  // Lost the race. Somebody else already moved it.
+  if (!row) return null;
+
   await recordStatus(appointmentId, existing.data.status, toStatus, reason, changedBy);
-  return data;
+  return row;
 }
 
 async function getAppointment(appointmentId) {

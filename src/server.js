@@ -23,6 +23,7 @@ const reportSweep = require('./services/reportSweep');
 const pricing = require('./services/pricing');
 const pricingPatch = require('./services/pricingPatch');
 const { validateReportInput } = require('./services/reportInputValidation');
+const reportLinks = require('./services/reportLinks');
 const personalBlueprintPreviewRoutes = require('./personalBlueprintPreviewRoutes');
 const { adminAuth, adminConfigured } = require('./auth');
 const {
@@ -315,6 +316,31 @@ app.get(['/book-consultation', '/private-consultation', '/consultation/book'], (
   const queryIndex = req.originalUrl.indexOf('?');
   const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
   return res.redirect(302, `/consultation${query}#bookingForm`);
+});
+
+/**
+ * The short link a customer taps in WhatsApp or email.
+ *
+ * Redirects to the signed PDF route rather than rendering here, so there is
+ * exactly one place that turns a report into a PDF. An invalid or expired
+ * token gets a plain, non-technical page - the person holding it is a
+ * customer, not a developer.
+ */
+app.get('/r/:token', (req, res) => {
+  const reportId = reportLinks.verify(req.params.token);
+  if (!reportId) {
+    res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(`<!doctype html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Link expired</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0910;color:#e8dcc8;
+font:16px/1.6 system-ui,sans-serif;padding:24px;text-align:center}
+a{color:#c9a96e}div{max-width:30rem}</style>
+<div><h1 style="font-weight:600;font-size:1.4rem">This link has expired</h1>
+<p>Report links stay active for 30 days. Message Divya and she will send yours again.</p>
+<p><a href="https://wa.me/${CONTACT_WHATSAPP}">Message Divya on WhatsApp</a></p></div>`);
+  }
+  return res.redirect(302, routes.signedPdfUrl(reportId));
 });
 
 app.get('/consultation', (req, res) => {

@@ -12,6 +12,9 @@
 
 const express = require('express');
 const razorpay = require('./services/razorpay');
+const whatsapp = require('./services/transports/whatsapp');
+const email = require('./services/transports/email');
+const delivery = require('./services/delivery');
 
 const router = express.Router();
 
@@ -91,6 +94,70 @@ router.get('/status', async (req, res) => {
     report.razorpay_said = (error.razorpay && error.razorpay.description) || '';
   }
 
+  return res.json(report);
+});
+
+/**
+ * Can we actually message anyone? The same question as /status, for the two
+ * delivery channels, and answered the same way: by asking the provider rather
+ * than by checking that a variable exists.
+ */
+router.get('/delivery', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+
+  const report = {
+    whatsapp: {
+      configured: whatsapp.isConfigured(),
+      sender: whatsapp.sender(),
+      api_style: whatsapp.style(),
+      templates: {
+        report_ready: whatsapp.templateName('report_ready'),
+        consultation_confirmed: whatsapp.templateName('consultation_confirmed')
+      },
+      message: whatsapp.isConfigured()
+        ? 'Configured. A template that Meta has not approved will still fail at send time, and the panel shows that per customer.'
+        : 'Not configured. Set UOMOX_API_URL, UOMOX_API_KEY and UOMOX_SENDER.'
+    },
+    email: {
+      configured: email.isConfigured(),
+      from: email.from(),
+      authenticated: null,
+      message: ''
+    },
+    owner: {
+      whatsapp: delivery.ownerPhone() ? 'set' : 'not set - Divya will not be alerted on WhatsApp',
+      email: delivery.ownerEmail() ? 'set' : 'not set - Divya will not be alerted by email'
+    }
+  };
+
+  if (!email.isConfigured()) {
+    report.email.message = 'Not configured. Set RESEND_API_KEY and MAIL_FROM.';
+  } else if (email.isSandboxSender()) {
+    // The trap worth naming: it authenticates, it returns 200, and it delivers
+    // to nobody but the Resend account owner.
+    report.email.message = 'Still sending from Resend\'s shared address, which only delivers to your own inbox. Verify divyabajaj.com in Resend and set MAIL_FROM to an address on it before any customer relies on email.';
+  }
+
+  if (email.isConfigured()) {
+    try {
+      const ping = await email.ping();
+      report.email.authenticated = true;
+      report.email.domains = ping.domains;
+      const verified = (ping.domains || []).filter(d => d.status === 'verified').map(d => d.name);
+      if (!report.email.message) {
+        report.email.message = verified.length
+          ? `Connected. Verified domains: ${verified.join(', ')}.`
+          : 'Connected, but no domain is verified yet, so delivery will be limited.';
+      }
+    } catch (error) {
+      report.email.authenticated = false;
+      report.email.message = error.status === 401
+        ? 'Resend rejected the API key. Generate a new one and redeploy.'
+        : `Resend could not be reached: ${error.message}`;
+    }
+  }
+
+  report.can_deliver = delivery.isConfigured();
   return res.json(report);
 });
 

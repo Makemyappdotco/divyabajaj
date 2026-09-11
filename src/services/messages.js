@@ -66,6 +66,147 @@ ${reportUrl ? `<p style="margin:0 0 24px"><a href="${escapeHtml(reportUrl)}" sty
   };
 }
 
+/**
+ * The free report.
+ *
+ * The landing page has always promised "sent instantly to your email and
+ * WhatsApp". It was the highest-volume moment on the site and the only one
+ * with a promise attached, and nothing was sending. This is that promise.
+ */
+function freeReportEmail({ name, reportUrl }) {
+  const who = firstName(name);
+  return {
+    subject: 'Your free numerology reading from Divya Bajaj',
+    text: [
+      `Hi ${who},`,
+      '',
+      'Your free numerology reading is ready, and it is attached.',
+      '',
+      'It covers your ruling number, your destiny path and current life phase,',
+      'and one remedy chosen for your numbers.',
+      '',
+      reportUrl ? `You can also open it here: ${reportUrl}` : '',
+      '',
+      'If you want the full picture, the Full Blueprint adds your birth chart,',
+      'your current Dasha and a 30-day plan. Just reply and Divya will explain.',
+      '',
+      'Divya Bajaj',
+      'Astro-Numerologist'
+    ].filter(Boolean).join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+<p style="margin:0 0 18px">Your free numerology reading is ready, and it is attached to this email.</p>
+<p style="margin:0 0 18px">It covers your ruling number, your destiny path and current life phase, and one remedy chosen for your numbers.</p>
+${reportUrl ? `<p style="margin:0 0 24px"><a href="${escapeHtml(reportUrl)}" style="display:inline-block;background:#B08D4A;color:#fff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600">Open your reading</a></p>` : ''}
+<p style="margin:0 0 18px;color:#6b6156;font-size:14px">If you want the full picture, the Full Blueprint adds your birth chart, your current Dasha and a 30-day plan. Reply to this email and Divya will explain.</p>
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj<br><span style="font-size:14px">Astro-Numerologist</span></p>
+</div>`
+  };
+}
+
+/** Paid, but the report takes minutes. Said once, so the wait is not silence. */
+function paymentReceivedEmail({ name, amountInr }) {
+  const who = firstName(name);
+  return {
+    subject: 'Payment received - your Full Blueprint is being prepared',
+    text: [
+      `Hi ${who},`,
+      '',
+      amountInr ? `We have received your payment of ₹${Number(amountInr).toLocaleString('en-IN')}.` : 'We have received your payment.',
+      '',
+      'Divya is preparing your Full Blueprint now. It takes a few minutes,',
+      'and it will arrive here and on WhatsApp as soon as it is ready.',
+      '',
+      'You do not need to do anything.',
+      '',
+      'Divya Bajaj',
+      'Astro-Numerologist'
+    ].join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+<p style="margin:0 0 18px">${amountInr ? `We have received your payment of &#8377;${Number(amountInr).toLocaleString('en-IN')}.` : 'We have received your payment.'}</p>
+<p style="margin:0 0 18px">Divya is preparing your Full Blueprint now. It takes a few minutes, and it will arrive here and on WhatsApp as soon as it is ready.</p>
+<p style="margin:0 0 18px;color:#6b6156">You do not need to do anything.</p>
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj<br><span style="font-size:14px">Astro-Numerologist</span></p>
+</div>`
+  };
+}
+
+/** It could not be built. Said plainly, with the money already on its way back. */
+function refundedEmail({ name, amountInr }) {
+  const who = firstName(name);
+  return {
+    subject: 'Your payment has been refunded in full',
+    text: [
+      `Hi ${who},`,
+      '',
+      'We could not complete your Full Blueprint, so your payment',
+      amountInr ? `of ₹${Number(amountInr).toLocaleString('en-IN')} has been refunded in full.` : 'has been refunded in full.',
+      'It should be back with you within a few working days.',
+      '',
+      'This was our fault, not anything to do with your details.',
+      'Reply to this email and Divya will prepare your reading personally.',
+      '',
+      'Divya Bajaj',
+      'Astro-Numerologist'
+    ].join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+<p style="margin:0 0 18px">We could not complete your Full Blueprint, so your payment${amountInr ? ` of &#8377;${Number(amountInr).toLocaleString('en-IN')}` : ''} has been refunded in full. It should be back with you within a few working days.</p>
+<p style="margin:0 0 18px">This was our fault, not anything to do with your details. Reply to this email and Divya will prepare your reading personally.</p>
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj<br><span style="font-size:14px">Astro-Numerologist</span></p>
+</div>`
+  };
+}
+
+function consultationReminderEmail({ name, startsAt, mode, joinUrl, soon }) {
+  const who = firstName(name);
+  const when = inIst(startsAt);
+  return {
+    subject: soon ? 'Your consultation with Divya starts in an hour' : 'Your consultation with Divya is tomorrow',
+    text: [
+      `Hi ${who},`,
+      '',
+      soon ? 'Your consultation starts in about an hour.' : 'A reminder that your consultation is tomorrow.',
+      '',
+      `When: ${when}`,
+      `Format: ${mode === 'phone_call' ? 'Phone call' : 'Video call'}`,
+      joinUrl ? `Join here: ${joinUrl}` : '',
+      '',
+      'Have your questions ready. Reply here if you need to move it.',
+      '',
+      'Divya Bajaj'
+    ].filter(Boolean).join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+<p style="margin:0 0 18px">${soon ? 'Your consultation starts in about an hour.' : 'A reminder that your consultation is tomorrow.'}</p>
+<p style="margin:0 0 18px"><strong>${escapeHtml(when)}</strong><br>${mode === 'phone_call' ? 'Phone call' : 'Video call'}</p>
+${joinUrl ? `<p style="margin:0 0 24px"><a href="${escapeHtml(joinUrl)}" style="display:inline-block;background:#B08D4A;color:#fff;text-decoration:none;padding:12px 22px;border-radius:6px;font-weight:600">Join the call</a></p>` : ''}
+<p style="margin:0 0 18px;color:#6b6156">Have your questions ready. Reply here if you need to move it.</p>
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj</p>
+</div>`
+  };
+}
+
+function consultationMovedEmail({ name, startsAt, cancelled }) {
+  const who = firstName(name);
+  return {
+    subject: cancelled ? 'Your consultation has been cancelled' : 'Your consultation has been moved',
+    text: cancelled
+      ? [`Hi ${who},`, '', 'Your consultation has been cancelled and any payment will be returned.',
+         'Reply here if you would like to book another time.', '', 'Divya Bajaj'].join('\n')
+      : [`Hi ${who},`, '', 'Your consultation has been moved.', '', `New time: ${inIst(startsAt)}`,
+         '', 'Reply here if that does not work.', '', 'Divya Bajaj'].join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+${cancelled
+  ? '<p style="margin:0 0 18px">Your consultation has been cancelled and any payment will be returned. Reply here if you would like to book another time.</p>'
+  : `<p style="margin:0 0 18px">Your consultation has been moved.</p><p style="margin:0 0 18px"><strong>${escapeHtml(inIst(startsAt))}</strong></p><p style="margin:0 0 18px;color:#6b6156">Reply here if that does not work.</p>`}
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj</p>
+</div>`
+  };
+}
+
 function consultationConfirmedEmail({ name, startsAt, mode }) {
   const who = firstName(name);
   const when = inIst(startsAt);
@@ -148,6 +289,33 @@ function consultationConfirmedWhatsapp({ name, startsAt }) {
   };
 }
 
+function freeReportWhatsapp({ name, reportToken }) {
+  // free_report_ready:  "Hi {{1}}, your free numerology reading is ready..."
+  return { body: [firstName(name)], buttonUrlSuffix: reportToken || '' };
+}
+
+function paymentReceivedWhatsapp({ name, amountInr }) {
+  // payment_received:  "Hi {{1}}, we have received your payment of {{2}}..."
+  return { body: [firstName(name), `₹${Number(amountInr || 0).toLocaleString('en-IN')}`] };
+}
+
+function refundedWhatsapp({ name, amountInr }) {
+  // blueprint_refunded:  "Hi {{1}}, ... refunded {{2}} in full..."
+  return { body: [firstName(name), `₹${Number(amountInr || 0).toLocaleString('en-IN')}`] };
+}
+
+function consultationReminderWhatsapp({ name, startsAt, soon }) {
+  // consultation_reminder_day / consultation_reminder_hour
+  return { body: [firstName(name), inIst(startsAt)], soon: Boolean(soon) };
+}
+
+function consultationMovedWhatsapp({ name, startsAt, cancelled }) {
+  // consultation_moved / consultation_cancelled
+  return cancelled
+    ? { body: [firstName(name)] }
+    : { body: [firstName(name), inIst(startsAt)] };
+}
+
 /**
  * Divya's heads-up, as free text.
  *
@@ -169,7 +337,13 @@ function ownerAlertWhatsapp({ event, name, phone, question, startsAt, amountInr 
 }
 
 module.exports = {
-  reportReadyEmail, consultationConfirmedEmail, ownerAlertEmail,
-  reportReadyWhatsapp, consultationConfirmedWhatsapp, ownerAlertWhatsapp,
+  // email
+  reportReadyEmail, freeReportEmail, paymentReceivedEmail, refundedEmail,
+  consultationConfirmedEmail, consultationReminderEmail, consultationMovedEmail,
+  ownerAlertEmail,
+  // whatsapp template variables
+  reportReadyWhatsapp, freeReportWhatsapp, paymentReceivedWhatsapp, refundedWhatsapp,
+  consultationConfirmedWhatsapp, consultationReminderWhatsapp, consultationMovedWhatsapp,
+  ownerAlertWhatsapp,
   inIst, firstName
 };

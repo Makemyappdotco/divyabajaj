@@ -139,6 +139,110 @@ async function deliverReport({ environment, jobId, reportId, name, email: to, ph
   return result;
 }
 
+/**
+ * The free reading.
+ *
+ * The landing page has promised "sent instantly to your email and WhatsApp"
+ * since launch, and nothing was sending. This is the highest-volume moment on
+ * the site, so it is also the one where a silent failure costs most.
+ */
+async function deliverFreeReport({ environment, reportId, name, email: to, phone, pdf }) {
+  const result = { attempted: false, whatsapp: null, email: null };
+  if (!isConfigured()) return Object.assign(result, { reason: 'not_configured' });
+  result.attempted = true;
+
+  let link = '';
+  let linkToken = '';
+  try {
+    if (reportId) {
+      linkToken = reportLinks.token(reportId);
+      link = `${reportLinks.siteUrl()}/r/${linkToken}`;
+    }
+  } catch (error) {
+    console.error('[delivery] could not mint a free report link:', error.message);
+  }
+
+  if (whatsappConfigured()) {
+    const vars = messages.freeReportWhatsapp({ name, reportToken: linkToken });
+    result.whatsapp = await attempt({
+      environment, jobId: reportId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone,
+        template: whatsapp.templateName('free_report_ready'),
+        bodyParams: vars.body,
+        buttonUrlSuffix: vars.buttonUrlSuffix
+      })
+    });
+  }
+
+  if (emailConfigured()) {
+    const mail = messages.freeReportEmail({ name, reportUrl: link });
+    result.email = await attempt({
+      environment, jobId: reportId, channel: 'email', to,
+      run: () => email.send({
+        to, subject: mail.subject, text: mail.text, html: mail.html,
+        attachment: pdf ? { filename: 'Divya-Bajaj-Numerology-Reading.pdf', content: pdf } : null
+      })
+    });
+  }
+
+  result.delivered = Boolean((result.whatsapp && result.whatsapp.sent) || (result.email && result.email.sent));
+  return result;
+}
+
+/**
+ * Paid, but the report takes minutes to write.
+ *
+ * Without this the customer pays and hears nothing until the report lands,
+ * which is the window where people assume it failed and pay again or complain.
+ */
+async function notifyPaymentReceived({ environment, jobId, name, email: to, phone, amountInr }) {
+  const result = { whatsapp: null, email: null };
+  if (!isConfigured()) return result;
+
+  if (whatsappConfigured()) {
+    const vars = messages.paymentReceivedWhatsapp({ name, amountInr });
+    result.whatsapp = await attempt({
+      environment, jobId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone, template: whatsapp.templateName('payment_received'), bodyParams: vars.body
+      })
+    });
+  }
+  if (emailConfigured()) {
+    const mail = messages.paymentReceivedEmail({ name, amountInr });
+    result.email = await attempt({
+      environment, jobId, channel: 'email', to,
+      run: () => email.send({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    });
+  }
+  return result;
+}
+
+/** The money is going back. Nobody should learn that from a bank statement. */
+async function notifyRefunded({ environment, jobId, name, email: to, phone, amountInr }) {
+  const result = { whatsapp: null, email: null };
+  if (!isConfigured()) return result;
+
+  if (whatsappConfigured()) {
+    const vars = messages.refundedWhatsapp({ name, amountInr });
+    result.whatsapp = await attempt({
+      environment, jobId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone, template: whatsapp.templateName('refunded'), bodyParams: vars.body
+      })
+    });
+  }
+  if (emailConfigured()) {
+    const mail = messages.refundedEmail({ name, amountInr });
+    result.email = await attempt({
+      environment, jobId, channel: 'email', to,
+      run: () => email.send({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    });
+  }
+  return result;
+}
+
 // ------------------------------------------------------- the consultation
 
 async function deliverBookingConfirmation({ environment, appointmentId, name, email: to, phone, startsAt, mode }) {
@@ -207,6 +311,7 @@ async function notifyOwner({ environment, event, name, phone, email: customerEma
 
 module.exports = {
   isConfigured, channels, whatsappConfigured, emailConfigured,
-  deliverReport, deliverBookingConfirmation, notifyOwner,
+  deliverReport, deliverFreeReport, deliverBookingConfirmation,
+  notifyPaymentReceived, notifyRefunded, notifyOwner,
   ownerPhone, ownerEmail
 };

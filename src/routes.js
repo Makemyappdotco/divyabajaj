@@ -6,6 +6,8 @@ const numerology = require('./services/numerology');
 const { generateDeliverablePdf } = require('./services/reportPdf');
 const { buildCombinedCsv, buildExcelWorkbook } = require('./services/export');
 
+const delivery = require('./services/delivery');
+
 const router = express.Router();
 const PDF_LINK_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -174,6 +176,38 @@ router.post('/reports/free', async (req, res) => {
     if (!updatedReport?.id) throw new Error('Completed report record was not saved');
 
     await db.updateLead(lead.id, { status: 'free_report_generated', tier: 'free_awareness' });
+
+    // The landing page promises "sent instantly to your email and WhatsApp".
+    // Until now nothing sent, which made that the only outright false claim on
+    // the site. Delivery is best effort and never fails the request - the
+    // report is already on screen either way.
+    try {
+      let pdf = null;
+      try {
+        const rendered = await generateDeliverablePdf({
+          lead,
+          report: updatedReport,
+          reportJson: updatedReport.report_json || null,
+          numbers: result.numbers || {},
+          astrologyData: null,
+          reportText: result.report_text || ''
+        });
+        pdf = rendered.buffer;
+      } catch (pdfError) {
+        console.error('[free report] could not render the PDF for email:', pdfError.message);
+      }
+
+      await delivery.deliverFreeReport({
+        environment: process.env.VERCEL_ENV === 'production' ? 'production' : 'test',
+        reportId: report.id,
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        pdf
+      });
+    } catch (deliveryError) {
+      console.error('[free report] delivery failed', deliveryError.message);
+    }
 
     return res.json({
       success: true,

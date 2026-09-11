@@ -211,6 +211,20 @@ router.post('/verify', handle('verify', async (req, res) => {
 
   const queued = await jobs.markPaid(job.id, { paymentId });
 
+  // Only when this call is the one that moved it out of awaiting_payment.
+  // The webhook lands here too, and nobody wants two receipts.
+  if (queued && queued.status === 'queued' && job.status === 'awaiting_payment') {
+    const price = await pricing.priceOf(PRODUCT, job.environment).catch(() => null);
+    delivery.notifyPaymentReceived({
+      environment: job.environment,
+      jobId: job.id,
+      name: job.payload && job.payload.name,
+      email: job.payload && job.payload.email,
+      phone: job.payload && job.payload.phone,
+      amountInr: price ? price.amount_inr : null
+    }).catch(error => console.error('[blueprint:verify] receipt failed', error.message));
+  }
+
   return res.json({
     success: true,
     job_id: job.id,

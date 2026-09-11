@@ -28,8 +28,15 @@ function style() { return (process.env.UOMOX_API_STYLE || 'cloud').toLowerCase()
 
 function templateName(key) {
   const map = {
+    free_report_ready: process.env.UOMOX_TEMPLATE_FREE_REPORT || 'free_report_ready',
+    payment_received: process.env.UOMOX_TEMPLATE_PAYMENT_RECEIVED || 'payment_received',
     report_ready: process.env.UOMOX_TEMPLATE_REPORT_READY || 'blueprint_ready',
-    consultation_confirmed: process.env.UOMOX_TEMPLATE_CONSULTATION || 'consultation_confirmed'
+    refunded: process.env.UOMOX_TEMPLATE_REFUNDED || 'blueprint_refunded',
+    consultation_confirmed: process.env.UOMOX_TEMPLATE_CONSULTATION || 'consultation_confirmed',
+    consultation_reminder_day: process.env.UOMOX_TEMPLATE_REMINDER_DAY || 'consultation_reminder_day',
+    consultation_reminder_hour: process.env.UOMOX_TEMPLATE_REMINDER_HOUR || 'consultation_reminder_hour',
+    consultation_moved: process.env.UOMOX_TEMPLATE_MOVED || 'consultation_moved',
+    consultation_cancelled: process.env.UOMOX_TEMPLATE_CANCELLED || 'consultation_cancelled'
   };
   return map[key] || key;
 }

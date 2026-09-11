@@ -13,6 +13,7 @@
 const jobs = require('./reportJobs');
 const razorpay = require('./razorpay');
 const db = require('../database');
+const delivery = require('./delivery');
 
 // Room to breathe between attempts, so a provider having a bad minute is not
 // hammered three times inside that minute and marked permanently broken.
@@ -53,9 +54,21 @@ async function refund(job) {
     await jobs.markRefunded(job.id, { refundId: created.id || '' });
 
     const supabase = db.getSupabaseClient();
+    let amountInr = null;
     if (supabase && job.order_id) {
+      const order = await supabase.from('orders').select('amount').eq('id', job.order_id).maybeSingle();
+      amountInr = order.data ? Number(order.data.amount) : null;
       await supabase.from('orders').update({ status: 'refunded', updated_at: now() }).eq('id', job.order_id);
     }
+
+    // Tell them. Learning about a refund from a bank statement, with no idea
+    // why, is worse than the failed report was.
+    const payload = job.payload || {};
+    await delivery.notifyRefunded({
+      environment: job.environment, jobId: job.id,
+      name: payload.name, email: payload.email, phone: payload.phone, amountInr
+    }).catch(error => console.error('[sweep] refund notice failed', error.message));
+
     return { refunded: true, refundId: created.id };
   } catch (error) {
     // A refund that fails must stay loud. The customer is owed money.

@@ -31,6 +31,8 @@ function normalisePayload(body = {}) {
     timezone_id: String(body.timezone_id || '').trim(),
     country_code: String(body.country_code || '').trim(),
     question: String(body.question || '').trim(),
+    // Strict true only. Consent is never inferred from a truthy value.
+    marketing_consent: body.marketing_consent === true,
     include_source_pdfs: false,
     source: String(body.source || 'paid_blueprint_live').trim()
   };
@@ -92,6 +94,16 @@ async function upsertLead(payload, { status = 'paid_blueprint_started' } = {}) {
     status,
     tier: REPORT_TYPE
   };
+
+  // Only ever GRANTS. Writing false here would mean a returning customer who
+  // opted in last time, and did not re-tick the box today, silently lost the
+  // permission they gave - and worse, it would overwrite a deliberate opt-out
+  // record with an ordinary one. Revoking has exactly one path: the customer
+  // asking to stop.
+  if (payload.marketing_consent === true) {
+    leadData.marketing_consent = true;
+    leadData.marketing_consent_at = new Date().toISOString();
+  }
 
   const lead = existing ? await db.updateLead(existing.id, leadData) : await db.createLead(leadData);
   if (!lead?.id) throw new Error('Lead record was not created');

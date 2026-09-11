@@ -118,6 +118,9 @@ async function createLead(data) {
     email_consent: data.email_consent === true,
     whatsapp_consent: data.whatsapp_consent === true,
     consent_recorded_at: data.consent_recorded_at || null,
+    // Marketing is its own permission, and only a ticked box grants it.
+    marketing_consent: data.marketing_consent === true,
+    marketing_consent_at: data.marketing_consent_at || null,
     last_activity_at: data.last_activity_at || createdAt,
     status: data.status || 'new',
     tier: data.tier || 'free_awareness',

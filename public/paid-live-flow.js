@@ -78,6 +78,9 @@
       .dbp-suggestion{display:block;width:100%;padding:12px 14px;text-align:left;border:0;border-bottom:1px solid rgba(201,169,110,.11);background:transparent;color:#eee3d7;font:inherit;cursor:pointer}
       .dbp-suggestion:hover,.dbp-suggestion:focus{background:rgba(201,169,110,.11);outline:none}
       .dbp-suggestion small{display:block;color:#8f867c;font-size:11px;margin-top:3px}
+      .dbp-consent{grid-column:1/-1;display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:12.5px;line-height:1.55;color:#9e9488;margin-top:2px}
+      .dbp-consent input{width:17px;height:17px;flex:none;margin-top:1px;accent-color:#c9a96e;cursor:pointer}
+      .dbp-consent span{flex:1;min-width:0}
       .dbp-actions{grid-column:1/-1;margin-top:5px;padding-top:18px;border-top:1px solid rgba(201,169,110,.11)}
       .dbp-submit,.dbp-download{width:100%;border:0;padding:17px 20px;background:linear-gradient(135deg,#c9a96e,#ead39c);color:#09070a;font:900 11px/1.2 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:1.8px;text-transform:uppercase;cursor:pointer;box-shadow:0 15px 40px rgba(201,169,110,.13)}
       .dbp-submit:disabled,.dbp-download:disabled{opacity:.6;cursor:wait}
@@ -157,6 +160,10 @@
                   <textarea class="dbp-textarea" id="dbpQuestion" placeholder="For example: career direction, business growth, marriage, money or overall life clarity"></textarea>
                   <div class="dbp-error"></div>
                 </div>
+                <label class="dbp-consent" for="dbpConsent">
+                  <input type="checkbox" id="dbpConsent">
+                  <span>Send me occasional guidance and offers from Divya on WhatsApp and email. You can stop these any time by replying STOP.</span>
+                </label>
                 <div class="dbp-actions">
                   <button class="dbp-submit" id="dbpSubmit" type="submit">Generate My Full Blueprint</button>
                   <div class="dbp-status" id="dbpStatus" role="status" aria-live="polite"></div>
@@ -448,6 +455,9 @@
       country_code: state.selectedLocation.country_code || '',
       question: values.question,
       include_source_pdfs: false,
+      // Never pre-ticked, and read as a strict boolean. Meta rejects a
+      // pre-ticked box as opt-in, and so should we.
+      marketing_consent: (qs('#dbpConsent', ensureModal()) || {}).checked === true,
       source: 'paid_blueprint_live'
     };
   }

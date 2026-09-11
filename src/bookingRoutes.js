@@ -193,6 +193,9 @@ router.post('/book', handle('book', async (req, res) => {
   if (!holdId || !slotKey) return fail(res, 400, 'Your slot reservation expired. Please pick a slot again.');
   const dob = cleanText(body.dob, 20);
   const pob = cleanText(body.pob, 200);
+  // Strictly true only. An absent field, a string, or anything else is a no -
+  // consent is the one flag that must never be inferred generously.
+  const marketingConsent = body.marketing_consent === true;
 
   if (name.length < 2) return fail(res, 400, 'Please enter your name.');
   if (!phone) return fail(res, 400, 'Please enter a valid WhatsApp number.');
@@ -226,9 +229,19 @@ router.post('/book', handle('book', async (req, res) => {
     utm_campaign: cleanText(body.utm_campaign, 100),
     status: 'consultation_requested',
     tier: 'consultation',
+    // Transactional only: they are paying for a call, so confirming it needs
+    // no permission. This is NOT marketing consent - that is a separate column
+    // and only a ticked box writes to it.
     email_consent: true,
     whatsapp_consent: true,
-    consent_recorded_at: new Date().toISOString()
+    consent_recorded_at: new Date().toISOString(),
+    // Only ever granted, never revoked here: an untouched box on a repeat
+    // booking must not wipe out permission given earlier, and must never
+    // overwrite a deliberate opt-out. Stopping has one path, and it is theirs.
+    ...(marketingConsent ? {
+      marketing_consent: true,
+      marketing_consent_at: new Date().toISOString()
+    } : {})
   });
 
   const created = await store.createAppointment({

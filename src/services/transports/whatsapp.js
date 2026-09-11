@@ -36,7 +36,13 @@ function templateName(key) {
     consultation_reminder_day: process.env.UOMOX_TEMPLATE_REMINDER_DAY || 'consultation_reminder_day',
     consultation_reminder_hour: process.env.UOMOX_TEMPLATE_REMINDER_HOUR || 'consultation_reminder_hour',
     consultation_moved: process.env.UOMOX_TEMPLATE_MOVED || 'consultation_moved',
-    consultation_cancelled: process.env.UOMOX_TEMPLATE_CANCELLED || 'consultation_cancelled'
+    consultation_cancelled: process.env.UOMOX_TEMPLATE_CANCELLED || 'consultation_cancelled',
+    // Marketing. These carry an opt-out button and require real consent.
+    free_to_blueprint_1: process.env.UOMOX_TEMPLATE_FREE_UPSELL_1 || 'free_to_blueprint_1',
+    free_to_blueprint_2: process.env.UOMOX_TEMPLATE_FREE_UPSELL_2 || 'free_to_blueprint_2',
+    checkout_abandoned: process.env.UOMOX_TEMPLATE_ABANDONED || 'checkout_abandoned',
+    blueprint_to_consultation: process.env.UOMOX_TEMPLATE_BLUEPRINT_UPSELL || 'blueprint_to_consultation',
+    post_call_followup: process.env.UOMOX_TEMPLATE_POST_CALL || 'post_call_followup'
   };
   return map[key] || key;
 }

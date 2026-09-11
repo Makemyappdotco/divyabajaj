@@ -15,6 +15,8 @@ const razorpay = require('./services/razorpay');
 const whatsapp = require('./services/transports/whatsapp');
 const email = require('./services/transports/email');
 const delivery = require('./services/delivery');
+const campaigns = require('./services/campaigns');
+const campaignSweep = require('./services/campaignSweep');
 
 const router = express.Router();
 
@@ -159,6 +161,39 @@ router.get('/delivery', async (req, res) => {
 
   report.can_deliver = delivery.isConfigured();
   return res.json(report);
+});
+
+/**
+ * Who WOULD get a follow-up, without sending any.
+ *
+ * A promotional sweep is the one job here that cannot be undone, so the panel
+ * gets a way to look at it first. Add ?send=true to actually send, which is
+ * deliberately awkward rather than a button.
+ */
+router.get('/campaigns', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const send = req.query.send === 'true';
+
+  try {
+    const summary = await campaignSweep.sweep({ dryRun: !send });
+    const consent = await campaigns.runtimeEnvironment();
+
+    return res.json({
+      ...summary,
+      environment: consent,
+      quiet_hours: campaigns.QUIET_HOURS,
+      campaigns: Object.entries(campaigns.CAMPAIGNS).map(([name, spec]) => ({
+        name, label: spec.label, template: spec.template,
+        sends_after_hours: spec.delayHours, requires: spec.after || null
+      })),
+      note: send
+        ? 'These were sent.'
+        : 'Nothing was sent. Add ?send=true to this URL to actually send them.'
+    });
+  } catch (error) {
+    console.error('[admin:campaigns]', error);
+    return res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

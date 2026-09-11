@@ -20,6 +20,8 @@ const paidReportRoutes = require('./paidReportRoutes');
 const adminReportRoutes = require('./adminReportRoutes');
 const adminPaymentStatusRoutes = require('./adminPaymentStatusRoutes');
 const reportSweep = require('./services/reportSweep');
+const campaignSweep = require('./services/campaignSweep');
+const whatsappInboundRoutes = require('./whatsappInboundRoutes');
 const pricing = require('./services/pricing');
 const pricingPatch = require('./services/pricingPatch');
 const { validateReportInput } = require('./services/reportInputValidation');
@@ -226,6 +228,11 @@ app.use('/api/booking/payment', paymentRoutes);
 // routes so its namespace is unambiguous.
 app.use('/api/reports/blueprint', paidReportRoutes);
 
+// Where Uomox posts customer replies, and the only way anyone can stop the
+// follow-ups. No auth by default because the provider may not support a
+// shared secret; set UOMOX_WEBHOOK_SECRET and it is enforced.
+app.use('/api/whatsapp', whatsappInboundRoutes);
+
 /**
  * The retry-and-refund sweep, for customers who paid and closed the tab.
  *
@@ -243,7 +250,15 @@ app.all('/api/internal/report-sweep', async (req, res) => {
 
   try {
     const summary = await reportSweep.sweep({ runJob: paidReportRoutes.runJob });
-    return res.json({ ok: true, ...summary });
+
+    // Follow-ups ride the same cron. Off unless explicitly switched on, so a
+    // promotional send can never be something that happened by default.
+    let campaignSummary = { skipped: 'CAMPAIGNS_ENABLED is not true' };
+    if (process.env.CAMPAIGNS_ENABLED === 'true') {
+      campaignSummary = await campaignSweep.sweep({});
+    }
+
+    return res.json({ ok: true, reports: summary, campaigns: campaignSummary });
   } catch (error) {
     console.error('[report-sweep]', error);
     return res.status(500).json({ error: error.message });

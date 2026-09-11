@@ -70,7 +70,7 @@ async function getAllExportData() {
   return { Leads: leads, Reports: reports, Payments: payments, Bookings: bookings, Events: events };
 }
 
-async function findOrCreateLead({ name, phone, dob, email, tob = '', pob = '', question, source }) {
+async function findOrCreateLead({ name, phone, dob, email, tob = '', pob = '', question, source, marketing_consent }) {
   const phoneKey = normalizePhone(phone);
   const emailKey = normalizeEmail(email);
   const candidates = await db.getLeads({ search: phoneKey });
@@ -80,6 +80,10 @@ async function findOrCreateLead({ name, phone, dob, email, tob = '', pob = '', q
   );
 
   const leadData = { name, phone, dob, email, tob, pob, question, source };
+  if (marketing_consent === true) {
+    leadData.marketing_consent = true;
+    leadData.marketing_consent_at = new Date().toISOString();
+  }
   return existing ? await db.updateLead(existing.id, leadData) : await db.createLead(leadData);
 }
 
@@ -134,10 +138,15 @@ router.post('/reports/free', async (req, res) => {
   let report = null;
   try {
     const { name, phone, dob, email, question, source } = req.body;
+    const marketingConsent = req.body.marketing_consent === true;
     const missing = requiredFields(req.body);
     if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
 
-    lead = await findOrCreateLead({ name, phone, dob, email, question, source: source || 'free_numerology_report_form' });
+    lead = await findOrCreateLead({
+      name, phone, dob, email, question,
+      source: source || 'free_numerology_report_form',
+      marketing_consent: marketingConsent
+    });
     if (!lead?.id) throw new Error('Lead record was not created');
 
     report = await db.createReport({

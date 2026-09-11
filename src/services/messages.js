@@ -336,7 +336,81 @@ function ownerAlertWhatsapp({ event, name, phone, question, startsAt, amountInr 
   ].filter(Boolean).join('\n');
 }
 
+// ------------------------------------------------------------- follow-ups
+
+/**
+ * The only messages here that the customer did not ask for.
+ *
+ * Written to be worth receiving on their own: each one says something useful
+ * or asks a real question, and mentions the paid thing once, at the end. A
+ * follow-up that is only a sales pitch gets reported as spam, and on WhatsApp
+ * enough reports take the business number down - so restraint here is not
+ * only taste, it is what keeps the channel working.
+ */
+const CAMPAIGN_COPY = {
+  free_to_blueprint_1: {
+    subject: 'Did your reading make sense?',
+    opening: 'I hope your free reading made sense.',
+    body: 'A free reading works from your name and date of birth alone. It cannot see your birth chart, your current Dasha, or the timing of what is coming - and timing is usually the part people actually need.',
+    close: 'The Full Blueprint covers all three. If you have a question about your reading in the meantime, just reply here.'
+  },
+  free_to_blueprint_2: {
+    subject: 'One more thing about your reading',
+    opening: 'A last note about the reading you got.',
+    body: 'The question you asked is the kind that usually depends on timing - which planetary period you are in, and how long it lasts. That needs your birth time and place, not just your date.',
+    close: 'That is what the Full Blueprint adds. This is the last message you will get about it.'
+  },
+  checkout_abandoned: {
+    subject: 'Your Full Blueprint is still waiting',
+    opening: 'You started ordering a Full Blueprint and did not finish.',
+    body: 'Nothing was charged, and your birth details are still saved, so picking it up takes a moment rather than starting again.',
+    close: 'If something went wrong at the payment step, reply here and Divya will sort it out personally.'
+  },
+  blueprint_to_consultation: {
+    subject: 'Any questions on your blueprint?',
+    opening: 'I hope you have had a chance to read your blueprint.',
+    body: 'Most people finish it with one specific question left over - whether to take the offer, when to start, how to read a particular period. A written report cannot go back and forth with you on that.',
+    close: 'A one-to-one call can. Or reply here and Divya will answer what she can in writing.'
+  },
+  post_call_followup: {
+    subject: 'How did your consultation go?',
+    opening: 'I hope your call with Divya was useful.',
+    body: 'If anything from it has become clearer, or harder, since you spoke, she would genuinely like to know.',
+    close: 'Reply here whenever you want to pick the thread back up.'
+  }
+};
+
+function campaignEmail(campaign, lead) {
+  const copy = CAMPAIGN_COPY[campaign];
+  if (!copy) throw new Error(`Unknown campaign: ${campaign}`);
+  const who = firstName(lead && lead.name);
+
+  return {
+    subject: copy.subject,
+    text: [
+      `Hi ${who},`, '', copy.opening, '', copy.body, '', copy.close, '',
+      'Divya Bajaj', 'Astro-Numerologist', '',
+      'To stop these follow-ups, just reply STOP.'
+    ].join('\n'),
+    html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
+<p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
+<p style="margin:0 0 18px">${escapeHtml(copy.opening)}</p>
+<p style="margin:0 0 18px">${escapeHtml(copy.body)}</p>
+<p style="margin:0 0 18px">${escapeHtml(copy.close)}</p>
+<p style="margin:24px 0 0;color:#6b6156">Divya Bajaj<br><span style="font-size:14px">Astro-Numerologist</span></p>
+<p style="margin:22px 0 0;color:#9a9084;font-size:12px">To stop these follow-ups, just reply STOP.</p>
+</div>`
+  };
+}
+
+/** Only the blanks. The body is fixed by whatever Meta approved. */
+function campaignWhatsapp(campaign, lead) {
+  if (!CAMPAIGN_COPY[campaign]) throw new Error(`Unknown campaign: ${campaign}`);
+  return { body: [firstName(lead && lead.name)] };
+}
+
 module.exports = {
+  CAMPAIGN_COPY, campaignEmail, campaignWhatsapp,
   // email
   reportReadyEmail, freeReportEmail, paymentReceivedEmail, refundedEmail,
   consultationConfirmedEmail, consultationReminderEmail, consultationMovedEmail,

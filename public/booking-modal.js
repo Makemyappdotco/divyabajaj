@@ -96,6 +96,11 @@
     '.dbm-f{margin-top:12px}',
     '.dbm-f label{display:block;font-size:12px;color:var(--text-m);margin-bottom:5px}',
     '.dbm-f label span{color:var(--text-s)}',
+    // Consent has to be readable, not buried. Full-width tap target, real
+    // line-height, and never pre-ticked.
+    '.dbm-consent{display:flex;gap:10px;align-items:flex-start;margin:4px 0 2px;cursor:pointer;font-size:12.5px;line-height:1.5;color:var(--text-m)}',
+    '.dbm-consent input{width:17px;height:17px;flex:none;margin-top:1px;accent-color:var(--gold);cursor:pointer}',
+    '.dbm-consent span{flex:1;min-width:0}',
     '.dbm-f input,.dbm-f select,.dbm-f textarea{width:100%;background:var(--bg);border:1px solid var(--sl);',
     '  border-radius:10px;padding:11px 13px;color:var(--text);font-family:var(--sans);font-size:14px}',
     '.dbm-f input:focus,.dbm-f select:focus,.dbm-f textarea:focus{outline:none;border-color:var(--gold)}',
@@ -219,6 +224,14 @@
                 '<select id="dbmMode"><option value="video_call">Video call</option><option value="phone_call">Audio call</option></select></div>' +
               '<div class="dbm-f"><label for="dbmQ">What is on your mind? <span>(optional)</span></label>' +
                 '<textarea id="dbmQ" placeholder="The one thing you most want answered."></textarea></div>' +
+              // Unticked by default, and it has to stay that way: a pre-ticked
+              // box is not consent, and Meta will not accept it as opt-in for
+              // the follow-up messages.
+              '<label class="dbm-consent" for="dbmConsent">' +
+                '<input type="checkbox" id="dbmConsent">' +
+                '<span>Send me occasional guidance and offers from Divya on WhatsApp and email. ' +
+                'You can stop these any time by replying STOP.</span>' +
+              '</label>' +
               '<div id="dbmMsg"></div>' +
               '<button class="dbm-go" id="dbmGo" type="submit">Confirm this slot</button>' +
             '</form>' +
@@ -447,6 +460,7 @@
       name: $('dbmName').value, phone: $('dbmPhone').value, email: $('dbmEmail').value,
       dob: $('dbmDob').value, tob: $('dbmTob').value, pob: $('dbmPob').value,
       mode: $('dbmMode').value, question: $('dbmQ').value,
+      marketing_consent: $('dbmConsent') ? $('dbmConsent').checked === true : false,
       utm_source: q.get('utm_source') || '', utm_medium: q.get('utm_medium') || '', utm_campaign: q.get('utm_campaign') || ''
     };
     if (!payload.name.trim() || !payload.phone.trim() || !payload.email.trim() || !payload.dob || !payload.pob.trim()) {

@@ -82,9 +82,11 @@ async function refund(job) {
  *
  * @param {function} runJob injected rather than required, to keep this module
  * free of the route layer and testable on its own.
+ * @param {function} deliverJob same, for sending a report that finished
+ * generating on an earlier pass and has now waited long enough.
  */
-async function sweep({ runJob, environment, limit = 5 } = {}) {
-  const summary = { looked_at: 0, generated: 0, retried: 0, refunded: 0, skipped: 0, errors: [] };
+async function sweep({ runJob, deliverJob, environment, limit = 5 } = {}) {
+  const summary = { looked_at: 0, generated: 0, retried: 0, refunded: 0, delivered: 0, skipped: 0, errors: [] };
 
   const pending = await jobs.pending({ environment, limit });
   summary.looked_at = pending.length;
@@ -117,6 +119,24 @@ async function sweep({ runJob, environment, limit = 5 } = {}) {
     } catch (error) {
       console.error('[sweep]', job.id, error.message);
       summary.errors.push({ job_id: job.id, error: error.message });
+    }
+  }
+
+  // Second pass: reports that finished generating on an earlier sweep and are
+  // now old enough to send. Separate from the loop above because those jobs
+  // are already 'generated' - jobs.pending() does not return them at all.
+  if (deliverJob) {
+    const awaitingDelivery = await jobs.pendingDelivery({ environment, limit });
+    for (const job of awaitingDelivery) {
+      if (!jobs.dueForDelivery(job)) { summary.skipped += 1; continue; }
+      try {
+        const outcome = await deliverJob(job.id);
+        if (outcome.delivered) summary.delivered += 1;
+        else summary.skipped += 1;
+      } catch (error) {
+        console.error('[sweep:deliver]', job.id, error.message);
+        summary.errors.push({ job_id: job.id, error: error.message });
+      }
     }
   }
 

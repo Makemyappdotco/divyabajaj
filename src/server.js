@@ -250,7 +250,7 @@ app.all('/api/internal/report-sweep', async (req, res) => {
   if (supplied !== expected) return res.status(401).json({ error: 'unauthorised' });
 
   try {
-    const summary = await reportSweep.sweep({ runJob: paidReportRoutes.runJob });
+    const summary = await reportSweep.sweep({ runJob: paidReportRoutes.runJob, deliverJob: paidReportRoutes.deliverJob });
 
     // Follow-ups ride the same cron. Off unless explicitly switched on, so a
     // promotional send can never be something that happened by default.

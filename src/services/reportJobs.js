@@ -22,6 +22,17 @@ const CLAIM_TIMEOUT_MS = 12 * 60 * 1000;
 // Three goes before the money is handed back.
 const MAX_ATTEMPTS = 3;
 
+// Generation happens promptly after payment - there is no reason to wait, and
+// starting early leaves room for retries. Delivery is a separate thing: the
+// landing page promises a reading Divya has prepared personally, and a report
+// that lands on WhatsApp within minutes of paying reads as automated,
+// whatever the copy says. So the finished report is held and only sent once
+// this much time has passed since payment. Overridable for tests; production
+// leaves it at the default hour.
+const DELIVERY_DELAY_MS = Number(process.env.REPORT_DELIVERY_DELAY_MS) >= 0
+  ? Number(process.env.REPORT_DELIVERY_DELAY_MS)
+  : 60 * 60 * 1000;
+
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 function now() { return new Date().toISOString(); }
 
@@ -149,6 +160,38 @@ async function markGenerated(jobId, { reportId }) {
   });
 }
 
+/**
+ * Has enough time passed since payment to deliver this without it looking
+ * automated? Measured from paid_at, not generated_at - a report that takes
+ * three retries to build should not get a shorter wait than one that worked
+ * first try.
+ *
+ * A job with no paid_at (should not happen; guards against one anyway) is
+ * treated as due rather than held forever with nothing to count from.
+ */
+function dueForDelivery(job) {
+  if (!job || !job.paid_at) return true;
+  return Date.now() - new Date(job.paid_at).getTime() >= DELIVERY_DELAY_MS;
+}
+
+/**
+ * Reports that are written but not yet sent. Distinct from pending(): those
+ * are jobs still waiting to be GENERATED, these are waiting to be DELIVERED.
+ * dueForDelivery() is applied by the caller, not here, so a job that is not
+ * yet due still shows up in the panel as generated-and-waiting rather than
+ * disappearing until its hour is up.
+ */
+async function pendingDelivery({ environment = runtimeEnvironment(), limit = 10 } = {}) {
+  const supabase = client();
+  const { data, error } = await supabase.from('report_jobs').select('*')
+    .eq('environment', environment)
+    .eq('status', 'generated')
+    .order('paid_at', { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data || []).filter(job => !job.delivery || Object.keys(job.delivery).length === 0);
+}
+
 async function markFailed(jobId, message) {
   return update(jobId, { status: 'failed', last_error: String(message || '').slice(0, 500) });
 }
@@ -200,8 +243,8 @@ async function listForPanel({ environment = runtimeEnvironment(), limit = 50 } =
 }
 
 module.exports = {
-  MAX_ATTEMPTS, CLAIM_TIMEOUT_MS, runtimeEnvironment,
+  MAX_ATTEMPTS, CLAIM_TIMEOUT_MS, DELIVERY_DELAY_MS, runtimeEnvironment,
   create, get, getByGatewayOrder, update, attachOrder,
   markPaid, claim, markGenerated, markFailed, markRefunded, recordDelivery,
-  pending, isExhausted, listForPanel
+  pending, pendingDelivery, dueForDelivery, isExhausted, listForPanel
 };

@@ -213,7 +213,8 @@ router.post('/verify', handle('verify', async (req, res) => {
   const queued = await jobs.markPaid(job.id, { paymentId });
 
   // Only when this call is the one that moved it out of awaiting_payment.
-  // The webhook lands here too, and nobody wants two receipts.
+  // The webhook lands here too, and nobody wants two receipts - or two
+  // "you made a sale" pings to Divya.
   if (queued && queued.status === 'queued' && job.status === 'awaiting_payment') {
     const price = await pricing.priceOf(PRODUCT, job.environment).catch(() => null);
     delivery.notifyPaymentReceived({
@@ -224,6 +225,19 @@ router.post('/verify', handle('verify', async (req, res) => {
       phone: job.payload && job.payload.phone,
       amountInr: price ? price.amount_inr : null
     }).catch(error => console.error('[blueprint:verify] receipt failed', error.message));
+
+    // Divya hears about the sale the moment it happens, not an hour later
+    // when the report is finally delivered. Those two things are on purpose
+    // decoupled now - see runJob().
+    delivery.notifyOwner({
+      environment: job.environment,
+      event: 'blueprint',
+      name: job.payload && job.payload.name,
+      phone: job.payload && job.payload.phone,
+      email: job.payload && job.payload.email,
+      question: job.payload && job.payload.question,
+      amountInr: price ? price.amount_inr : null
+    }).catch(error => console.error('[blueprint:verify] owner alert failed', error.message));
   }
 
   return res.json({
@@ -242,6 +256,12 @@ router.post('/verify', handle('verify', async (req, res) => {
  * Called by the customer's browser right after payment, and by the sweep for
  * anyone who closed their tab. Whoever calls it, claim() guarantees only one
  * of them does the work.
+ *
+ * This deliberately stops at "generated". Delivery is a separate step
+ * (deliverJob, below) that only happens once jobs.dueForDelivery() says
+ * enough time has passed since payment - see reportJobs.js for why. Doing it
+ * inline here, right after generation finishes, is exactly the "arrives
+ * within minutes of paying" behaviour that made the report look automated.
  */
 async function runJob(jobId) {
   const claimed = await jobs.claim(jobId);
@@ -258,10 +278,9 @@ async function runJob(jobId) {
 
     await jobs.markGenerated(claimed.id, { reportId: saved.report_id });
 
-    // The PDF, so the email can carry it as an attachment rather than only a
-    // link. Rendering can fail on a cold serverless start; if it does the
-    // email still goes with the link, which is why this is not fatal.
-    let pdf = null;
+    // The PDF, stored now so delivery - whenever it happens - does not need
+    // to re-render anything. Rendering can fail on a cold serverless start;
+    // if it does, delivery still goes out with the link only.
     try {
       const lead = claimed.lead_id ? await db.getLead(claimed.lead_id) : null;
       const rendered = await generateDeliverablePdf({
@@ -272,42 +291,22 @@ async function runJob(jobId) {
         astrologyData: result.astrology_data || null,
         reportText: result.report_text || ''
       });
-      pdf = rendered.buffer;
       // The important one. This report takes minutes to render, so a document
       // URL that rendered on demand would time out on Meta's side every time.
       await reportStorage.store({
         reportId: saved.report_id, reportType: 'paid_blueprint',
-        pdf, templateVersion: 'integrated-life-report-v1'
+        pdf: rendered.buffer, templateVersion: 'integrated-life-report-v1'
       });
     } catch (error) {
-      console.error('[blueprint:run] could not render the PDF for email, sending the link only:', error.message);
+      console.error('[blueprint:run] could not render/store the PDF, delivery will use the link only:', error.message);
     }
 
-    // Delivery is best effort and never rolls back a generated report: the
-    // customer has paid and the report exists either way.
-    const sent = await delivery.deliverReport({
-      environment: claimed.environment,
-      jobId: claimed.id,
-      reportId: saved.report_id,
-      name: claimed.payload.name,
-      email: claimed.payload.email,
-      phone: claimed.payload.phone,
-      pdf
-    });
-    await jobs.recordDelivery(claimed.id, sent);
-
-    // Divya's own heads-up, separately, so a failure to reach her never looks
-    // like a failure to reach the customer.
-    const price = await pricing.priceOf(PRODUCT, claimed.environment).catch(() => null);
-    await delivery.notifyOwner({
-      environment: claimed.environment,
-      event: 'blueprint',
-      name: claimed.payload.name,
-      phone: claimed.payload.phone,
-      email: claimed.payload.email,
-      question: claimed.payload.question,
-      amountInr: price ? price.amount_inr : null
-    });
+    // If the hour has already passed by the time generation finishes - a
+    // retry after failures, or a sweep picking up an old job - deliver right
+    // away rather than making someone wait even longer than promised.
+    if (jobs.dueForDelivery(claimed)) {
+      await deliverJob(claimed.id);
+    }
 
     return { claimed: true, ok: true, report: result, reportId: saved.report_id };
   } catch (error) {
@@ -315,6 +314,43 @@ async function runJob(jobId) {
     await jobs.markFailed(jobId, error.message);
     return { claimed: true, ok: false, error: error.message };
   }
+}
+
+/**
+ * Sends a generated-but-not-yet-delivered report. Called once dueForDelivery()
+ * is true - either from the end of runJob() when the wait has already
+ * elapsed, or from the sweep for jobs generated earlier whose hour has now
+ * come up.
+ *
+ * Re-reads the job rather than trusting a passed-in copy, since this can run
+ * a full hour after generation and the row may have moved on (delivered by
+ * something else already, in particular).
+ */
+async function deliverJob(jobId, { force = false } = {}) {
+  const job = await jobs.get(jobId);
+  if (!job || job.status !== 'generated') return { delivered: false, reason: 'not ready' };
+  // force is for the admin panel's manual "resend" - a human deciding to send
+  // it again is different from the automatic path accidentally double-sending.
+  if (!force && job.delivery && Object.keys(job.delivery).length) return { delivered: false, reason: 'already delivered' };
+
+  let pdf = null;
+  try {
+    pdf = await reportStorage.fetch({ reportId: job.report_id, reportType: 'paid_blueprint' });
+  } catch (error) {
+    console.error('[blueprint:deliver] could not fetch the stored PDF, sending the link only:', error.message);
+  }
+
+  const sent = await delivery.deliverReport({
+    environment: job.environment,
+    jobId: job.id,
+    reportId: job.report_id,
+    name: job.payload.name,
+    email: job.payload.email,
+    phone: job.payload.phone,
+    pdf
+  });
+  await jobs.recordDelivery(job.id, sent);
+  return { delivered: true, sent };
 }
 
 router.post('/run', handle('run', async (req, res) => {
@@ -384,3 +420,4 @@ router.get('/status', handle('status', async (req, res) => {
 
 module.exports = router;
 module.exports.runJob = runJob;
+module.exports.deliverJob = deliverJob;

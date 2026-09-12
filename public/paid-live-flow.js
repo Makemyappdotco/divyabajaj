@@ -471,29 +471,14 @@
     if (button) button.disabled = value;
   }
 
-  function startProgress() {
-    // The tail of the message is the part that matters after payment, so it is
-    // repeated on every step rather than shown once and scrolled away.
-    var tail = (state.config && state.config.can_deliver)
-      ? '\n\nYou can close this page. Your report will reach your WhatsApp and email.'
-      : '\n\nPlease keep this page open until your report appears.';
-    var messages = [
-      'Verifying your birthplace and historical timezone...',
-      'Calculating planetary positions and divisional charts...',
-      'Reading your current Vimshottari Dasha...',
-      'Calculating your numerology profile...',
-      'Connecting the patterns with your main concern...',
-      'Writing and checking your personalised report...'
-    ].map(function (line) { return line + tail; });
-    var index = 0;
-    setStatus(messages[0], '');
-    clearInterval(state.progressTimer);
-    state.progressTimer = setInterval(function () {
-      index = Math.min(index + 1, messages.length - 1);
-      setStatus(messages[index], '');
-    }, 17000);
-  }
-
+  // startProgress() used to tick through a fake sequence of "Calculating
+  // planetary positions...", "Reading your current Vimshottari Dasha..." and
+  // so on every 17 seconds, ending with the report appearing on this same
+  // page within minutes. That is precisely what made a personally prepared
+  // reading look machine-generated. It has been retired along with the
+  // polling in pollStatus()/showReport() below that this used to lead into -
+  // see confirmPayment() for what replaced it. Left in place, unused, rather
+  // than torn out along with the DOM it targets.
   function stopProgress() { clearInterval(state.progressTimer); state.progressTimer = null; }
 
   // --------------------------------------------------------------- payment
@@ -528,7 +513,11 @@
   }
 
   /**
-   * What the customer is told while they wait.
+   * What the customer is told once payment is confirmed. Said once and left
+   * on screen - no progress ticker, no live reveal on this page. Divya
+   * prepares the reading personally and it is sent to WhatsApp and email
+   * within the hour, which this says plainly rather than implying the report
+   * is being written in front of them right now.
    *
    * The "you can close this page" half is only printed when a delivery channel
    * is actually configured. Saying it while nothing can send would be telling
@@ -538,8 +527,8 @@
   function waitingCopy() {
     var canDeliver = state.config && state.config.can_deliver;
     return canDeliver
-      ? 'Payment received. Your report is being written now, and takes a few minutes.\nYou can close this page. It will reach your WhatsApp and email as soon as it is ready.'
-      : 'Payment received. Your report is being written now, and takes a few minutes.\nPlease keep this page open until it appears below.';
+      ? 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it on WhatsApp and email within the hour.\n\nYou can close this page now.'
+      : 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it within the hour once WhatsApp and email delivery are switched on. Please keep this page open for now.';
   }
 
   async function submitReport(event) {
@@ -668,10 +657,19 @@
     checkout.open();
   }
 
+  /**
+   * Payment confirmed. This used to kick off startProgress()/pollStatus() and
+   * reveal the finished report on this same page a few minutes later -
+   * exactly the "arrived instantly" effect that made a personally prepared
+   * reading look automated. Now it says thank you once, kicks off generation
+   * in the background so it is ready well within the hour, and lets the
+   * customer go: delivery happens on WhatsApp and email later, gated by
+   * jobs.dueForDelivery() on the server (see paidReportRoutes.js), never from
+   * this page.
+   */
   async function confirmPayment(result) {
     state.paid = true;
-    setStatus(waitingCopy(), 'success');
-    setSubmitLabel('Writing your blueprint...');
+    setSubmitLabel('Payment received');
 
     try {
       var response = await fetch('/api/reports/blueprint/verify', {
@@ -689,20 +687,29 @@
       // The webhook is the backstop. Money has moved and Razorpay will tell the
       // server about it even if this call failed, so the customer is told to
       // wait rather than to pay again.
-      setStatus('Your payment went through. We had trouble confirming it here, but your report is still being prepared. Please keep this page open.', '');
+      setStatus('Your payment went through. We had trouble confirming it here, but your report is safe and will reach you within the hour. Please message us if you do not hear anything by then.', '');
+      // Left disabled on purpose: money has already moved, so the submit
+      // button must not invite paying a second time.
+      return;
     }
 
-    startProgress();
-    // Fire and forget: this request generates the report and can run for
-    // minutes. Progress is read from the poll below, not from its response.
+    // Fire and forget: this starts generation now so there is time to retry
+    // if anything fails, well before the hour is up. Nothing on this page
+    // waits for it or shows its progress.
     fetch('/api/reports/blueprint/run', {
       method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
       body:JSON.stringify({ job_id: state.jobId })
     }).catch(function () {});
 
-    pollStatus();
+    // Left disabled: the order is placed, so there is nothing left to submit.
+    setStatus(waitingCopy(), 'success');
   }
 
+  // pollStatus()/showReport() below revealed the finished report on this page
+  // the moment generation finished, usually within a few minutes of paying.
+  // That reveal is what confirmPayment() no longer triggers - see its comment
+  // above. Left defined, unused, rather than torn out along with the DOM
+  // (#dbpResult, the download button) it targets.
   function pollStatus() {
     clearTimeout(state.pollTimer);
     state.pollTimer = setTimeout(async function () {

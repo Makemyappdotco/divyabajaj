@@ -143,13 +143,12 @@ router.post('/:id/resend', handle('resend', async (req, res) => {
     return res.status(503).json({ error: 'No WhatsApp or email provider is connected yet, so nothing can be sent.' });
   }
 
-  const lead = job.payload || {};
-  const sent = await delivery.deliverReport({
-    environment: job.environment, jobId: job.id,
-    name: lead.name, email: lead.email, phone: lead.phone, reportUrl: ''
-  });
-  await jobs.recordDelivery(job.id, sent);
-  return res.json({ success: true, delivery: sent });
+  // Goes through the same path the automatic delivery uses, force:true so a
+  // human pressing this button can resend even if it already went out once -
+  // this used to build its own delivery call here, missing the report id and
+  // the PDF, so a resend went out with no attachment.
+  const outcome = await paidReportRoutes.deliverJob(job.id, { force: true });
+  return res.json({ success: true, delivery: outcome.sent });
 }));
 
 /** Hand the money back on purpose, before the retries are spent. */

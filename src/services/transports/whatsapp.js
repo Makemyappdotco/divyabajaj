@@ -8,8 +8,13 @@
 // That variation is the whole reason this file is configured rather than
 // hardcoded. UOMOX_API_STYLE picks the body shape:
 //
-//   cloud  - Meta's Cloud API JSON, which most BSPs pass straight through
-//   simple - a flat {to, template, params} body, which the rest tend to use
+//   uomox  - Uomox's own shape: {destination, templateName, templateParams,
+//            media, buttons}, confirmed against their own Postman docs
+//            (https://documenter.getpostman.com/view/46192021/2sB2xEC9Ng).
+//            This is what Divya's Uomox account actually speaks - use this.
+//   cloud  - Meta's Cloud API JSON, which most OTHER BSPs pass straight
+//            through unchanged
+//   simple - a flat {to, template, params} body, which some others use
 //
 // Getting this wrong is not loud. A BSP will happily answer 200 to a body it
 // only half understands and deliver nothing, so send() treats anything that is
@@ -24,7 +29,7 @@
 function baseUrl() { return String(process.env.UOMOX_API_URL || '').replace(/\/$/, ''); }
 function apiKey() { return process.env.UOMOX_API_KEY || ''; }
 function sender() { return process.env.UOMOX_SENDER || ''; }
-function style() { return (process.env.UOMOX_API_STYLE || 'cloud').toLowerCase(); }
+function style() { return (process.env.UOMOX_API_STYLE || 'uomox').toLowerCase(); }
 
 function templateName(key) {
   const map = {
@@ -49,8 +54,17 @@ function templateName(key) {
 
 function language() { return process.env.UOMOX_TEMPLATE_LANG || 'en'; }
 
+/**
+ * Uomox's own API has no concept of "sender" in the request at all - the
+ * WhatsApp number is tied to the access token itself, not sent alongside it.
+ * A sender is only actually needed for the 'simple' style (which puts it in
+ * the body) or when the URL itself carries a {sender} placeholder - so it is
+ * only required in those two cases, not universally.
+ */
 function isConfigured() {
-  return Boolean(baseUrl() && apiKey() && sender());
+  if (!baseUrl() || !apiKey()) return false;
+  if (style() === 'simple' || baseUrl().includes('{sender}')) return Boolean(sender());
+  return true;
 }
 
 /**
@@ -135,6 +149,44 @@ function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentU
 }
 
 /**
+ * Uomox's real shape, taken directly from their own Postman docs. Everything
+ * goes through one endpoint (broadcast/send-template) - there is no separate
+ * free-text endpoint at all, template-based or not, which is why a bare
+ * `text` (used for Divya's own alerts) cannot be sent through Uomox today;
+ * see the comment on notifyOwner() in delivery.js.
+ *
+ * Confirmed against Uomox's docs: destination, templateName, templateParams,
+ * an optional media header (their own example only shows type "image").
+ * NOT confirmed by their docs, best-effort until tested against a real
+ * approved template: a "document" media type for the PDF header, and the
+ * exact shape of a dynamic URL button (their "Send Dynamic Button Url
+ * Message" example is a copy-paste of the media example in their own docs
+ * and does not actually show a button). Both are flagged below - test these
+ * two specifically once a template using them is approved.
+ */
+function uomoxBody({ to, template, bodyParams, buttonUrlSuffix, documentUrl, documentName }) {
+  const body = {
+    destination: to,
+    templateName: template,
+    templateParams: (bodyParams || []).map(String),
+    buttons: []
+  };
+  if (documentUrl) {
+    // NOT CONFIRMED: Uomox's docs only demonstrate type "image". Meta's own
+    // Cloud API uses "document" for a PDF header, which is the reasonable
+    // guess here, but this specific line needs a live test once
+    // blueprint_ready (the template with a document header) is approved.
+    body.media = { url: documentUrl, type: 'document', filename: documentName || 'report.pdf' };
+  }
+  if (buttonUrlSuffix) {
+    // NOT CONFIRMED: see the function comment above - Uomox's own example for
+    // this is broken/duplicated, so this is a best guess pending a real test.
+    body.buttons = [String(buttonUrlSuffix)];
+  }
+  return body;
+}
+
+/**
  * Sends, and is honest about what happened.
  *
  * A 2xx alone is not treated as delivered: BSPs return 200 with an error body
@@ -147,8 +199,15 @@ async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentU
   const number = normalise(to);
   if (!number) return { sent: false, reason: 'no recipient' };
   if (!template && !text) return { sent: false, reason: 'nothing to send' };
+  // Uomox has exactly one send endpoint and it is template-only - there is no
+  // free-text send at all, not even inside the 24-hour reply window. A caller
+  // asking for plain text (Divya's own owner alerts today) gets told why
+  // instead of firing a request Uomox cannot honour.
+  if (style() === 'uomox' && text && !template) {
+    return { sent: false, reason: 'Uomox has no free-text endpoint - only approved templates can be sent' };
+  }
 
-  const build = style() === 'simple' ? simpleBody : cloudBody;
+  const build = style() === 'simple' ? simpleBody : style() === 'uomox' ? uomoxBody : cloudBody;
   const payload = build({ to: number, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName });
 
   // Meta's own URL carries the sender in the path; most wrappers do not.
@@ -175,8 +234,11 @@ async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentU
     throw error;
   }
 
-  // An explicit failure flag inside a 200, which several providers do.
-  if (result.error || result.success === false || result.status === 'failed') {
+  // An explicit failure flag inside a 200, which several providers do. Uomox
+  // answers {"status":"success",...} on a real send, so for that style
+  // anything other than "success" is a failure too, not just "failed".
+  const uomoxFailed = style() === 'uomox' && result.status && result.status !== 'success';
+  if (result.error || result.success === false || result.status === 'failed' || uomoxFailed) {
     const error = new Error(
       (result.error && (result.error.message || result.error.description)) ||
       result.message || 'The WhatsApp provider rejected the message'
@@ -186,7 +248,9 @@ async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentU
     throw error;
   }
 
-  const id = (result.messages && result.messages[0] && result.messages[0].id) ||
+  const id = (result.metaResponse && result.metaResponse.messages && result.metaResponse.messages[0] &&
+      result.metaResponse.messages[0].id) ||
+    (result.messages && result.messages[0] && result.messages[0].id) ||
     result.message_id || result.id || '';
   return { sent: true, id, provider: result };
 }

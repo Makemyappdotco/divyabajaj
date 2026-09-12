@@ -206,6 +206,91 @@ test('the flat shape is sent when the provider wants that instead', async () => 
   assert.deepStrictEqual(seen.params, ['Ananya']);
 });
 
+test('the Uomox shape (the provider actually in use) is sent correctly, with no sender required', async () => {
+  let seen = null;
+  const { server, url } = await fakeProvider((req, res, body) => {
+    seen = { headers: req.headers, body };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'success', message: 'Template message sent successfully.',
+      metaResponse: { messaging_product: 'whatsapp', messages: [{ id: 'wamid.UOMOXTEST', message_status: 'accepted' }] }
+    }));
+  });
+
+  // Deliberately no UOMOX_SENDER - Uomox ties the number to the token, not
+  // to anything in the request, so this must still count as configured.
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'secret-token', UOMOX_API_STYLE: 'uomox' });
+  assert.strictEqual(wa.isConfigured(), true, 'Uomox should not require a sender to be considered configured');
+
+  const result = await wa.send({
+    to: '9812345678', template: 'payment_received', bodyParams: ['Ananya', '999']
+  });
+  server.close();
+
+  assert.strictEqual(result.sent, true);
+  assert.strictEqual(result.id, 'wamid.UOMOXTEST');
+  assert.strictEqual(seen.headers.authorization, 'Bearer secret-token');
+  assert.strictEqual(seen.body.destination, '919812345678');
+  assert.strictEqual(seen.body.templateName, 'payment_received');
+  assert.deepStrictEqual(seen.body.templateParams, ['Ananya', '999']);
+  assert.deepStrictEqual(seen.body.buttons, []);
+});
+
+test('uomox is the default style, since it is the provider actually in use', () => {
+  const wa = loadWhatsapp({ UOMOX_API_URL: 'http://example.invalid', UOMOX_API_KEY: 'k' });
+  assert.strictEqual(wa.style(), 'uomox');
+});
+
+test('Uomox has no free-text send, so an owner alert (plain text, no template) is skipped, not attempted', async () => {
+  let called = false;
+  const { server, url } = await fakeProvider((req, res) => {
+    called = true;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'success' }));
+  });
+
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'k', UOMOX_API_STYLE: 'uomox' });
+  const result = await wa.send({ to: '9812345678', text: 'Ananya just paid ₹999' });
+  server.close();
+
+  assert.strictEqual(called, false, 'a free-text send should never reach the provider for Uomox');
+  assert.strictEqual(result.sent, false);
+  assert.ok(/free-text/.test(result.reason), result.reason);
+});
+
+test('Uomox answering anything other than "success" is treated as a failure, not just "failed"', async () => {
+  const { server, url } = await fakeProvider((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', message: 'Template not approved for this account' }));
+  });
+
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'k', UOMOX_API_STYLE: 'uomox' });
+  await assert.rejects(
+    () => wa.send({ to: '9812345678', template: 'x', bodyParams: [] }),
+    /Template not approved for this account/
+  );
+  server.close();
+});
+
+test('a document header for Uomox carries the report PDF link', async () => {
+  let seen = null;
+  const { server, url } = await fakeProvider((req, res, body) => {
+    seen = body;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'success', metaResponse: { messages: [{ id: 'wamid.DOC' }] } }));
+  });
+
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'k', UOMOX_API_STYLE: 'uomox' });
+  await wa.send({
+    to: '9812345678', template: 'blueprint_ready', bodyParams: ['Ananya'],
+    documentUrl: 'https://example.com/report.pdf', documentName: 'Divya-Bajaj-Full-Blueprint.pdf'
+  });
+  server.close();
+
+  assert.strictEqual(seen.media.url, 'https://example.com/report.pdf');
+  assert.strictEqual(seen.media.filename, 'Divya-Bajaj-Full-Blueprint.pdf');
+});
+
 test('a 200 that carries an error is NOT called a success', async () => {
   const { server, url } = await fakeProvider((req, res) => {
     // Exactly what several providers do, and the reason status codes alone

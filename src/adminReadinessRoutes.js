@@ -81,10 +81,11 @@ function whatsappCheck() {
   if (!whatsapp.isConfigured()) {
     return check('WhatsApp', false,
       'Not connected. Reports and confirmations are not sent on WhatsApp.',
-      'Set UOMOX_API_URL (the send-message endpoint), UOMOX_API_KEY and UOMOX_SENDER in Vercel.');
+      'Set UOMOX_API_URL (https://api.uomox.com/services/V1/broadcast/send-template) and UOMOX_API_KEY (the Access Token from the Uomox portal) in Vercel.');
   }
+  const senderNote = whatsapp.sender() ? `, sending from ${whatsapp.sender()}` : '';
   return check('WhatsApp', true,
-    `Connected, sending from ${whatsapp.sender()}. A template Meta has not approved will still fail per message, and each failure shows against that customer in Reports.`,
+    `Connected${senderNote}. A template Meta has not approved will still fail per message, and each failure shows against that customer in Reports.`,
     null);
 }
 

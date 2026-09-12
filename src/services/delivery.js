@@ -296,9 +296,14 @@ async function deliverBookingConfirmation({ environment, appointmentId, name, em
  *
  * Deliberately separate from the customer's message and deliberately
  * best-effort: this is a convenience so she does not have to watch the panel,
- * never the thing a customer depends on. Her WhatsApp copy is free text, which
- * only reaches her if she has messaged the business number in the last 24
- * hours - so the email carries the same information for when it has not.
+ * never the thing a customer depends on. Her WhatsApp copy is written as free
+ * text, which was written for a generic Cloud-API-shaped provider that allows
+ * free text inside a 24-hour reply window. Uomox (the provider actually in
+ * use) has no free-text send at all, ever - only approved templates, on both
+ * customer and owner sends alike - so this WhatsApp attempt will record as
+ * "skipped" until an approved owner-alert template exists. The email below is
+ * not a fallback for the 24-hour window; today it is the only channel that
+ * actually reaches her.
  */
 async function notifyOwner({ environment, event, name, phone, email: customerEmail, question, startsAt, amountInr }) {
   const result = { whatsapp: null, email: null };

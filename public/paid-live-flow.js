@@ -86,6 +86,13 @@
       .dbp-submit:disabled,.dbp-download:disabled{opacity:.6;cursor:wait}
       .dbp-status{display:none;margin-top:12px;padding:12px 14px;border:1px solid rgba(201,169,110,.18);background:rgba(201,169,110,.04);color:#d2c6b9;font-size:12px;line-height:1.5;white-space:pre-wrap}
       .dbp-status.show{display:block}.dbp-status.error{border-color:rgba(227,124,112,.35);color:#ffaaa0;background:rgba(227,124,112,.06)}.dbp-status.success{border-color:rgba(55,212,124,.3);color:#b6edcc;background:rgba(55,212,124,.055)}
+      .dbp-success{display:none;text-align:center;padding:34px 8px 8px}
+      .dbp-success.show{display:block}
+      .dbp-success-tick{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;background:rgba(55,212,124,.14);border:1px solid rgba(55,212,124,.4);color:#5be89a;font-size:30px;font-weight:900;display:grid;place-items:center}
+      .dbp-success h3{font-family:Fraunces,Georgia,serif;font-size:27px;color:#fff6e9;margin:0 0 14px;font-weight:600}
+      .dbp-success-msg{font-size:14px;color:#d2c6b9;line-height:1.7;white-space:pre-wrap;margin:0 0 26px;max-width:440px;margin-left:auto;margin-right:auto}
+      .dbp-success-whatsapp{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:14px 22px;background:#25D366;color:#08240f;text-decoration:none;font:900 12px/1.2 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.6px}
+      .dbp-success-whatsapp:hover{background:#2fe377}
       .dbp-result{display:none;margin-top:22px;padding-top:22px;border-top:1px solid rgba(201,169,110,.14)}
       .dbp-result.show{display:block}
       .dbp-result h4{font-family:Fraunces,Georgia,serif;font-size:25px;color:#fff6e9;margin:0 0 6px}
@@ -134,10 +141,19 @@
             <div class="dbp-trust">Private and personalised. Your details are used only to prepare your report.</div>
           </aside>
           <main class="dbp-main">
-            <div class="dbp-main-head">
+            <div class="dbp-main-head" id="dbpMainHead">
               <div class="dbp-eyebrow">Create your personalised report</div>
               <h3 id="dbpTitle">Enter your birth details</h3>
               <p>Please use accurate information. Your date, time and birthplace directly affect the chart calculations.</p>
+            </div>
+            <div class="dbp-success" id="dbpSuccess">
+              <div class="dbp-success-tick">&#10003;</div>
+              <h3>Payment received</h3>
+              <p class="dbp-success-msg" id="dbpSuccessMsg"></p>
+              <a class="dbp-success-whatsapp" id="dbpSuccessWhatsapp" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M17.47 14.38c-.29-.14-1.7-.84-1.96-.93-.26-.1-.46-.14-.65.14-.19.29-.75.93-.92 1.12-.17.19-.34.22-.63.07-.29-.14-1.22-.45-2.32-1.43-.86-.76-1.44-1.71-1.6-2-.17-.29-.02-.44.13-.59.13-.13.29-.34.43-.5.14-.17.19-.29.29-.48.1-.19.05-.36-.02-.5-.07-.14-.65-1.57-.9-2.15-.24-.57-.48-.5-.65-.5-.17-.01-.36-.01-.55-.01s-.5.07-.77.36c-.26.29-1 .98-1 2.4s1.03 2.78 1.17 2.97c.14.19 2.03 3.1 4.92 4.35.69.3 1.22.48 1.64.61.69.22 1.31.19 1.81.11.55-.08 1.7-.7 1.94-1.37.24-.67.24-1.24.17-1.37-.07-.12-.26-.19-.55-.33z"/><path d="M12.02 2C6.5 2 2 6.48 2 12c0 1.85.51 3.58 1.4 5.07L2 22l5.06-1.33A9.94 9.94 0 0 0 12.02 22C17.53 22 22 17.52 22 12S17.53 2 12.02 2zm0 18.06c-1.66 0-3.2-.46-4.52-1.26l-.32-.19-3 .79.8-2.93-.21-.3A8.02 8.02 0 0 1 4 12c0-4.42 3.6-8.02 8.02-8.02S20.04 7.58 20.04 12s-3.6 8.06-8.02 8.06z"/></svg>
+                <span id="dbpSuccessWhatsappLabel">Message Divya on WhatsApp</span>
+              </a>
             </div>
             <form id="dbpForm" novalidate>
               <div class="dbp-grid">
@@ -231,6 +247,9 @@
     var overlay = ensureModal();
     overlay.classList.add('is-open');
     document.body.classList.add('dbp-lock');
+    // Already paid (closed the popup and reopened it from the page CTA): go
+    // straight back to the success view, not a blank form.
+    if (state.paid) { showPaymentSuccess(); return; }
     // The button should say what it does before it does it: the customer is
     // paying at this step now, and finding that out only after filling seven
     // fields would feel like a trap.
@@ -240,23 +259,15 @@
     setTimeout(function () { var el = qs('#dbp-name', overlay); if (el) el.focus({ preventScroll:true }); }, 80);
   }
 
+  // Closing this popup must never be blocked. Money moving, a report still
+  // generating, delivery not yet configured - none of that is the
+  // customer's problem, and none of it is a reason to trap someone on this
+  // page against their will. This used to refuse to close after payment
+  // when we could not yet message the customer, which was wrong: closing a
+  // browser tab is always allowed on the web, and pretending otherwise here
+  // only confused and angered people. The report keeps generating and will
+  // still be delivered on schedule whether this modal is open or not.
   function closeModal() {
-    // Once paid, whether they may leave depends entirely on whether we can
-    // send the report to them.
-    if (state.paid && state.generating) {
-      if (state.config && state.config.can_deliver) {
-        var overlay = document.getElementById('dbpOverlay');
-        if (overlay) overlay.classList.remove('is-open');
-        document.body.classList.remove('dbp-lock');
-        return;
-      }
-      setStatus('Your report is still being written, and we cannot message it to you yet. Please keep this page open a little longer.', '');
-      return;
-    }
-    if (state.generating) {
-      setStatus('Please wait a moment.', '');
-      return;
-    }
     var overlay = document.getElementById('dbpOverlay');
     if (overlay) overlay.classList.remove('is-open');
     document.body.classList.remove('dbp-lock');
@@ -519,16 +530,56 @@
    * within the hour, which this says plainly rather than implying the report
    * is being written in front of them right now.
    *
-   * The "you can close this page" half is only printed when a delivery channel
-   * is actually configured. Saying it while nothing can send would be telling
-   * someone who just paid that their report is coming, and then sending
-   * nothing.
+   * Closing this page is ALWAYS fine either way - generation and delivery
+   * both happen on the server, on their own schedule, whether this tab is
+   * open or not. The two branches only change what we promise about
+   * WhatsApp/email: with a delivery channel actually configured we promise
+   * the hour; without one yet, we say so honestly instead of promising a
+   * time we cannot back up.
    */
   function waitingCopy() {
     var canDeliver = state.config && state.config.can_deliver;
     return canDeliver
-      ? 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it on WhatsApp and email within the hour.\n\nYou can close this page now.'
-      : 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it within the hour once WhatsApp and email delivery are switched on. Please keep this page open for now.';
+      ? 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it on WhatsApp and email within the hour.\n\nYou can close this page now - there is nothing more to do here.'
+      : 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. It will reach you on WhatsApp and email as soon as delivery is switched on.\n\nYou can close this page now - there is nothing more to do here.';
+  }
+
+  /**
+   * A WhatsApp link for a customer who has already paid and wants to reach
+   * Divya - a support/check-in message, distinct from showWhatsappFallback()
+   * above which is for placing an order. Reuses the same number the backend
+   * already sends in config.whatsapp_handoff rather than needing its own field.
+   */
+  function supportWhatsappLink() {
+    var config = state.config || {};
+    var number = String(config.whatsapp_handoff || '').replace(/^https:\/\/wa\.me\//, '').split('?')[0];
+    var lead = (state.pdfPayload && state.pdfPayload.lead) || {};
+    var lines = ['Hi Divya, I just paid for my Full Blueprint report and wanted to check in.'];
+    if (lead.name) lines.push('Name: ' + lead.name);
+    if (lead.email) lines.push('Email: ' + lead.email);
+    var text = lines.join('\n');
+    return 'https://wa.me/' + number + '?text=' + encodeURIComponent(text);
+  }
+
+  /**
+   * The actual "proper pop up" the customer sees once payment is confirmed:
+   * replaces the form with a full-screen confirmation inside the same modal -
+   * a tick, a heading, the waiting copy, and a WhatsApp button so they have
+   * somewhere to go if they have a question, rather than only a small status
+   * line under a disabled button.
+   */
+  function showPaymentSuccess(message) {
+    var overlay = ensureModal();
+    var head = qs('#dbpMainHead', overlay);
+    if (head) head.style.display = 'none';
+    var form = qs('#dbpForm', overlay);
+    if (form) form.style.display = 'none';
+    qs('#dbpResult', overlay).classList.remove('show');
+    qs('#dbpSuccessMsg', overlay).textContent = message || waitingCopy();
+    qs('#dbpSuccessWhatsapp', overlay).href = supportWhatsappLink();
+    qs('#dbpSuccess', overlay).classList.add('show');
+    var main = overlay.querySelector('.dbp-main');
+    if (main) main.scrollTop = 0;
   }
 
   async function submitReport(event) {
@@ -686,8 +737,10 @@
     } catch (error) {
       // The webhook is the backstop. Money has moved and Razorpay will tell the
       // server about it even if this call failed, so the customer is told to
-      // wait rather than to pay again.
-      setStatus('Your payment went through. We had trouble confirming it here, but your report is safe and will reach you within the hour. Please message us if you do not hear anything by then.', '');
+      // wait rather than to pay again - shown as the same full success popup,
+      // not a small inline error, because from the customer's side this IS a
+      // successful payment.
+      showPaymentSuccess('Your payment went through, thank you.\n\nWe had trouble confirming it on this page, but your money is safe and your report will still reach you within the hour. Message Divya below if you do not hear anything by then.');
       // Left disabled on purpose: money has already moved, so the submit
       // button must not invite paying a second time.
       return;
@@ -702,7 +755,7 @@
     }).catch(function () {});
 
     // Left disabled: the order is placed, so there is nothing left to submit.
-    setStatus(waitingCopy(), 'success');
+    showPaymentSuccess();
   }
 
   // pollStatus()/showReport() below revealed the finished report on this page

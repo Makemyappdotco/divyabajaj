@@ -143,14 +143,41 @@ console.log('\nreport delivery delay\n');
     confirmPayment);
   check('confirmPayment() still kicks off generation in the background',
     /reports\/blueprint\/run/.test(confirmPayment));
-  check('the waiting copy says the report is prepared personally within the hour',
-    /waitingCopy/.test(confirmPayment));
+  check('confirmPayment() shows the full success popup on both the happy path and the "money moved but confirm failed" path',
+    (confirmPayment.match(/showPaymentSuccess\(/g) || []).length === 2, confirmPayment);
 
-  const waitingCopySource = source.slice(source.indexOf('function waitingCopy'), source.indexOf('function submitReport'));
+  const waitingCopySource = source.slice(source.indexOf('function waitingCopy'), source.indexOf('function supportWhatsappLink'));
   check('waitingCopy() promises the hour, not instant arrival',
     /within the hour/.test(waitingCopySource));
   check('waitingCopy() no longer says the report "takes a few minutes"',
     !/few minutes/.test(waitingCopySource), waitingCopySource);
+  check('waitingCopy() never tells the customer to keep the page open',
+    !/keep this page open/.test(waitingCopySource), waitingCopySource);
+
+  // The payment-confirmation screen: a proper popup (tick, heading, message,
+  // a WhatsApp CTA), not just a one-line status message under the button -
+  // Dhruv was explicit that the small inline text was not enough on its own.
+  const showPaymentSuccessSource = source.slice(source.indexOf('function showPaymentSuccess'), source.indexOf('async function submitReport'));
+  check('showPaymentSuccess() defaults to waitingCopy() when no override message is given',
+    /message \|\| waitingCopy\(\)/.test(showPaymentSuccessSource), showPaymentSuccessSource);
+  check('showPaymentSuccess() hides the form and shows the dedicated success view',
+    /dbpForm.*display\s*=\s*.none./s.test(showPaymentSuccessSource) && /dbpSuccess.*classList\.add\(.show.\)/s.test(showPaymentSuccessSource),
+    showPaymentSuccessSource);
+  check('showPaymentSuccess() points the WhatsApp button at a real support link',
+    /dbpSuccessWhatsapp.*\.href\s*=\s*supportWhatsappLink\(\)/.test(showPaymentSuccessSource), showPaymentSuccessSource);
+
+  check('the modal markup includes a WhatsApp CTA in the success view',
+    /id="dbpSuccessWhatsapp"/.test(source) && /wa\.me/.test(source));
+
+  // Closing the popup must never be blocked - not by "still generating", not
+  // by "we cannot message you yet". Money moving or a report still being
+  // written is never a reason to trap someone on this page.
+  const closeModalSource = source.slice(source.indexOf('function closeModal'), source.indexOf('function formatDate'));
+  check('closeModal() no longer conditions closing on payment/generation/delivery state',
+    !/state\.paid/.test(closeModalSource) && !/state\.generating/.test(closeModalSource) && !/can_deliver/.test(closeModalSource),
+    closeModalSource);
+  check('closeModal() always removes is-open, unconditionally',
+    /classList\.remove\(.is-open.\)/.test(closeModalSource), closeModalSource);
 })();
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

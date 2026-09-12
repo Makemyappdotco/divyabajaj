@@ -16,7 +16,7 @@
   "crons": [
     {
       "path": "/api/internal/report-sweep",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

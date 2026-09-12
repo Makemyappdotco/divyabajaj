@@ -17,6 +17,7 @@ const razorpay = require('./services/razorpay');
 const pricing = require('./services/pricing');
 const reportJobs = require('./services/reportJobs');
 const delivery = require('./services/delivery');
+const paidReportRoutes = require('./paidReportRoutes');
 
 const router = express.Router();
 
@@ -320,7 +321,15 @@ router.post('/webhook', async (req, res) => {
             // and we would be generating the same report twice over.
             await supabase.from('orders').update({ status: 'paid', updated_at: now() }).eq('id', orderRow.data.id);
             const job = await reportJobs.getByGatewayOrder(gatewayOrderId);
-            if (job) await reportJobs.markPaid(job.id, { paymentId });
+            if (job) {
+              // job.status here is BEFORE markPaid, same as /verify captures
+              // it - notifyFirstPaid() uses that to tell whether the webhook
+              // or the browser is the one that actually wins the race.
+              const previousStatus = job.status;
+              const queued = await reportJobs.markPaid(job.id, { paymentId });
+              paidReportRoutes.notifyFirstPaid({ job, previousStatus, queued })
+                .catch(error => console.error('[payment:webhook] notify failed', error.message));
+            }
           } else {
             const appt = await supabase.from('appointments').select('*').eq('order_id', orderRow.data.id).maybeSingle();
             if (appt.data) {

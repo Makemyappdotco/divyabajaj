@@ -12,5 +12,11 @@
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/internal/report-sweep",
+      "schedule": "*/5 * * * *"
+    }
   ]
 }

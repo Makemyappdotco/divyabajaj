@@ -87,12 +87,42 @@ console.log('\nreport delivery delay\n');
 
   // Divya should hear about a sale immediately, not an hour later when the
   // report finally goes out - that decoupling is the point of this whole
-  // change, so /verify must notify her, not runJob()/deliverJob().
+  // change, so whichever of /verify or the webhook first moves the job out
+  // of awaiting_payment must notify her, not runJob()/deliverJob().
+  const notifyFirstPaid = source.slice(
+    source.indexOf('async function notifyFirstPaid'),
+    source.indexOf("router.post('/verify'")
+  );
   const verify = source.slice(source.indexOf("router.post('/verify'"), source.indexOf('// ----------------------------------------------------------------------- run'));
-  check('the owner is notified at payment time, not delivery time',
-    /delivery\.notifyOwner/.test(verify));
-  check('runJob() no longer notifies the owner (moved to /verify)',
+
+  check('notifyFirstPaid() is the one place that sends the receipt and the owner alert',
+    /delivery\.notifyOwner/.test(notifyFirstPaid) && /delivery\.notifyPaymentReceived/.test(notifyFirstPaid));
+  check('notifyFirstPaid() only fires on the transition out of awaiting_payment, never on a duplicate call',
+    /previousStatus === 'awaiting_payment'/.test(notifyFirstPaid) && /queued\.status === 'queued'/.test(notifyFirstPaid));
+  check('/verify calls notifyFirstPaid() instead of notifying inline',
+    /notifyFirstPaid\(\{\s*job,\s*previousStatus:\s*job\.status,\s*queued\s*\}\)/.test(verify));
+  check('runJob() no longer notifies the owner (moved to notifyFirstPaid)',
     !/notifyOwner/.test(runJob));
+  check('notifyFirstPaid is exported so the webhook path can share it',
+    /module\.exports\.notifyFirstPaid = notifyFirstPaid/.test(source));
+})();
+
+// --------------------------------------------------- the webhook backstop
+// notifies too, not only the browser's /verify call. A customer who pays and
+// closes the tab before /verify ever runs used to get no receipt, and Divya
+// got no sale alert, even though the webhook still queued and generated
+// their report - the report existed and nobody was told. This is that fix.
+
+(() => {
+  const source = read('src/paymentRoutes.js');
+  check('paymentRoutes.js requires paidReportRoutes to reach notifyFirstPaid',
+    /require\(['"]\.\/paidReportRoutes['"]\)/.test(source));
+
+  const webhook = source.slice(source.indexOf("router.post('/webhook'"));
+  check('the webhook captures the job status BEFORE calling markPaid',
+    /previousStatus\s*=\s*job\.status/.test(webhook));
+  check('the webhook calls notifyFirstPaid so a webhook-only payment still gets a receipt and an owner alert',
+    /paidReportRoutes\.notifyFirstPaid\(\{\s*job,\s*previousStatus,\s*queued\s*\}\)/.test(webhook));
 })();
 
 // ------------------------------------------------------------- the sweep
@@ -109,6 +139,23 @@ console.log('\nreport delivery delay\n');
   const wiring = read('src/server.js');
   check('server.js wires deliverJob into the sweep call, not just runJob',
     /reportSweep\.sweep\(\{[^}]*deliverJob:\s*paidReportRoutes\.deliverJob/.test(wiring));
+})();
+
+// --------------------------------------------------- something has to call
+// the sweep. The route existing is not enough - Vercel only runs it on a
+// schedule if vercel.json actually declares that schedule. Without this a
+// generated report can sit finished and undelivered forever: nothing else
+// in this codebase ever calls /api/internal/report-sweep.
+
+(() => {
+  const vercelConfig = JSON.parse(read('vercel.json'));
+  const crons = vercelConfig.crons || [];
+  const sweepCron = crons.find(c => c.path === '/api/internal/report-sweep');
+
+  check('vercel.json declares a Cron Job that actually calls the report sweep',
+    Boolean(sweepCron), JSON.stringify(crons));
+  check('the sweep cron has a schedule string set',
+    Boolean(sweepCron && typeof sweepCron.schedule === 'string' && sweepCron.schedule.trim()));
 })();
 
 // --------------------------------------------------------- the copy itself

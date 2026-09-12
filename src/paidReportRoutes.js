@@ -173,6 +173,44 @@ router.post('/checkout', handle('checkout', async (req, res) => {
 // -------------------------------------------------------------------- verify
 
 /**
+ * The one-time "you paid, hang tight" receipt and Divya's sale alert.
+ *
+ * Two different callers can be the one that first moves a job out of
+ * awaiting_payment: the browser's /verify below, or the Razorpay webhook in
+ * paymentRoutes.js (a customer who pays and closes the tab before /verify
+ * ever runs is exactly the case the webhook exists for). Both call this with
+ * the job's status from BEFORE they called markPaid, so only whichever one
+ * actually won that race sends anything - one receipt, one ping to Divya,
+ * never zero and never two.
+ */
+async function notifyFirstPaid({ job, previousStatus, queued }) {
+  if (!(queued && queued.status === 'queued' && previousStatus === 'awaiting_payment')) return;
+
+  const price = await pricing.priceOf(PRODUCT, job.environment).catch(() => null);
+  delivery.notifyPaymentReceived({
+    environment: job.environment,
+    jobId: job.id,
+    name: job.payload && job.payload.name,
+    email: job.payload && job.payload.email,
+    phone: job.payload && job.payload.phone,
+    amountInr: price ? price.amount_inr : null
+  }).catch(error => console.error('[blueprint:notify] receipt failed', error.message));
+
+  // Divya hears about the sale the moment it happens, not an hour later
+  // when the report is finally delivered. Those two things are on purpose
+  // decoupled now - see runJob().
+  delivery.notifyOwner({
+    environment: job.environment,
+    event: 'blueprint',
+    name: job.payload && job.payload.name,
+    phone: job.payload && job.payload.phone,
+    email: job.payload && job.payload.email,
+    question: job.payload && job.payload.question,
+    amountInr: price ? price.amount_inr : null
+  }).catch(error => console.error('[blueprint:notify] owner alert failed', error.message));
+}
+
+/**
  * The browser's word that payment succeeded, checked against the signature.
  *
  * This only QUEUES the job. It does not generate, because generation takes
@@ -212,33 +250,11 @@ router.post('/verify', handle('verify', async (req, res) => {
 
   const queued = await jobs.markPaid(job.id, { paymentId });
 
-  // Only when this call is the one that moved it out of awaiting_payment.
-  // The webhook lands here too, and nobody wants two receipts - or two
-  // "you made a sale" pings to Divya.
-  if (queued && queued.status === 'queued' && job.status === 'awaiting_payment') {
-    const price = await pricing.priceOf(PRODUCT, job.environment).catch(() => null);
-    delivery.notifyPaymentReceived({
-      environment: job.environment,
-      jobId: job.id,
-      name: job.payload && job.payload.name,
-      email: job.payload && job.payload.email,
-      phone: job.payload && job.payload.phone,
-      amountInr: price ? price.amount_inr : null
-    }).catch(error => console.error('[blueprint:verify] receipt failed', error.message));
-
-    // Divya hears about the sale the moment it happens, not an hour later
-    // when the report is finally delivered. Those two things are on purpose
-    // decoupled now - see runJob().
-    delivery.notifyOwner({
-      environment: job.environment,
-      event: 'blueprint',
-      name: job.payload && job.payload.name,
-      phone: job.payload && job.payload.phone,
-      email: job.payload && job.payload.email,
-      question: job.payload && job.payload.question,
-      amountInr: price ? price.amount_inr : null
-    }).catch(error => console.error('[blueprint:verify] owner alert failed', error.message));
-  }
+  // Only when THIS call is the one that moved it out of awaiting_payment.
+  // The webhook can land first instead - see notifyFirstPaid() below, shared
+  // with src/paymentRoutes.js, so whichever one actually wins the race is
+  // the only one that sends the receipt and Divya's sale alert.
+  notifyFirstPaid({ job, previousStatus: job.status, queued });
 
   return res.json({
     success: true,
@@ -421,3 +437,4 @@ router.get('/status', handle('status', async (req, res) => {
 module.exports = router;
 module.exports.runJob = runJob;
 module.exports.deliverJob = deliverJob;
+module.exports.notifyFirstPaid = notifyFirstPaid;

@@ -389,6 +389,18 @@ test('the PDF goes as a base64 attachment', async () => {
   assert.strictEqual(Buffer.from(seen.attachments[0].content, 'base64').toString(), '%PDF-1.4 hello');
 });
 
+test('the free report now points at the Utility-approved template, not the Marketing one', () => {
+  // free_report_ready (Marketing) accepted sends and returned real message
+  // IDs while never actually reaching a phone that had not opted in to
+  // marketing messages - confirmed against real delivery_attempts rows on
+  // 2026-09-14. free_report_ready_new is the same content, approved as
+  // Utility instead, which does not carry that restriction.
+  delete process.env.UOMOX_TEMPLATE_FREE_REPORT;
+  delete require.cache[require.resolve('../src/services/transports/whatsapp')];
+  const wa = require('../src/services/transports/whatsapp');
+  assert.strictEqual(wa.templateName('free_report_ready'), 'free_report_ready_new');
+});
+
 test('deliverFreeReport does not wire a document or button into the WhatsApp send', () => {
   // Regression guard for the same bug: it is not enough that
   // freeReportWhatsapp() stopped returning button/document data, the actual

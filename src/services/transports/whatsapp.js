@@ -33,7 +33,14 @@ function style() { return (process.env.UOMOX_API_STYLE || 'uomox').toLowerCase()
 
 function templateName(key) {
   const map = {
-    free_report_ready: process.env.UOMOX_TEMPLATE_FREE_REPORT || 'free_report_ready',
+    // 'free_report_ready' itself was approved as a Marketing-category
+    // template, which needs the recipient to have opted in to marketing
+    // messages - WhatsApp will accept and return a message ID for it either
+    // way, so a "sent" status here never actually proved delivery. On
+    // 2026-09-14 it was resubmitted and approved as 'free_report_ready_new'
+    // under the Utility category instead, which does not carry that
+    // restriction. Same content, so this only changes the template name.
+    free_report_ready: process.env.UOMOX_TEMPLATE_FREE_REPORT || 'free_report_ready_new',
     payment_received: process.env.UOMOX_TEMPLATE_PAYMENT_RECEIVED || 'payment_received',
     report_ready: process.env.UOMOX_TEMPLATE_REPORT_READY || 'blueprint_ready',
     refunded: process.env.UOMOX_TEMPLATE_REFUNDED || 'blueprint_refunded',

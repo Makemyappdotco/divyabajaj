@@ -72,8 +72,13 @@ async function attempt({ environment, jobId, channel, to, run }) {
     });
     return result;
   } catch (error) {
-    await record({ environment, jobId, channel, to, status: 'failed', detail: error.message });
-    console.error(`[delivery:${channel}]`, error.message);
+    // error.message alone hides WHY - a WhatsApp BSP's rejection reason lives
+    // in the raw body (error.provider), which used to be thrown away here.
+    // Keeping it is what let a guessed request shape (see uomoxBody() in
+    // transports/whatsapp.js) actually get diagnosed instead of re-guessed.
+    const raw = error.provider ? ` | provider: ${JSON.stringify(error.provider)}` : '';
+    await record({ environment, jobId, channel, to, status: 'failed', detail: error.message + raw });
+    console.error(`[delivery:${channel}]`, error.message, error.provider || '');
     return { sent: false, reason: error.message };
   }
 }

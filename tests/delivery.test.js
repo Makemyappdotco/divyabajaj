@@ -377,6 +377,24 @@ test('the PDF goes as a base64 attachment', async () => {
   assert.strictEqual(Buffer.from(seen.attachments[0].content, 'base64').toString(), '%PDF-1.4 hello');
 });
 
+// -------------------------------------------------- failure diagnostics
+
+test('a failed send keeps the provider\'s raw response, not just its message', () => {
+  // attempt()'s catch block used to store only error.message, which is why a
+  // guessed Uomox request shape (see uomoxBody() in transports/whatsapp.js)
+  // could not be diagnosed from delivery_attempts alone - only "Required
+  // parameter is missing" ever showed up, never which field. Both the
+  // record() call and the console.error must carry error.provider now.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const catchBlock = source.slice(source.indexOf('async function attempt'), source.indexOf('// ------------------------------------------------------------ the report'));
+
+  assert.ok(catchBlock.includes('error.provider'), 'the catch block should reference error.provider');
+  assert.ok(/detail:\s*error\.message\s*\+\s*raw/.test(catchBlock), 'record() should be given message + the raw provider detail');
+  assert.ok(/console\.error\([^)]*error\.provider/.test(catchBlock), 'the console log should also carry error.provider for Vercel logs');
+});
+
 (async () => {
   for (const run of queue) await run();
   console.log(`\n${passed} passed, ${failed} failed\n`);

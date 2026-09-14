@@ -177,18 +177,16 @@ async function deliverFreeReport({ environment, reportId, name, email: to, phone
   }
 
   if (whatsappConfigured()) {
-    const vars = messages.freeReportWhatsapp({ name, reportToken: linkToken });
-    // Same /r/<token> link for the header and the button - see the comment
-    // in deliverReport() above for why this used to be two different URLs.
+    const vars = messages.freeReportWhatsapp({ name });
+    // No PDF header and no dynamic button wired in here on purpose - see the
+    // long comment on freeReportWhatsapp() in messages.js. This template's
+    // "View Report" button is a fixed link, not a per-customer one.
     result.whatsapp = await attempt({
       environment, jobId: reportId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('free_report_ready'),
-        bodyParams: vars.body,
-        buttonUrlSuffix: vars.buttonUrlSuffix,
-        documentUrl: link || null,
-        documentName: 'Divya-Bajaj-Numerology-Reading.pdf'
+        bodyParams: vars.body
       })
     });
   }

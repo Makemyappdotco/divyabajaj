@@ -293,9 +293,24 @@ function consultationConfirmedWhatsapp({ name, startsAt }) {
   };
 }
 
-function freeReportWhatsapp({ name, reportToken }) {
+function freeReportWhatsapp({ name }) {
   // free_report_ready:  "Hi {{1}}, your free numerology reading is ready..."
-  return { body: [firstName(name)], buttonUrlSuffix: reportToken || '' };
+  //
+  // Confirmed with Uomox support (2026-09-14), against a real failing send:
+  // this template has no document-header component, and its "View Report"
+  // button is a FIXED link baked into the approved template, not a dynamic
+  // one - Uomox's own working example for it sends no media and no button at
+  // all, just two plain body variables. The guessed shape this used to send
+  // (a document header plus a per-customer dynamic button) is what every
+  // real free-report WhatsApp send was failing on, with (#131008) Required
+  // parameter is missing, every single time.
+  //
+  // KNOWN LIMITATION, not fixed by this change: because the button's link is
+  // fixed, every customer sees the same "View Report" link right now, not
+  // their own report. Fixing that needs the template itself rebuilt with a
+  // dynamic button and resubmitted to Meta - tracked separately, on purpose,
+  // so today's fix is only the part that is actually confirmed.
+  return { body: [firstName(name), 'Divya-Bajaj-Numerology-Reading.pdf'] };
 }
 
 function paymentReceivedWhatsapp({ name, amountInr }) {

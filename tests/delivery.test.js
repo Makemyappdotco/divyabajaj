@@ -114,6 +114,18 @@ test('the WhatsApp template gets numbered blanks, not a sentence', () => {
   assert.strictEqual(vars.buttonUrlSuffix, 'abc123');
 });
 
+test('the free report WhatsApp template sends two body variables and no button, confirmed against a real Uomox failure', () => {
+  // free_report_ready's button turned out to be a fixed link baked into the
+  // approved template, not a dynamic one - Uomox support confirmed their own
+  // working request for it has no media and no button, only two body
+  // variables. Sending a documentUrl/buttonUrlSuffix here (what this used to
+  // do) is exactly what made every real send fail with (#131008) Required
+  // parameter is missing.
+  const vars = messages.freeReportWhatsapp({ name: 'Ananya Rao' });
+  assert.deepStrictEqual(vars.body, ['Ananya', 'Divya-Bajaj-Numerology-Reading.pdf']);
+  assert.strictEqual(vars.buttonUrlSuffix, undefined, 'no button data should be sent for this template');
+});
+
 test("Divya's alert carries what she needs to act", () => {
   const text = messages.ownerAlertWhatsapp({
     event: 'blueprint', name: 'Ananya Rao', phone: '9812345678',
@@ -375,6 +387,19 @@ test('the PDF goes as a base64 attachment', async () => {
   assert.strictEqual(seen.attachments.length, 1);
   assert.strictEqual(seen.attachments[0].filename, 'r.pdf');
   assert.strictEqual(Buffer.from(seen.attachments[0].content, 'base64').toString(), '%PDF-1.4 hello');
+});
+
+test('deliverFreeReport does not wire a document or button into the WhatsApp send', () => {
+  // Regression guard for the same bug: it is not enough that
+  // freeReportWhatsapp() stopped returning button/document data, the actual
+  // wire-up in deliverFreeReport() has to stop passing it through too.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const fn = source.slice(source.indexOf('async function deliverFreeReport'), source.indexOf('async function notifyPaymentReceived'));
+
+  assert.ok(!fn.includes('buttonUrlSuffix'), 'deliverFreeReport should not send button data for free_report_ready');
+  assert.ok(!fn.includes('documentUrl'), 'deliverFreeReport should not send a document header for free_report_ready');
 });
 
 // -------------------------------------------------- failure diagnostics

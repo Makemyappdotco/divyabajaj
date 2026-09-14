@@ -177,10 +177,10 @@ async function deliverFreeReport({ environment, reportId, name, email: to, phone
   }
 
   if (whatsappConfigured()) {
-    const vars = messages.freeReportWhatsapp({ name });
-    // No PDF header and no dynamic button wired in here on purpose - see the
-    // long comment on freeReportWhatsapp() in messages.js. This template's
-    // "View Report" button is a fixed link, not a per-customer one.
+    const vars = messages.freeReportWhatsapp({ name, reportToken: linkToken });
+    // No document header here - this template does not have one. The
+    // button link travels as the second body value; see the long comment
+    // on freeReportWhatsapp() in messages.js for why.
     result.whatsapp = await attempt({
       environment, jobId: reportId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({

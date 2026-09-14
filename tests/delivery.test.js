@@ -114,16 +114,21 @@ test('the WhatsApp template gets numbered blanks, not a sentence', () => {
   assert.strictEqual(vars.buttonUrlSuffix, 'abc123');
 });
 
-test('the free report WhatsApp template sends two body variables and no button, confirmed against a real Uomox failure', () => {
-  // free_report_ready's button turned out to be a fixed link baked into the
-  // approved template, not a dynamic one - Uomox support confirmed their own
-  // working request for it has no media and no button, only two body
-  // variables. Sending a documentUrl/buttonUrlSuffix here (what this used to
-  // do) is exactly what made every real send fail with (#131008) Required
-  // parameter is missing.
+test('the free report WhatsApp template sends the greeting then the real report link, with no separate button field', () => {
+  // Confirmed 2026-09-14 by reading the template's own button config in
+  // Uomox: "View Report (URL https://divyabajaj.com/r/{{1}} (Example:
+  // free-report.pdf))". Uomox flattens every component's blanks into one
+  // array - body {{1}} first, then the button's {{1}} - so the token has to
+  // be the second value here, not a separate buttons field, or the button
+  // opens a placeholder link instead of this customer's real report.
+  const vars = messages.freeReportWhatsapp({ name: 'Ananya Rao', reportToken: 'tok_abc123' });
+  assert.deepStrictEqual(vars.body, ['Ananya', 'tok_abc123']);
+  assert.strictEqual(vars.buttonUrlSuffix, undefined, 'this provider has no separate button field - the token travels inside body');
+});
+
+test('a missing report token does not crash the free report WhatsApp send', () => {
   const vars = messages.freeReportWhatsapp({ name: 'Ananya Rao' });
-  assert.deepStrictEqual(vars.body, ['Ananya', 'Divya-Bajaj-Numerology-Reading.pdf']);
-  assert.strictEqual(vars.buttonUrlSuffix, undefined, 'no button data should be sent for this template');
+  assert.deepStrictEqual(vars.body, ['Ananya', '']);
 });
 
 test("Divya's alert carries what she needs to act", () => {
@@ -401,10 +406,11 @@ test('the free report now points at the Utility-approved template, not the Marke
   assert.strictEqual(wa.templateName('free_report_ready'), 'free_report_ready_new');
 });
 
-test('deliverFreeReport does not wire a document or button into the WhatsApp send', () => {
-  // Regression guard for the same bug: it is not enough that
-  // freeReportWhatsapp() stopped returning button/document data, the actual
-  // wire-up in deliverFreeReport() has to stop passing it through too.
+test('deliverFreeReport does not send a document header or a separate button field', () => {
+  // This template has no document-header component, and this provider has
+  // no separate button field - the real report link travels inside
+  // bodyParams (see freeReportWhatsapp() in messages.js). Sending either of
+  // these would trip (#131008) Required parameter is missing again.
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');

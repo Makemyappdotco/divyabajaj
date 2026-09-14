@@ -293,24 +293,31 @@ function consultationConfirmedWhatsapp({ name, startsAt }) {
   };
 }
 
-function freeReportWhatsapp({ name }) {
-  // free_report_ready:  "Hi {{1}}, your free numerology reading is ready..."
+function freeReportWhatsapp({ name, reportToken }) {
+  // free_report_ready_new:  "Hi {{1}}, your free numerology reading is ready..."
+  //   button: View Report -> https://divyabajaj.com/r/{{1}}
   //
-  // Confirmed with Uomox support (2026-09-14), against a real failing send:
-  // this template has no document-header component, and its "View Report"
-  // button is a FIXED link baked into the approved template, not a dynamic
-  // one - Uomox's own working example for it sends no media and no button at
-  // all, just two plain body variables. The guessed shape this used to send
-  // (a document header plus a per-customer dynamic button) is what every
-  // real free-report WhatsApp send was failing on, with (#131008) Required
-  // parameter is missing, every single time.
+  // Confirmed 2026-09-14 by reading the template's own button config in
+  // Uomox: "View Report (URL https://divyabajaj.com/r/{{1}} (Example:
+  // free-report.pdf))". The button IS dynamic - "Example: free-report.pdf"
+  // is only the sample Meta asked for at submission time, not a fixed value.
   //
-  // KNOWN LIMITATION, not fixed by this change: because the button's link is
-  // fixed, every customer sees the same "View Report" link right now, not
-  // their own report. Fixing that needs the template itself rebuilt with a
-  // dynamic button and resubmitted to Meta - tracked separately, on purpose,
-  // so today's fix is only the part that is actually confirmed.
-  return { body: [firstName(name), 'Divya-Bajaj-Numerology-Reading.pdf'] };
+  // Earlier in this same day this was wrongly treated as a fixed/static
+  // button (see the git history on this function), because a document
+  // header plus a separate buttons field was failing with (#131008)
+  // Required parameter is missing, and Uomox support's own working example
+  // for this template sent no separate button field either - just two
+  // plain values. That was correct as far as it went: there is no separate
+  // "buttons" field for this provider. What was missed is that Uomox flattens
+  // every component's blanks into ONE array, in order: body {{1}} first,
+  // then the button's {{1}} right after it. So the second value in this
+  // array IS the button's link, not a second line of body text - which is
+  // also why the WhatsApp message never had a visible second body variable.
+  //
+  // So: index 0 fills the greeting, index 1 fills the button. Sending the
+  // real signed /r/ token there is what makes the button open THIS
+  // customer's actual report instead of a fixed placeholder.
+  return { body: [firstName(name), reportToken || ''] };
 }
 
 function paymentReceivedWhatsapp({ name, amountInr }) {

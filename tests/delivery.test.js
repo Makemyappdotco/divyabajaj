@@ -380,6 +380,47 @@ test('deliverFreeReport sends the free-reading header image, from SITE_URL', () 
   assert.ok(fs.existsSync(imagePath), 'the image the code points at should actually exist in public/whatsapp/');
 });
 
+test('every other live WhatsApp send also carries the header image Divya\'s team uploaded for it', () => {
+  // Same fix, same reason, for the four remaining templates that send
+  // unconditionally today (not gated behind CAMPAIGNS_ENABLED): the paid
+  // blueprint, payment received, refunded, and consultation confirmed.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+
+  const boundaries = [
+    ['async function deliverReport', 'async function deliverFreeReport', 'blueprint-ready.png'],
+    ['async function notifyPaymentReceived', 'async function notifyRefunded', 'payment-received.png'],
+    ['async function notifyRefunded', 'async function deliverBookingConfirmation', 'refunded.png'],
+    ['async function deliverBookingConfirmation', 'async function deliverConsultationCancelled', 'consultation-confirmed.png']
+  ];
+
+  boundaries.forEach(([start, end, file]) => {
+    const fn = source.slice(source.indexOf(start), source.indexOf(end));
+    assert.ok(fn.includes(start), `could not find ${start} in delivery.js - has it been renamed or moved?`);
+    const expected = new RegExp('imageUrl:\\s*`\\$\\{reportLinks\\.siteUrl\\(\\)\\}/whatsapp/' + file.replace('.', '\\.') + '`');
+    assert.ok(expected.test(fn), `${start} should send imageUrl pointing at whatsapp/${file}, built from reportLinks.siteUrl()`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'whatsapp', file)),
+      `the image ${start} points at (public/whatsapp/${file}) should actually exist`);
+  });
+});
+
+test('deliverReport (the paid blueprint) sends an image header now, but still no document header', () => {
+  // The image header is new; the "no document header" fact (confirmed
+  // against the live template in Uomox, see the comment in deliverReport)
+  // has not changed - this guards against the two ever being sent together,
+  // which would be rejected the same way documentUrl+imageUrl conflict for
+  // any other template (see "a document header wins" test above).
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const fn = source.slice(source.indexOf('async function deliverReport'), source.indexOf('async function deliverFreeReport'));
+
+  assert.ok(!fn.includes('buttonUrlSuffix'), 'deliverReport should not send button data for report_ready/blueprint_ready');
+  assert.ok(!fn.includes('documentUrl'), 'deliverReport should not send a document header for report_ready/blueprint_ready');
+  assert.ok(fn.includes('imageUrl'), 'deliverReport should send the blueprint-ready image header');
+});
+
 test('a 200 that carries an error is NOT called a success', async () => {
   const { server, url } = await fakeProvider((req, res) => {
     // Exactly what several providers do, and the reason status codes alone

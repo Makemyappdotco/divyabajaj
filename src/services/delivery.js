@@ -117,16 +117,19 @@ async function deliverReport({ environment, jobId, reportId, name, email: to, ph
     const vars = messages.reportReadyWhatsapp({ name, reportToken: linkToken });
     // No document header here - blueprint_ready has none (confirmed by
     // reading the template's own setup in Uomox), whatever its body text
-    // says. The button link travels as the second body value; see the long
-    // comment on reportReadyWhatsapp() in messages.js for why. The SAME /r/
-    // link used for the button is also what the email points at, minted
-    // once above so the two channels cannot disagree.
+    // says. It DOES have a static image header (the "Your Full Blueprint Is
+    // Ready" banner), same requirement as the free report - resend on every
+    // message or the send fails. The button link travels as the second body
+    // value; see the long comment on reportReadyWhatsapp() in messages.js
+    // for why. The SAME /r/ link used for the button is also what the email
+    // points at, minted once above so the two channels cannot disagree.
     result.whatsapp = await attempt({
       environment, jobId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('report_ready'),
-        bodyParams: vars.body
+        bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/blueprint-ready.png`
       })
     });
   }
@@ -223,7 +226,8 @@ async function notifyPaymentReceived({ environment, jobId, name, email: to, phon
     result.whatsapp = await attempt({
       environment, jobId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
-        to: phone, template: whatsapp.templateName('payment_received'), bodyParams: vars.body
+        to: phone, template: whatsapp.templateName('payment_received'), bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/payment-received.png`
       })
     });
   }
@@ -247,7 +251,8 @@ async function notifyRefunded({ environment, jobId, name, email: to, phone, amou
     result.whatsapp = await attempt({
       environment, jobId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
-        to: phone, template: whatsapp.templateName('refunded'), bodyParams: vars.body
+        to: phone, template: whatsapp.templateName('refunded'), bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/refunded.png`
       })
     });
   }
@@ -275,7 +280,8 @@ async function deliverBookingConfirmation({ environment, appointmentId, name, em
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('consultation_confirmed'),
-        bodyParams: vars.body
+        bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/consultation-confirmed.png`
       })
     });
   }

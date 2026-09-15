@@ -405,6 +405,52 @@ test('every other live WhatsApp send also carries the header image Divya\'s team
   });
 });
 
+test('deliverConsultationMoved sends its own header image too - the only one of the two reschedule/cancel templates with one so far', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const fn = source.slice(source.indexOf('async function deliverConsultationMoved'), source.indexOf('// --------------------------------------------------------------- to Divya'));
+
+  assert.ok(/imageUrl:\s*`\$\{reportLinks\.siteUrl\(\)\}\/whatsapp\/consultation-moved\.png`/.test(fn),
+    'deliverConsultationMoved should send imageUrl pointing at whatsapp/consultation-moved.png');
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'whatsapp', 'consultation-moved.png')),
+    'the image deliverConsultationMoved points at should actually exist');
+
+  // consultation_cancelled has no header image yet - Divya's team has not
+  // sent one for it - so deliverConsultationCancelled should not claim one
+  // that does not exist.
+  const cancelledFn = source.slice(source.indexOf('async function deliverConsultationCancelled'), source.indexOf('async function deliverConsultationMoved'));
+  assert.ok(!/imageUrl/.test(cancelledFn), 'deliverConsultationCancelled should not send imageUrl until an image exists for it');
+});
+
+test('the five gated marketing/campaign templates also carry the header images Divya\'s team uploaded for them', () => {
+  // Same fix as the transactional sends above, for campaignSweep.js's
+  // whatsapp.send() call - these are gated behind CAMPAIGNS_ENABLED, but
+  // when they do fire they should look the same as everything else: a
+  // resent header image, never a hardcoded domain.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'campaignSweep.js'), 'utf8');
+
+  const expected = {
+    free_to_blueprint_1: 'free-to-blueprint-1.png',
+    free_to_blueprint_2: 'free-to-blueprint-2.png',
+    checkout_abandoned: 'checkout-abandoned.png',
+    blueprint_to_consultation: 'blueprint-to-consultation.png',
+    post_call_followup: 'post-call-followup.png'
+  };
+
+  Object.entries(expected).forEach(([campaign, file]) => {
+    const mapEntry = new RegExp(campaign + ":\\s*'" + file.replace('.', '\\.') + "'");
+    assert.ok(mapEntry.test(source), `CAMPAIGN_IMAGES should map ${campaign} to ${file}`);
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', 'whatsapp', file)),
+      `the image ${campaign} points at (public/whatsapp/${file}) should actually exist`);
+  });
+
+  assert.ok(/imageUrl:\s*image\s*\?\s*`\$\{reportLinks\.siteUrl\(\)\}\/whatsapp\/\$\{image\}`\s*:\s*undefined/.test(source),
+    'sendCampaign() should build imageUrl from reportLinks.siteUrl(), same as every other send, not a hardcoded domain');
+});
+
 test('deliverReport (the paid blueprint) sends an image header now, but still no document header', () => {
   // The image header is new; the "no document header" fact (confirmed
   // against the live template in Uomox, see the comment in deliverReport)

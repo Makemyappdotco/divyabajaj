@@ -13,16 +13,31 @@ const delivery = require('./delivery');
 const messages = require('./messages');
 const whatsapp = require('./transports/whatsapp');
 const email = require('./transports/email');
+const reportLinks = require('./reportLinks');
+
+// Header images Divya's team supplied for each marketing template, same
+// pattern as the transactional sends in delivery.js - resent with every
+// message, per Meta/Uomox's own header rules, never reused from the
+// template definition itself.
+const CAMPAIGN_IMAGES = {
+  free_to_blueprint_1: 'free-to-blueprint-1.png',
+  free_to_blueprint_2: 'free-to-blueprint-2.png',
+  checkout_abandoned: 'checkout-abandoned.png',
+  blueprint_to_consultation: 'blueprint-to-consultation.png',
+  post_call_followup: 'post-call-followup.png'
+};
 
 async function sendCampaign(campaign, lead) {
   const spec = campaigns.CAMPAIGNS[campaign];
   const vars = messages.campaignWhatsapp(campaign, lead);
 
   if (whatsapp.isConfigured() && lead.phone) {
+    const image = CAMPAIGN_IMAGES[campaign];
     const result = await whatsapp.send({
       to: lead.phone,
       template: whatsapp.templateName(spec.template),
-      bodyParams: vars.body
+      bodyParams: vars.body,
+      imageUrl: image ? `${reportLinks.siteUrl()}/whatsapp/${image}` : undefined
     });
     if (result.sent) return { channel: 'whatsapp', id: result.id };
   }

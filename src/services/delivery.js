@@ -352,7 +352,8 @@ async function deliverConsultationMoved({ environment, appointmentId, name, emai
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('consultation_moved'),
-        bodyParams: vars.body
+        bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/consultation-moved.png`
       })
     });
   }

@@ -59,6 +59,8 @@ run delivery.test.js
 run campaigns.test.js
 run booking-payment-ui.test.js
 run report-delivery-delay.test.js
+run pdf-sections.test.js
+run public-hours.test.js
 
 # Integration suites: fresh harness each.
 for suite in schedule-api.test.js booking-api.test.js payment-api.test.js pricing-e2e.test.js paid-report.test.js; do

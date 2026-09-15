@@ -2332,7 +2332,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 </div>
 
 <div class="avail-body">
-<div class="avail-slots reveal">
+<div class="avail-slots reveal" id="availSlots">
 <div class="avail-slot"><div class="aday">Wed</div><div class="atime">6:30 PM<br>8:00 PM</div></div>
 <div class="avail-slot"><div class="aday">Fri</div><div class="atime">6:30 PM<br>8:00 PM</div></div>
 <div class="avail-slot"><div class="aday">Sat</div><div class="atime">11:30 AM<br>2:00 PM</div></div>
@@ -2944,6 +2944,51 @@ function serviceToFreeReport(){ closeServicePopup(); setTimeout(function(){ if(t
   if(cb) cb.addEventListener('click', closeServicePopup);
   if(p) p.addEventListener('click', function(e){ if(e.target===p) closeServicePopup(); });
   document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ var sp=document.getElementById('servicePopup'); if(sp && sp.classList.contains('active')) closeServicePopup(); } });
+})();
+</script>
+
+<script>
+/* ===== Live "book directly" hours, from Divya's actual backend schedule =====
+   Replaces the static Wed/Fri/Sat/Sun placeholder tiles with whatever days
+   and times are actually switched on in the admin panel's schedule grid, so
+   this section can never show stale or fictional hours. */
+(function(){
+  function pad(box){ return box.length < 2 ? '0'+box : box; }
+  function fmtTime(t){
+    var parts = String(t||'').split(':');
+    var h = Number(parts[0]);
+    var m = pad(parts[1] || '00');
+    if (!Number.isFinite(h)) return String(t||'');
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + m + ' ' + ampm;
+  }
+  function shortDay(label){ return String(label||'').slice(0,3); }
+  function tileHtml(day){
+    var times = (day.intervals||[]).map(function(iv){
+      return fmtTime(iv.start_time) + ' - ' + fmtTime(iv.end_time);
+    }).join('<br>');
+    return '<div class="avail-slot"><div class="aday">'+shortDay(day.label)+'</div><div class="atime">'+times+'</div></div>';
+  }
+  function fallbackHtml(){
+    return '<div class="avail-slot" style="grid-column:1/-1;padding:20px 12px"><div class="atime">New slots are being scheduled. Message Divya on WhatsApp for the next available time.</div></div>';
+  }
+  function render(days){
+    var box = document.getElementById('availSlots');
+    if (!box) return;
+    box.innerHTML = (days && days.length) ? days.map(tileHtml).join('') : fallbackHtml();
+  }
+  function loadHours(){
+    fetch('/api/booking/hours', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!data || data.success === false) { render([]); return; }
+        render(data.week || []);
+      })
+      .catch(function(){ render([]); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadHours);
+  else loadHours();
 })();
 </script>
 </body>

@@ -114,6 +114,19 @@ router.get('/availability', handle('availability', async (req, res) => {
   });
 }));
 
+/**
+ * Divya's standing weekly hours, for public pages that want to show "book
+ * directly" times without duplicating the actual slot-search logic above.
+ * Only the days that are switched on are returned - a page rendering this
+ * should not have to also know what "is_active: false" means.
+ */
+router.get('/hours', handle('hours', async (req, res) => {
+  if (!db.usingSupabase()) return fail(res, 503, 'Booking is temporarily unavailable.');
+
+  const week = await store.getWeeklyHours(store.runtimeEnvironment());
+  return res.json({ success: true, week: week.filter(day => day.is_active) });
+}));
+
 function groupDays(slots) {
   const byDate = new Map();
   for (const slot of slots) {

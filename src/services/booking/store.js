@@ -61,6 +61,47 @@ async function getRules(environment) {
   );
 }
 
+const HOURS_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * The plain weekly pattern - which days are open and what hours each one
+ * runs - for public pages like the landing page's "book directly" section.
+ * Same source the admin panel's schedule grid reads and writes
+ * (availability_rules, kind='grid'), so a change Divya makes there shows up
+ * here too instead of the landing page carrying its own hardcoded copy of
+ * her hours that silently goes stale.
+ *
+ * Deliberately only the 'grid' rows, not 'extra' one-off or recurring extra
+ * windows - those are exceptions Divya adds for a specific stretch, not her
+ * standing weekly hours, and mixing them in would make this look like a
+ * permanent pattern that isn't one.
+ */
+async function getWeeklyHours(environment) {
+  const rules = await getRules(environment);
+  const grid = rules.filter(r => (r.kind || 'grid') === 'grid');
+
+  const byWeekday = new Map();
+  grid.forEach(rule => {
+    const weekday = Number(rule.weekday);
+    if (!byWeekday.has(weekday)) byWeekday.set(weekday, []);
+    byWeekday.get(weekday).push(rule);
+  });
+
+  return HOURS_WEEKDAYS.map((label, weekday) => {
+    const rows = (byWeekday.get(weekday) || [])
+      .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')));
+    return {
+      weekday,
+      label,
+      is_active: rows.length > 0,
+      intervals: rows.map(r => ({
+        start_time: String(r.start_time || '').slice(0, 5),
+        end_time: String(r.end_time || '').slice(0, 5)
+      }))
+    };
+  });
+}
+
 async function getBlocked(environment, from, to) {
   return unwrap(
     client().from('blocked_dates').select('starts_at, ends_at, reason')
@@ -265,7 +306,7 @@ async function getAppointment(appointmentId) {
 module.exports = {
   listAvailability, holdSlot, releaseHold, releaseExpired,
   createAppointment, setAppointmentStatus, getAppointment, recordStatus,
-  getRules, getBlocked, getTaken,
+  getRules, getBlocked, getTaken, getWeeklyHours,
   runtimeEnvironment, HOLD_MINUTES, MIN_NOTICE_MINUTES, MAX_DAYS_AHEAD,
   LIVE_APPOINTMENT_STATUSES
 };

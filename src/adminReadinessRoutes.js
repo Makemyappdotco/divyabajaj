@@ -130,6 +130,19 @@ function storageModeCheck() {
     'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, then redeploy.');
 }
 
+// Not required to take payments, so it is listed last and never blocks
+// ready_to_take_real_money - but Divya has asked more than once whether the
+// follow-up messages are actually live, and the only honest answer before this
+// existed was "check the Vercel dashboard yourself". Now the panel says it
+// directly, read from the same env var the sweep itself checks.
+function campaignsCheck() {
+  const ok = process.env.CAMPAIGNS_ENABLED === 'true';
+  return check('Follow-up messages', ok,
+    ok ? 'On. The 5 follow-up templates (free reading to blueprint, abandoned checkout, blueprint to consultation, post-call) go out on the daily sweep.'
+       : 'Off. The follow-up templates are built and ready, but nothing sends until this is turned on. This is optional, not required to take payments.',
+    'Set CAMPAIGNS_ENABLED to true in Vercel, then redeploy.');
+}
+
 router.get('/', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -143,7 +156,8 @@ router.get('/', async (req, res) => {
       whatsappCheck(),
       mail,
       ownerCheck(),
-      cronCheck()
+      cronCheck(),
+      campaignsCheck()
     ];
 
     const blocking = checks.filter(c => !c.ok);
@@ -172,3 +186,4 @@ router.get('/', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.campaignsCheck = campaignsCheck;

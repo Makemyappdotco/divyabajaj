@@ -171,9 +171,35 @@ function drawCover(doc, { lead, numbers, paid }) {
     .text('Private and personalised. Prepared for guidance, clarity and self-reflection.', 62, doc.page.height - 92, { width: doc.page.width - 124, align: 'center' });
 }
 
+/**
+ * The AI sometimes opens the report with its own title line (for example
+ * "Numerology Report for Dhruv Gupta") and/or a markdown divider ("---")
+ * before the first real numbered heading - neither the free nor the paid
+ * prompt asks for this, the model just does it on its own. Left in, that
+ * boilerplate used to become its own section titled "Personal Reading" with
+ * no real number of its own, so the "REPORT MAP" page and every section
+ * badge showed it as "01" while every actual heading used its own plain
+ * "1", "2", "3"... two different numbering styles side by side, which is
+ * the "zero one" Dhruv flagged as broken. Stripping it here means that
+ * leftover bucket ends up empty and gets dropped entirely (see the filter
+ * at the end of parseSections below).
+ */
+function stripLeadingBoilerplate(lines) {
+  const rest = lines.slice();
+  while (rest.length) {
+    const line = rest[0].trim();
+    if (!line) { rest.shift(); continue; }
+    const isDivider = /^[-=*_]{3,}$/.test(line);
+    const isTitleEcho = line.length <= 100 && /\breport\b/i.test(line) && /\bfor\b/i.test(line);
+    if (isDivider || isTitleEcho) { rest.shift(); continue; }
+    break;
+  }
+  return rest;
+}
+
 function parseSections(reportText) {
   const raw = cleanMarkdown(reportText);
-  const lines = raw.split('\n');
+  const lines = stripLeadingBoilerplate(raw.split('\n'));
   const sections = [];
   let current = { title: 'Personal Reading', number: '', lines: [] };
 

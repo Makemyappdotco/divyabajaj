@@ -526,21 +526,21 @@
   /**
    * What the customer is told once payment is confirmed. Said once and left
    * on screen - no progress ticker, no live reveal on this page. Divya
-   * prepares the reading personally and it is sent to WhatsApp and email
-   * within the hour, which this says plainly rather than implying the report
-   * is being written in front of them right now.
+   * prepares the reading personally and it is sent to WhatsApp and email as
+   * soon as it is generated (no artificial wait any more - see
+   * reportJobs.js's DELIVERY_DELAY_MS), which this says plainly rather than
+   * promising a specific window.
    *
    * Closing this page is ALWAYS fine either way - generation and delivery
-   * both happen on the server, on their own schedule, whether this tab is
-   * open or not. The two branches only change what we promise about
-   * WhatsApp/email: with a delivery channel actually configured we promise
-   * the hour; without one yet, we say so honestly instead of promising a
-   * time we cannot back up.
+   * both happen on the server, whether this tab is open or not. The two
+   * branches only change what we promise about WhatsApp/email: with a
+   * delivery channel actually configured we say "shortly"; without one yet,
+   * we say so honestly instead of promising something we cannot back up.
    */
   function waitingCopy() {
     var canDeliver = state.config && state.config.can_deliver;
     return canDeliver
-      ? 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it on WhatsApp and email within the hour.\n\nYou can close this page now - there is nothing more to do here.'
+      ? 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. You will receive it on WhatsApp and email shortly.\n\nYou can close this page now - there is nothing more to do here.'
       : 'Payment received, thank you.\n\nDivya is preparing your Full Blueprint personally. It will reach you on WhatsApp and email as soon as delivery is switched on.\n\nYou can close this page now - there is nothing more to do here.';
   }
 
@@ -710,13 +710,13 @@
 
   /**
    * Payment confirmed. This used to kick off startProgress()/pollStatus() and
-   * reveal the finished report on this same page a few minutes later -
-   * exactly the "arrived instantly" effect that made a personally prepared
-   * reading look automated. Now it says thank you once, kicks off generation
-   * in the background so it is ready well within the hour, and lets the
-   * customer go: delivery happens on WhatsApp and email later, gated by
-   * jobs.dueForDelivery() on the server (see paidReportRoutes.js), never from
-   * this page.
+   * reveal the finished report on this same page a few minutes later. That
+   * reveal is still retired (no progress ticker, no live report on this
+   * page), but delivery itself is no longer held back - it now goes out on
+   * WhatsApp and email as soon as generation finishes, gated only by
+   * jobs.dueForDelivery() on the server, which defaults to zero delay (see
+   * paidReportRoutes.js / reportJobs.js). This says thank you once, kicks off
+   * generation in the background, and lets the customer go.
    */
   async function confirmPayment(result) {
     state.paid = true;
@@ -740,15 +740,15 @@
       // wait rather than to pay again - shown as the same full success popup,
       // not a small inline error, because from the customer's side this IS a
       // successful payment.
-      showPaymentSuccess('Your payment went through, thank you.\n\nWe had trouble confirming it on this page, but your money is safe and your report will still reach you within the hour. Message Divya below if you do not hear anything by then.');
+      showPaymentSuccess('Your payment went through, thank you.\n\nWe had trouble confirming it on this page, but your money is safe and your report will still reach you shortly. Message Divya below if you do not hear anything soon.');
       // Left disabled on purpose: money has already moved, so the submit
       // button must not invite paying a second time.
       return;
     }
 
-    // Fire and forget: this starts generation now so there is time to retry
-    // if anything fails, well before the hour is up. Nothing on this page
-    // waits for it or shows its progress.
+    // Fire and forget: this starts generation now, which also starts
+    // delivery the moment it finishes (no wait built in any more). Nothing
+    // on this page waits for it or shows its progress.
     fetch('/api/reports/blueprint/run', {
       method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store',
       body:JSON.stringify({ job_id: state.jobId })

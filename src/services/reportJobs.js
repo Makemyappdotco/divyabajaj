@@ -23,15 +23,16 @@ const CLAIM_TIMEOUT_MS = 12 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
 
 // Generation happens promptly after payment - there is no reason to wait, and
-// starting early leaves room for retries. Delivery is a separate thing: the
-// landing page promises a reading Divya has prepared personally, and a report
-// that lands on WhatsApp within minutes of paying reads as automated,
-// whatever the copy says. So the finished report is held and only sent once
-// this much time has passed since payment. Overridable for tests; production
-// leaves it at the default hour.
+// starting early leaves room for retries. Delivery used to be held back on
+// purpose (an hour, by default) so a report did not land on WhatsApp within
+// minutes of paying and read as automated. Divya's team has since asked for
+// the opposite: the moment the report is generated, it should go out -
+// no wait at all. So this now defaults to zero, and dueForDelivery() (below)
+// is true as soon as a job has a paid_at. Still overridable via the env var,
+// in case a wait is ever wanted again without another code change.
 const DELIVERY_DELAY_MS = Number(process.env.REPORT_DELIVERY_DELAY_MS) >= 0
   ? Number(process.env.REPORT_DELIVERY_DELAY_MS)
-  : 60 * 60 * 1000;
+  : 0;
 
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 function now() { return new Date().toISOString(); }

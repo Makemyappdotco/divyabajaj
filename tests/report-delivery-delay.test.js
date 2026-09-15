@@ -1,14 +1,15 @@
 // The Full Blueprint used to arrive on WhatsApp and email within a few
 // minutes of paying - generation finished, and delivery happened in the same
-// breath, in the same function call. The landing page promises a reading
-// Divya prepares personally; a report that lands minutes after payment reads
-// as automated no matter what the copy says.
+// breath, in the same function call. For a while, delivery was deliberately
+// held back by an hour (jobs.dueForDelivery()) because a report landing
+// minutes after payment read as automated. Divya's team has since asked for
+// that wait to be removed entirely: generate, then deliver, with nothing in
+// between. So DELIVERY_DELAY_MS now defaults to zero, and dueForDelivery()
+// is true as soon as a job has a paid_at.
 //
-// The fix: generation and delivery are now separate steps. Generation still
-// happens promptly (so there is time to retry a failure). Delivery is held
-// until jobs.dueForDelivery() says enough time has passed since payment - by
-// default an hour - and a page reload or a closed tab must never reveal the
-// finished report early either.
+// Generation and delivery remain separate steps in the code (claim/retry
+// safety, a page reload or closed tab never reveals the report early on this
+// page) - only the wait between "generated" and "delivered" changed.
 //
 // jobs.dueForDelivery() is pure (no database), so it is tested directly.
 // Everything downstream of it - runJob() no longer delivering inline, the
@@ -38,16 +39,18 @@ console.log('\nreport delivery delay\n');
   delete require.cache[require.resolve('../src/services/reportJobs')];
   const jobs = require('../src/services/reportJobs');
 
-  check('the default delay is an hour', jobs.DELIVERY_DELAY_MS === 60 * 60 * 1000,
-    String(jobs.DELIVERY_DELAY_MS));
+  check('the default delay is now zero - deliver the moment it is generated',
+    jobs.DELIVERY_DELAY_MS === 0, String(jobs.DELIVERY_DELAY_MS));
 
   const hourAgo = new Date(Date.now() - 61 * 60 * 1000).toISOString();
   const justNow = new Date(Date.now() - 60 * 1000).toISOString();
 
   check('a job paid over an hour ago is due',
     jobs.dueForDelivery({ paid_at: hourAgo }) === true);
-  check('a job paid a minute ago is not due',
-    jobs.dueForDelivery({ paid_at: justNow }) === false);
+  check('a job paid a minute ago is already due too - no wait built in any more',
+    jobs.dueForDelivery({ paid_at: justNow }) === true);
+  check('a job paid this instant is already due',
+    jobs.dueForDelivery({ paid_at: new Date().toISOString() }) === true);
   check('a job with no paid_at at all is treated as due rather than held forever',
     jobs.dueForDelivery({ paid_at: null }) === true);
   check('a job with no paid_at field is treated as due rather than held forever',
@@ -55,11 +58,13 @@ console.log('\nreport delivery delay\n');
 })();
 
 (() => {
+  // The env var override still works, in case a wait is ever wanted again -
+  // this is not exercised by default, only when explicitly configured.
   delete require.cache[require.resolve('../src/services/reportJobs')];
-  process.env.REPORT_DELIVERY_DELAY_MS = '0';
+  process.env.REPORT_DELIVERY_DELAY_MS = String(60 * 60 * 1000);
   const jobs = require('../src/services/reportJobs');
-  check('REPORT_DELIVERY_DELAY_MS=0 makes a job paid this instant already due',
-    jobs.dueForDelivery({ paid_at: new Date().toISOString() }) === true);
+  check('REPORT_DELIVERY_DELAY_MS can still opt back into a wait if ever needed',
+    jobs.dueForDelivery({ paid_at: new Date().toISOString() }) === false);
   delete process.env.REPORT_DELIVERY_DELAY_MS;
   delete require.cache[require.resolve('../src/services/reportJobs')];
 })();
@@ -170,8 +175,10 @@ console.log('\nreport delivery delay\n');
     !/as soon as it is ready/.test(paymentReceived), paymentReceived);
   check('the payment-received email no longer says "a few minutes"',
     !/few minutes/.test(paymentReceived), paymentReceived);
-  check('the payment-received email says the honest thing: within the hour',
-    /within the hour/.test(paymentReceived));
+  check('the payment-received email no longer promises a specific "within the hour" window',
+    !/within the hour/.test(paymentReceived), paymentReceived);
+  check('the payment-received email says the honest thing now: shortly',
+    /shortly/.test(paymentReceived));
 })();
 
 // --------------------------------------------------------- the frontend
@@ -194,8 +201,10 @@ console.log('\nreport delivery delay\n');
     (confirmPayment.match(/showPaymentSuccess\(/g) || []).length === 2, confirmPayment);
 
   const waitingCopySource = source.slice(source.indexOf('function waitingCopy'), source.indexOf('function supportWhatsappLink'));
-  check('waitingCopy() promises the hour, not instant arrival',
-    /within the hour/.test(waitingCopySource));
+  check('waitingCopy() no longer promises a specific "within the hour" window',
+    !/within the hour/.test(waitingCopySource), waitingCopySource);
+  check('waitingCopy() says the honest thing now: shortly',
+    /shortly/.test(waitingCopySource));
   check('waitingCopy() no longer says the report "takes a few minutes"',
     !/few minutes/.test(waitingCopySource), waitingCopySource);
   check('waitingCopy() never tells the customer to keep the page open',

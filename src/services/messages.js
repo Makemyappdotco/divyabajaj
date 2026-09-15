@@ -105,9 +105,11 @@ ${reportUrl ? `<p style="margin:0 0 24px"><a href="${escapeHtml(reportUrl)}" sty
 }
 
 /**
- * Paid, but the report is held back on purpose - see reportJobs.js for why.
- * This is the only thing the customer hears until it arrives, so it says
- * plainly that the wait is expected rather than a sign anything is wrong.
+ * Paid. Generation and delivery now happen back to back, with no artificial
+ * wait in between - see reportJobs.js's DELIVERY_DELAY_MS for why that wait
+ * existed before and why it is gone now. This is the only thing the customer
+ * hears until the report itself lands, so it says plainly that it is coming
+ * shortly rather than promising a specific window that is no longer true.
  */
 function paymentReceivedEmail({ name, amountInr }) {
   const who = firstName(name);
@@ -119,7 +121,7 @@ function paymentReceivedEmail({ name, amountInr }) {
       amountInr ? `We have received your payment of ₹${Number(amountInr).toLocaleString('en-IN')}.` : 'We have received your payment.',
       '',
       'Divya is preparing your Full Blueprint personally. You will have it here',
-      'and on WhatsApp within the hour.',
+      'and on WhatsApp shortly.',
       '',
       'You do not need to do anything.',
       '',
@@ -129,7 +131,7 @@ function paymentReceivedEmail({ name, amountInr }) {
     html: `<div style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#2a2520;max-width:34rem;margin:0 auto;padding:24px">
 <p style="margin:0 0 18px">Hi ${escapeHtml(who)},</p>
 <p style="margin:0 0 18px">${amountInr ? `We have received your payment of &#8377;${Number(amountInr).toLocaleString('en-IN')}.` : 'We have received your payment.'}</p>
-<p style="margin:0 0 18px">Divya is preparing your Full Blueprint personally. You will have it here and on WhatsApp within the hour.</p>
+<p style="margin:0 0 18px">Divya is preparing your Full Blueprint personally. You will have it here and on WhatsApp shortly.</p>
 <p style="margin:0 0 18px;color:#6b6156">You do not need to do anything.</p>
 <p style="margin:24px 0 0;color:#6b6156">Divya Bajaj<br><span style="font-size:14px">Astro-Numerologist</span></p>
 </div>`

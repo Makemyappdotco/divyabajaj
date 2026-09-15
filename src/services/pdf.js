@@ -171,30 +171,63 @@ function drawCover(doc, { lead, numbers, paid }) {
     .text('Private and personalised. Prepared for guidance, clarity and self-reflection.', 62, doc.page.height - 92, { width: doc.page.width - 124, align: 'center' });
 }
 
+// A bare markdown divider line ("---", "===", "***"...) on its own. The AI
+// puts one of these between every section, not just before the first
+// heading, so it has to be recognised and dropped wherever it shows up -
+// not only at the top of the document.
+const DIVIDER_LINE = /^[-=*_]{3,}$/;
+
+function isDividerLine(line) {
+  return DIVIDER_LINE.test(line);
+}
+
+/**
+ * Decides whether a single trimmed line is a section heading, and if so
+ * what its title/number are. Shared by stripLeadingBoilerplate (to find
+ * where the real content starts) and parseSections (to split the body into
+ * sections), so the two never disagree about what counts as a heading.
+ */
+function matchHeading(line) {
+  const numbered = line.match(/^(\d{1,2})[.)]\s+(.{3,120})$/);
+  const strongHeading = line.match(/^(?:section\s+)?([A-Z][A-Za-z0-9 &'()+\-/]{3,90})$/);
+  const looksLikeHeading = numbered || (
+    line.length <= 78 &&
+    !/[.!?]$/.test(line) &&
+    !/^[-*•]/.test(line) &&
+    strongHeading &&
+    /(?:Summary|Opening|Overview|Reading|Pattern|Direction|Guidance|Numbers|Lessons|Strengths|Career|Money|Relationship|Marriage|Family|Health|Current|Months|Years|Correction|Business|Mobile|House|Gemstone|Remedy|Action|Consultation|Step|Blueprint|Nature|Triggers|Professions)/i.test(line)
+  );
+  if (!looksLikeHeading) return null;
+  return {
+    title: numbered ? numbered[2] : line,
+    number: numbered ? numbered[1] : ''
+  };
+}
+
 /**
  * The AI sometimes opens the report with its own title line (for example
- * "Numerology Report for Dhruv Gupta") and/or a markdown divider ("---")
- * before the first real numbered heading - neither the free nor the paid
- * prompt asks for this, the model just does it on its own. Left in, that
- * boilerplate used to become its own section titled "Personal Reading" with
- * no real number of its own, so the "REPORT MAP" page and every section
- * badge showed it as "01" while every actual heading used its own plain
- * "1", "2", "3"... two different numbering styles side by side, which is
- * the "zero one" Dhruv flagged as broken. Stripping it here means that
- * leftover bucket ends up empty and gets dropped entirely (see the filter
- * at the end of parseSections below).
+ * "Numerology Report for Dhruv Gupta"), a "(DOB: ...)" line, and/or a
+ * markdown divider ("---") before the first real numbered heading - neither
+ * the free nor the paid prompt asks for this, the model just does it on its
+ * own, and the exact mix of lines varies between reports. Rather than try to
+ * name every possible boilerplate line (the earlier version of this function
+ * only recognised dividers and a "report...for" title echo, and broke on a
+ * plain "(DOB: 23 August 1994)" line sitting between them - which is exactly
+ * what let a real report still show the bug after that fix went out), this
+ * looks ahead for the first line that is actually a heading and drops
+ * everything before it, whatever it says. That leftover bucket then ends up
+ * empty and gets dropped entirely (see the filter at the end of
+ * parseSections below), instead of showing up as a stray "01 Personal
+ * Reading" section ahead of "1 Your Quick Snapshot" - the "zero one" bug
+ * Dhruv flagged as still broken.
  */
 function stripLeadingBoilerplate(lines) {
-  const rest = lines.slice();
-  while (rest.length) {
-    const line = rest[0].trim();
-    if (!line) { rest.shift(); continue; }
-    const isDivider = /^[-=*_]{3,}$/.test(line);
-    const isTitleEcho = line.length <= 100 && /\breport\b/i.test(line) && /\bfor\b/i.test(line);
-    if (isDivider || isTitleEcho) { rest.shift(); continue; }
-    break;
+  const searchLimit = Math.min(lines.length, 30);
+  for (let i = 0; i < searchLimit; i += 1) {
+    const line = lines[i].trim();
+    if (line && matchHeading(line)) return lines.slice(i);
   }
-  return rest;
+  return lines;
 }
 
 function parseSections(reportText) {
@@ -215,23 +248,15 @@ function parseSections(reportText) {
       return;
     }
 
-    const numbered = line.match(/^(\d{1,2})[.)]\s+(.{3,120})$/);
-    const strongHeading = line.match(/^(?:section\s+)?([A-Z][A-Za-z0-9 &'()+\-/]{3,90})$/);
-    const looksLikeHeading = numbered || (
-      line.length <= 78 &&
-      !/[.!?]$/.test(line) &&
-      !/^[-*•]/.test(line) &&
-      strongHeading &&
-      /(?:Summary|Opening|Overview|Reading|Pattern|Direction|Guidance|Numbers|Lessons|Strengths|Career|Money|Relationship|Marriage|Family|Health|Current|Months|Years|Correction|Business|Mobile|House|Gemstone|Remedy|Action|Consultation|Step|Blueprint|Nature|Triggers|Professions)/i.test(line)
-    );
+    // A bare "---" between sections (or anywhere else in the body) is
+    // formatting the AI added on its own, not content - drop it rather
+    // than let it fall through and print as a literal "---" line.
+    if (isDividerLine(line)) return;
 
-    if (looksLikeHeading) {
+    const heading = matchHeading(line);
+    if (heading) {
       pushCurrent();
-      current = {
-        title: numbered ? numbered[2] : line,
-        number: numbered ? numbered[1] : '',
-        lines: []
-      };
+      current = { title: heading.title, number: heading.number, lines: [] };
       return;
     }
 
@@ -504,4 +529,4 @@ function generateReportPdf({ lead = {}, report = {}, numbers = {}, astrologyData
   });
 }
 
-module.exports = { generateReportPdf };
+module.exports = { generateReportPdf, parseSections };

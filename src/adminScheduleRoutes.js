@@ -112,6 +112,72 @@ function validateDay(day, index) {
   };
 }
 
+/**
+ * Validates one "extra window": either another recurring window on a weekday
+ * (repeats every week, same as a grid row) or a one-off window tied to a
+ * single calendar date (never repeats). Kept separate from validateDay
+ * because extra windows are added and removed one at a time rather than
+ * saved as a whole week, and a one-off has a date instead of a weekday.
+ */
+function validateExtraWindow(body) {
+  const specificDate = body.specific_date ? String(body.specific_date).trim() : null;
+  const hasWeekday = body.weekday !== undefined && body.weekday !== null && body.weekday !== '';
+  if (!specificDate && !hasWeekday) throw bad('Pick either a day of the week or a specific date.');
+  if (specificDate && !/^\d{4}-\d{2}-\d{2}$/.test(specificDate)) throw bad('That date does not look right.');
+
+  let weekday;
+  if (specificDate) {
+    // Stored purely so the admin list can show a day name without recomputing
+    // it; slot matching for a one-off ignores this and matches on the date.
+    const parsed = new Date(`${specificDate}T00:00:00Z`);
+    if (!Number.isFinite(parsed.getTime())) throw bad('That date does not look right.');
+    weekday = parsed.getUTCDay();
+  } else {
+    weekday = Number(body.weekday);
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw bad('Pick a valid day of the week.');
+  }
+
+  if (!CLOCK.test(String(body.start_time || ''))) throw bad('Start time must look like 18:30.');
+  if (!CLOCK.test(String(body.end_time || ''))) throw bad('End time must look like 20:30.');
+
+  const [sh, sm] = body.start_time.split(':').map(Number);
+  const [eh, em] = body.end_time.split(':').map(Number);
+  const open = sh * 60 + sm;
+  const close = eh * 60 + em;
+  if (close <= open) throw bad('The end time has to be after the start time.');
+
+  const length = Number(body.slot_duration_minutes) || 60;
+  if (length < 15 || length > 240) throw bad('A call has to be between 15 and 240 minutes.');
+  if (close - open < length) {
+    throw bad(`${close - open} minutes is not long enough for a ${length} minute call.`);
+  }
+
+  const bufferAfter = Number(body.buffer_after_minutes) || 0;
+  const bufferBefore = Number(body.buffer_before_minutes) || 0;
+  if (bufferAfter < 0 || bufferAfter > 120 || bufferBefore < 0 || bufferBefore > 120) {
+    throw bad('Breaks have to be between 0 and 120 minutes.');
+  }
+
+  const cap = body.max_bookings === '' || body.max_bookings == null ? null : Number(body.max_bookings);
+  if (cap !== null && (!Number.isInteger(cap) || cap < 1 || cap > 20)) {
+    throw bad('The daily limit has to be a whole number from 1 to 20.');
+  }
+
+  return {
+    weekday,
+    specific_date: specificDate,
+    kind: 'extra',
+    start_time: body.start_time,
+    end_time: body.end_time,
+    timezone_id: body.timezone_id || 'Asia/Kolkata',
+    slot_duration_minutes: length,
+    buffer_before_minutes: bufferBefore,
+    buffer_after_minutes: bufferAfter,
+    max_bookings: cap,
+    is_active: true
+  };
+}
+
 // ------------------------------------------------------------------ read
 
 router.get('/', handle('read', async (req, res) => {
@@ -141,9 +207,16 @@ router.get('/', handle('read', async (req, res) => {
     names = Object.fromEntries(leads.data.map(l => [l.id, l]));
   }
 
+  // Rows written by the simple weekly grid ('grid', the default for anything
+  // saved before this column existed) are what fills the week view below.
+  // Rows added one at a time through /extra-window ('extra') never appear
+  // there and are never touched by a grid save - see PUT /hours.
+  const gridRules = rules.data.filter(r => (r.kind || 'grid') === 'grid');
+  const extraRules = rules.data.filter(r => r.kind === 'extra');
+
   // Every weekday is returned, active or not, so the panel can render a full
   // week without inventing rows client-side.
-  const byWeekday = new Map(rules.data.map(r => [Number(r.weekday), r]));
+  const byWeekday = new Map(gridRules.map(r => [Number(r.weekday), r]));
   const week = WEEKDAYS.map((label, weekday) => {
     const rule = byWeekday.get(weekday);
     return {
@@ -158,11 +231,32 @@ router.get('/', handle('read', async (req, res) => {
     };
   });
 
+  // Extra windows, newest first, in the shape the admin panel's list needs -
+  // a one-off carries a date and no weekday label; a recurring extra window
+  // carries a weekday label and no date.
+  const extra_windows = extraRules
+    .slice()
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    .map(r => ({
+      id: r.id,
+      repeats: !r.specific_date,
+      weekday: r.specific_date ? null : Number(r.weekday),
+      weekday_label: r.specific_date ? null : WEEKDAYS[Number(r.weekday)],
+      specific_date: r.specific_date || null,
+      start_time: String(r.start_time || '').slice(0, 5),
+      end_time: String(r.end_time || '').slice(0, 5),
+      slot_duration_minutes: r.slot_duration_minutes,
+      buffer_before_minutes: r.buffer_before_minutes,
+      buffer_after_minutes: r.buffer_after_minutes,
+      max_bookings: r.max_bookings
+    }));
+
   return res.json({
     environment,
     environment_label: environmentLabel(),
     week,
-    configured: rules.data.some(r => r.is_active),
+    extra_windows,
+    configured: gridRules.some(r => r.is_active) || extraRules.length > 0,
     blocked: blocked.data,
     upcoming: upcoming.data.map(a => Object.assign({}, a, { lead: names[a.lead_id] || null })),
     hold_minutes: store.HOLD_MINUTES,
@@ -183,20 +277,54 @@ router.put('/hours', handle('hours', async (req, res) => {
 
   // Replace rather than merge: the panel always sends the whole week, so a day
   // Divya switched off must actually disappear rather than linger as a stale
-  // active rule that keeps offering slots.
+  // active rule that keeps offering slots. Scoped to kind = 'grid' so this can
+  // never touch an extra window added separately through /extra-window.
   const supabase = client();
-  const wipe = await supabase.from('availability_rules').delete().eq('environment', environment);
+  const wipe = await supabase.from('availability_rules').delete()
+    .eq('environment', environment).eq('kind', 'grid');
   if (wipe.error) throw new Error(wipe.error.message);
 
   if (keep.length) {
     const rows = keep.map(day => Object.assign({
-      id: id('avr'), environment, created_at: now(), updated_at: now()
+      id: id('avr'), environment, kind: 'grid', created_at: now(), updated_at: now()
     }, day));
     const insert = await supabase.from('availability_rules').insert(rows);
     if (insert.error) throw new Error(insert.error.message);
   }
 
   return res.json({ success: true, active_days: keep.length, environment });
+}));
+
+// -------------------------------------------------------------- extra windows
+
+/**
+ * Adds one extra bookable window on top of the weekly grid - either another
+ * recurring window on a weekday, or a one-off window tied to a single date.
+ * Never touches the grid rows, and is never touched by a grid save.
+ */
+router.post('/extra-window', handle('extra-window:create', async (req, res) => {
+  const environment = scope();
+  const row = validateExtraWindow(req.body || {});
+
+  const supabase = client();
+  const insert = await supabase.from('availability_rules').insert(Object.assign({
+    id: id('avr'), environment, created_at: now(), updated_at: now()
+  }, row)).select().single();
+  if (insert.error) throw new Error(insert.error.message);
+
+  return res.json({ success: true, window: insert.data });
+}));
+
+/**
+ * Removes one extra window. Scoped to kind = 'extra' so this endpoint can
+ * never be pointed at a grid row by id and delete part of the weekly hours.
+ */
+router.delete('/extra-window/:id', handle('extra-window:delete', async (req, res) => {
+  const environment = scope();
+  const remove = await client().from('availability_rules').delete()
+    .eq('environment', environment).eq('kind', 'extra').eq('id', String(req.params.id));
+  if (remove.error) throw new Error(remove.error.message);
+  return res.json({ success: true });
 }));
 
 // ----------------------------------------------------------- blocked dates

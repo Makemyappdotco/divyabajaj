@@ -85,7 +85,13 @@ function computeSlots({
     // that day, so max_bookings means "calls in a day" and not "calls a stranger
     // can still add on top of the ones I have".
     let dayCount = 0;
-    const dayRules = active.filter(rule => Number(rule.weekday) === day.weekday);
+    // A rule with a specific_date is a one-off: it only ever applies to that one
+    // calendar date, no matter what weekday column it happens to carry. A rule
+    // with no specific_date is the recurring case and matches every week on its
+    // weekday, exactly as before.
+    const dayRules = active.filter(rule => (
+      rule.specific_date ? rule.specific_date === day.date : Number(rule.weekday) === day.weekday
+    ));
 
     for (const rule of dayRules) {
       const open = parseClock(rule.start_time);

@@ -139,5 +139,60 @@ console.log('\n--- grouping ---');
   check('grouped by IST date', grouped.map(g => `${g.date}:${g.slots.length}`), ['2026-09-10:3', '2026-09-12:3']);
 }
 
+console.log('\n--- extra windows: one-off specific_date ---');
+{
+  // A one-off tied to 2026-09-11 (a Friday) must appear only on that date,
+  // even though its own weekday column says Thursday (4) - specific_date
+  // always wins over weekday for matching.
+  const oneOff = rule({ id: 'extra1', weekday: 4, specific_date: '2026-09-11', start_time: '09:00', end_time: '11:00' });
+  const slots = computeSlots({ rules: [oneOff], from: FROM, to: TO, now: NOW });
+  check('a one-off with specific_date only produces slots on that date', times(slots), ['11/09/2026, 09:00', '11/09/2026, 10:00']);
+  check('every slot carries the specific_date, not the weekday-derived date', slots.every(s => s.date === '2026-09-11'), true);
+}
+{
+  // A specific_date rule must NOT also leak onto its own weekday every week -
+  // Thursday 10 Sept should see nothing from a rule dated for Friday 11 Sept.
+  const oneOff = rule({ id: 'extra1', weekday: 4, specific_date: '2026-09-11', start_time: '09:00', end_time: '11:00' });
+  const regular = rule({ id: 'grid', start_time: '18:00', end_time: '19:00' });
+  const slots = computeSlots({ rules: [oneOff, regular], from: FROM, to: TO, now: NOW });
+  const thursday = slots.filter(s => s.date === '2026-09-10');
+  check('the one-off does not also fire on its stored weekday', thursday.map(s => ist(s.starts_at)), ['10/09/2026, 18:00']);
+}
+{
+  // Outside the window entirely: from/to only covers 10-12 Sept, so a
+  // specific_date of 15 Sept must simply produce nothing, not throw.
+  const oneOff = rule({ id: 'extra1', specific_date: '2026-09-15', start_time: '09:00', end_time: '11:00' });
+  const slots = computeSlots({ rules: [oneOff], from: FROM, to: TO, now: NOW });
+  check('a specific_date outside the requested window yields no slots', slots.length, 0);
+}
+
+console.log('\n--- extra windows: second recurring window, same weekday ---');
+{
+  // Divya's real example: free 9-11am AND separately free 5-8pm on the same
+  // Sunday. Two grid-shaped rows, same weekday, no specific_date on either -
+  // both must produce slots, exactly the "multiple rules per day" support
+  // computeSlots already had before this feature existed.
+  const morning = rule({ id: 'sun-am', weekday: 0, start_time: '09:00', end_time: '11:00', slot_duration_minutes: 60 });
+  const evening = rule({ id: 'sun-pm', weekday: 0, start_time: '17:00', end_time: '20:00', slot_duration_minutes: 60 });
+  const sundayFrom = new Date('2026-09-13T00:00:00Z');
+  const sundayTo = new Date('2026-09-13T23:59:00Z');
+  const slots = computeSlots({ rules: [morning, evening], from: sundayFrom, to: sundayTo, now: NOW });
+  check('both windows on the same Sunday produce their own slots', times(slots), [
+    '13/09/2026, 09:00', '13/09/2026, 10:00',
+    '13/09/2026, 17:00', '13/09/2026, 18:00', '13/09/2026, 19:00'
+  ]);
+}
+{
+  // Mixing a recurring extra window with a one-off on a different date, plus
+  // the plain grid rule, all in one call - nothing should interfere.
+  const grid = rule({ id: 'grid', weekday: 4, start_time: '18:00', end_time: '19:00' });
+  const recurringExtra = rule({ id: 'extra-recurring', weekday: 6, start_time: '09:00', end_time: '10:00' });
+  const oneOffExtra = rule({ id: 'extra-oneoff', specific_date: '2026-09-11', start_time: '13:00', end_time: '14:00' });
+  const slots = computeSlots({ rules: [grid, recurringExtra, oneOffExtra], from: FROM, to: TO, now: NOW });
+  check('grid, recurring extra and one-off extra all coexist', times(slots), [
+    '10/09/2026, 18:00', '11/09/2026, 13:00', '12/09/2026, 09:00'
+  ]);
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : fail + ' CHECK(S) FAILED'} (${pass} passed)`);
 process.exitCode = fail === 0 ? 0 : 1;

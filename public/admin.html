@@ -244,6 +244,10 @@
   .block-row:last-child{border-bottom:0}
   .block-add{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
   .block-add .f{display:flex;flex-direction:column;gap:4px}
+  /* Without this, the [hidden] attribute set from JS (see wireExtraWindows)
+     loses to the .block-add .f{display:flex} rule above - same specificity,
+     later in the cascade - and a field meant to be hidden stays visible. */
+  .block-add .f[hidden]{display:none}
   .block-add label{font-size:11.5px;color:var(--ink-3)}
   .block-add input{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-size:13px;color:var(--ink)}
   .empty{text-align:center;padding:42px 20px;color:var(--ink-3);font-size:13px}
@@ -1064,6 +1068,117 @@
     });
   }
 
+  /**
+   * A day the weekly grid above can't express by itself: another window on a
+   * weekday that already has one (free 9-11am AND separately 5-8pm on the same
+   * Sunday), or a window that applies to one exact date and never repeats.
+   * Deliberately its own card and its own save path (/extra-window, one row
+   * at a time) rather than folded into the grid: the grid always saves the
+   * whole week at once, and a window that should not repeat has no home in a
+   * "day of the week" table.
+   */
+  function extraWindowLabel(w) {
+    if (w.repeats) return 'Every ' + w.weekday_label;
+    var d = new Date(w.specific_date + 'T00:00:00+05:30');
+    return isNaN(d.getTime()) ? w.specific_date : d.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
+    }) + ' only';
+  }
+
+  function extraWindowsCard(sched) {
+    var windows = sched.extra_windows || [];
+    var rows = windows.length
+      ? windows.map(function (w) {
+          var p = previewTimes(w.start_time, w.end_time, w.slot_duration_minutes, w.max_bookings);
+          return '<div class="block-row"><span>' + esc(extraWindowLabel(w)) + ', ' + esc(w.start_time) + '–' + esc(w.end_time) + '</span>' +
+            '<span class="dim">' + esc(p.text) + '</span>' +
+            '<button class="btn quiet" data-remove-extra="' + esc(w.id) + '" style="margin-left:auto">Remove</button></div>';
+        }).join('')
+      : '<div class="dim" style="font-size:13px;padding:6px 0">No extra windows yet. Add one below.</div>';
+
+    return '<div class="card" style="margin-top:14px">' +
+      '<div class="section-head"><div class="section-title">Extra windows</div>' +
+      '<div class="section-note">on top of the hours above</div></div>' +
+      '<div class="dim" style="font-size:13px;line-height:1.6;margin-bottom:10px">' +
+        'For a day that needs more than one block of time – for example free 9am–11am and separately free 5pm–8pm on the same Sunday – add each extra block here. ' +
+        'Each one can either repeat every week, or apply just once to a specific date.</div>' +
+      rows +
+      '<div class="block-add">' +
+        '<div class="f"><label for="ewRepeats">Type</label><select id="ewRepeats">' +
+          '<option value="1">Repeats every week</option><option value="0">Just this one date</option>' +
+        '</select></div>' +
+        '<div class="f" id="ewWeekdayField"><label for="ewWeekday">Day</label><select id="ewWeekday">' +
+          DAY_LABELS.map(function (label, i) { return '<option value="' + i + '">' + esc(label) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="f" id="ewDateField" hidden><label for="ewDate">Date</label><input type="date" id="ewDate"></div>' +
+        '<div class="f"><label for="ewFrom">From</label><input type="time" id="ewFrom" value="09:00"></div>' +
+        '<div class="f"><label for="ewTo">Until</label><input type="time" id="ewTo" value="11:00"></div>' +
+        '<div class="f"><label for="ewLen">Each call</label><select id="ewLen">' +
+          [30, 45, 60, 90, 120].map(function (m) { return '<option value="' + m + '"' + (m === 60 ? ' selected' : '') + '>' + m + ' min</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="f"><label for="ewGap">Gap after</label><select id="ewGap">' +
+          [0, 10, 15, 30].map(function (m) { return '<option value="' + m + '"' + (m === 15 ? ' selected' : '') + '>' + (m === 0 ? 'none' : m + ' min') + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="f"><label for="ewCap">Limit per day</label><select id="ewCap">' +
+          ['', 1, 2, 3, 4, 5, 6, 8, 10].map(function (v) {
+            return '<option value="' + v + '">' + (v === '' ? 'no limit' : v + ' call' + (v > 1 ? 's' : '')) + '</option>';
+          }).join('') +
+        '</select></div>' +
+        '<button class="btn" id="addExtraWindow">Add window</button>' +
+      '</div><div class="save-note" id="extraNote" style="margin-top:9px"></div></div>';
+  }
+
+  function wireExtraWindows() {
+    var repeatsField = $('ewRepeats');
+    if (!repeatsField) return;
+
+    repeatsField.addEventListener('change', function () {
+      var repeats = repeatsField.value === '1';
+      $('ewWeekdayField').hidden = !repeats;
+      $('ewDateField').hidden = repeats;
+    });
+
+    $('addExtraWindow').addEventListener('click', function () {
+      var button = $('addExtraWindow');
+      var repeats = repeatsField.value === '1';
+      var body = {
+        start_time: $('ewFrom').value,
+        end_time: $('ewTo').value,
+        slot_duration_minutes: Number($('ewLen').value),
+        buffer_after_minutes: Number($('ewGap').value),
+        buffer_before_minutes: 0,
+        max_bookings: $('ewCap').value === '' ? null : Number($('ewCap').value)
+      };
+      if (repeats) {
+        body.weekday = Number($('ewWeekday').value);
+      } else {
+        if (!$('ewDate').value) return note('extraNote', 'bad', 'Pick a date first.');
+        body.specific_date = $('ewDate').value;
+      }
+
+      button.disabled = true;
+      note('extraNote', '', 'Adding…');
+      apiWrite('/extra-window', 'POST', body)
+        .then(function () { renderConsultations(); })
+        .catch(function (e) {
+          button.disabled = false;
+          note('extraNote', 'bad', e.message);
+        });
+    });
+
+    document.querySelectorAll('[data-remove-extra]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        button.disabled = true;
+        apiWrite('/extra-window/' + button.getAttribute('data-remove-extra'), 'DELETE')
+          .then(function () { renderConsultations(); })
+          .catch(function (e) {
+            button.disabled = false;
+            note('extraNote', 'bad', e.message);
+          });
+      });
+    });
+  }
+
   function blocksCard(sched) {
     var rows = sched.blocked.length
       ? sched.blocked.map(function (b) {
@@ -1366,10 +1481,12 @@
         '</div>' +
         (prices ? pricingCard(prices) : '') +
         '<div style="margin-top:14px">' + scheduleCard(sched) + '</div>' +
+        extraWindowsCard(sched) +
         blocksCard(sched) + upcomingCard(sched) + calendarCard(sched);
       view.innerHTML = html;
       wirePricing();
       wireSchedule();
+      wireExtraWindows();
       wireReschedule();
       var tileButton = $('upcomingTile');
       if (tileButton) tileButton.addEventListener('click', function () {

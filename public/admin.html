@@ -175,7 +175,23 @@
   .sched-copy:hover{color:var(--gold-d);border-color:var(--line)}
   .sched-day.off .sched-copy{visibility:hidden}
 
-  .sched-fields{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+  /* One row per time block on a day - Divya can have as many as she needs
+     (e.g. free 9-11am and separately free 5-8pm on the same Sunday), added
+     and removed one at a time rather than through a separate form. */
+  .sched-intervals{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}
+  .sched-interval{display:flex;align-items:center;gap:8px}
+  .sched-interval input[type=time]{background:var(--bg);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font:inherit;font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .sched-interval input[type=time]:focus{outline:2px solid var(--gold-l);outline-offset:1px;border-color:var(--gold-l)}
+  .si-sep{font-size:12px;color:var(--ink-3)}
+  .si-remove{width:26px;height:26px;flex:none;border-radius:7px;border:1px solid transparent;
+    color:var(--ink-3);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .si-remove:hover{color:var(--danger);border-color:var(--line)}
+  .sched-add-interval{font-size:12px;color:var(--gold-d);border:1px dashed var(--line);border-radius:8px;
+    padding:6px 12px;margin-bottom:12px;display:inline-block}
+  .sched-add-interval:hover{border-color:var(--gold-l);background:var(--surface-2)}
+
+  .sched-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .sf{display:flex;flex-direction:column;gap:4px;min-width:0}
   .sf span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
   .sf input,.sf select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;
@@ -244,9 +260,9 @@
   .block-row:last-child{border-bottom:0}
   .block-add{display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
   .block-add .f{display:flex;flex-direction:column;gap:4px}
-  /* Without this, the [hidden] attribute set from JS (see wireExtraWindows)
-     loses to the .block-add .f{display:flex} rule above - same specificity,
-     later in the cascade - and a field meant to be hidden stays visible. */
+  /* Without this, a [hidden] attribute set from JS loses to the
+     .block-add .f{display:flex} rule above - same specificity, later in the
+     cascade - and a field meant to be hidden stays visible. */
   .block-add .f[hidden]{display:none}
   .block-add label{font-size:11.5px;color:var(--ink-3)}
   .block-add input{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-size:13px;color:var(--ink)}
@@ -981,19 +997,34 @@
     });
   }
 
+  /** Inner markup of one time-block row - a bare pair of time inputs and a
+   * remove button, no wrapping div, so the same markup builds both the
+   * server-rendered row and the one the "+ Add another time" button creates. */
+  function intervalInnerHtml(interval) {
+    return '<input type="time" class="si-from" value="' + esc(interval.start_time || '') + '">' +
+      '<span class="si-sep">to</span>' +
+      '<input type="time" class="si-to" value="' + esc(interval.end_time || '') + '">' +
+      '<button class="si-remove" type="button" title="Remove this time">&times;</button>';
+  }
+  function intervalRow(interval) {
+    return '<div class="sched-interval">' + intervalInnerHtml(interval) + '</div>';
+  }
+
   function scheduleCard(sched) {
     var rows = sched.week.map(function (day) {
-      var p = previewTimes(day.start_time, day.end_time, day.slot_duration_minutes, day.max_bookings);
+      var intervalsHtml = day.intervals.map(intervalRow).join('');
+      var cap = day.max_bookings == null ? null : Number(day.max_bookings);
+      var p = previewMulti(day.intervals, day.slot_duration_minutes, cap);
       return '<div class="sched-day' + (day.is_active ? '' : ' off') + '" data-weekday="' + day.weekday + '">' +
         '<div class="sched-head">' +
           '<label class="sched-toggle"><input type="checkbox" class="s-on"' + (day.is_active ? ' checked' : '') + '>' +
             '<span>' + esc(DAY_LABELS[day.weekday]) + '</span></label>' +
-          '<button class="sched-copy" data-copy="' + day.weekday + '" title="Use these settings for every day that is switched on">Copy to all</button>' +
+          '<button class="sched-copy" data-copy="' + day.weekday + '" title="Use these times for every day that is switched on">Copy to all</button>' +
         '</div>' +
         '<div class="sched-body">' +
+          '<div class="sched-intervals">' + intervalsHtml + '</div>' +
+          '<button class="sched-add-interval" type="button" data-add="' + day.weekday + '">+ Add another time</button>' +
           '<div class="sched-fields">' +
-            '<label class="sf"><span>From</span><input type="time" class="s-from" value="' + esc(day.start_time) + '"></label>' +
-            '<label class="sf"><span>Until</span><input type="time" class="s-to" value="' + esc(day.end_time) + '"></label>' +
             '<label class="sf"><span>Each call</span><select class="s-len">' +
               [30, 45, 60, 90, 120].map(function (m) {
                 return '<option value="' + m + '"' + (Number(day.slot_duration_minutes) === m ? ' selected' : '') + '>' + m + ' min</option>';
@@ -1040,13 +1071,40 @@
 
   function rowOf(weekday) { return document.querySelector('.sched-day[data-weekday="' + weekday + '"]'); }
 
+  /** Same math as previewTimes, run once per time block and combined, so the
+   * preview line under a day reflects every block that day has, not just one. */
+  function previewMulti(intervals, length, cap) {
+    var parse = function (v) { var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); return m ? +m[1] * 60 + +m[2] : null; };
+    var n = Number(length) || 60;
+    var list = (intervals || []).slice().sort(function (a, b) { return (parse(a.start_time) || 0) - (parse(b.start_time) || 0); });
+    if (!list.length) return { text: 'add a time to get started', bad: false };
+    var times = [];
+    var bad = false;
+    list.forEach(function (interval) {
+      var open = parse(interval.start_time), close = parse(interval.end_time);
+      if (open == null || close == null || close <= open) { bad = true; return; }
+      for (var t = open; t + n <= close; t += n) {
+        if (cap && times.length >= cap) break;
+        var h = Math.floor(t / 60), m = t % 60;
+        var ampm = h >= 12 ? 'pm' : 'am', h12 = h % 12 === 0 ? 12 : h % 12;
+        times.push(h12 + (m ? ':' + String(m).padStart(2, '0') : '') + ' ' + ampm);
+      }
+    });
+    if (bad) return { text: 'set a valid start and end for every time', bad: true };
+    if (!times.length) return { text: 'too short for one ' + n + ' minute call', bad: true };
+    return { text: times.join(', ') + '  ·  ' + times.length + ' slot' + (times.length > 1 ? 's' : ''), bad: false };
+  }
+
+  function readIntervals(row) {
+    return Array.prototype.map.call(row.querySelectorAll('.sched-interval'), function (el) {
+      return { start_time: el.querySelector('.si-from').value, end_time: el.querySelector('.si-to').value };
+    });
+  }
+
   function paintPreview(row) {
     var out = row.querySelector('.sched-preview');
     var cap = row.querySelector('.s-cap').value;
-    var p = previewTimes(
-      row.querySelector('.s-from').value, row.querySelector('.s-to').value,
-      row.querySelector('.s-len').value, cap === '' ? null : Number(cap)
-    );
+    var p = previewMulti(readIntervals(row), row.querySelector('.s-len').value, cap === '' ? null : Number(cap));
     out.textContent = p.text;
     out.classList.toggle('bad', p.bad);
   }
@@ -1058,124 +1116,12 @@
       return {
         weekday: Number(row.getAttribute('data-weekday')),
         is_active: pick('.s-on').checked,
-        start_time: pick('.s-from').value,
-        end_time: pick('.s-to').value,
+        intervals: readIntervals(row),
         slot_duration_minutes: Number(pick('.s-len').value),
         buffer_after_minutes: Number(pick('.s-gap').value),
         buffer_before_minutes: 0,
         max_bookings: cap === '' ? null : Number(cap)
       };
-    });
-  }
-
-  /**
-   * A day the weekly grid above can't express by itself: another window on a
-   * weekday that already has one (free 9-11am AND separately 5-8pm on the same
-   * Sunday), or a window that applies to one exact date and never repeats.
-   * Deliberately its own card and its own save path (/extra-window, one row
-   * at a time) rather than folded into the grid: the grid always saves the
-   * whole week at once, and a window that should not repeat has no home in a
-   * "day of the week" table.
-   */
-  function extraWindowLabel(w) {
-    if (w.repeats) return 'Every ' + w.weekday_label;
-    var d = new Date(w.specific_date + 'T00:00:00+05:30');
-    return isNaN(d.getTime()) ? w.specific_date : d.toLocaleDateString('en-IN', {
-      timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-    }) + ' only';
-  }
-
-  function extraWindowsCard(sched) {
-    var windows = sched.extra_windows || [];
-    var rows = windows.length
-      ? windows.map(function (w) {
-          var p = previewTimes(w.start_time, w.end_time, w.slot_duration_minutes, w.max_bookings);
-          return '<div class="block-row"><span>' + esc(extraWindowLabel(w)) + ', ' + esc(w.start_time) + '–' + esc(w.end_time) + '</span>' +
-            '<span class="dim">' + esc(p.text) + '</span>' +
-            '<button class="btn quiet" data-remove-extra="' + esc(w.id) + '" style="margin-left:auto">Remove</button></div>';
-        }).join('')
-      : '<div class="dim" style="font-size:13px;padding:6px 0">No extra windows yet. Add one below.</div>';
-
-    return '<div class="card" style="margin-top:14px">' +
-      '<div class="section-head"><div class="section-title">Extra windows</div>' +
-      '<div class="section-note">on top of the hours above</div></div>' +
-      '<div class="dim" style="font-size:13px;line-height:1.6;margin-bottom:10px">' +
-        'For a day that needs more than one block of time – for example free 9am–11am and separately free 5pm–8pm on the same Sunday – add each extra block here. ' +
-        'Each one can either repeat every week, or apply just once to a specific date.</div>' +
-      rows +
-      '<div class="block-add">' +
-        '<div class="f"><label for="ewRepeats">Type</label><select id="ewRepeats">' +
-          '<option value="1">Repeats every week</option><option value="0">Just this one date</option>' +
-        '</select></div>' +
-        '<div class="f" id="ewWeekdayField"><label for="ewWeekday">Day</label><select id="ewWeekday">' +
-          DAY_LABELS.map(function (label, i) { return '<option value="' + i + '">' + esc(label) + '</option>'; }).join('') +
-        '</select></div>' +
-        '<div class="f" id="ewDateField" hidden><label for="ewDate">Date</label><input type="date" id="ewDate"></div>' +
-        '<div class="f"><label for="ewFrom">From</label><input type="time" id="ewFrom" value="09:00"></div>' +
-        '<div class="f"><label for="ewTo">Until</label><input type="time" id="ewTo" value="11:00"></div>' +
-        '<div class="f"><label for="ewLen">Each call</label><select id="ewLen">' +
-          [30, 45, 60, 90, 120].map(function (m) { return '<option value="' + m + '"' + (m === 60 ? ' selected' : '') + '>' + m + ' min</option>'; }).join('') +
-        '</select></div>' +
-        '<div class="f"><label for="ewGap">Gap after</label><select id="ewGap">' +
-          [0, 10, 15, 30].map(function (m) { return '<option value="' + m + '"' + (m === 15 ? ' selected' : '') + '>' + (m === 0 ? 'none' : m + ' min') + '</option>'; }).join('') +
-        '</select></div>' +
-        '<div class="f"><label for="ewCap">Limit per day</label><select id="ewCap">' +
-          ['', 1, 2, 3, 4, 5, 6, 8, 10].map(function (v) {
-            return '<option value="' + v + '">' + (v === '' ? 'no limit' : v + ' call' + (v > 1 ? 's' : '')) + '</option>';
-          }).join('') +
-        '</select></div>' +
-        '<button class="btn" id="addExtraWindow">Add window</button>' +
-      '</div><div class="save-note" id="extraNote" style="margin-top:9px"></div></div>';
-  }
-
-  function wireExtraWindows() {
-    var repeatsField = $('ewRepeats');
-    if (!repeatsField) return;
-
-    repeatsField.addEventListener('change', function () {
-      var repeats = repeatsField.value === '1';
-      $('ewWeekdayField').hidden = !repeats;
-      $('ewDateField').hidden = repeats;
-    });
-
-    $('addExtraWindow').addEventListener('click', function () {
-      var button = $('addExtraWindow');
-      var repeats = repeatsField.value === '1';
-      var body = {
-        start_time: $('ewFrom').value,
-        end_time: $('ewTo').value,
-        slot_duration_minutes: Number($('ewLen').value),
-        buffer_after_minutes: Number($('ewGap').value),
-        buffer_before_minutes: 0,
-        max_bookings: $('ewCap').value === '' ? null : Number($('ewCap').value)
-      };
-      if (repeats) {
-        body.weekday = Number($('ewWeekday').value);
-      } else {
-        if (!$('ewDate').value) return note('extraNote', 'bad', 'Pick a date first.');
-        body.specific_date = $('ewDate').value;
-      }
-
-      button.disabled = true;
-      note('extraNote', '', 'Adding…');
-      apiWrite('/extra-window', 'POST', body)
-        .then(function () { renderConsultations(); })
-        .catch(function (e) {
-          button.disabled = false;
-          note('extraNote', 'bad', e.message);
-        });
-    });
-
-    document.querySelectorAll('[data-remove-extra]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        button.disabled = true;
-        apiWrite('/extra-window/' + button.getAttribute('data-remove-extra'), 'DELETE')
-          .then(function () { renderConsultations(); })
-          .catch(function (e) {
-            button.disabled = false;
-            note('extraNote', 'bad', e.message);
-          });
-      });
     });
   }
 
@@ -1306,33 +1252,79 @@
     el.textContent = text;
   }
 
+  // Wires one time-block row: repaint the preview as its times change, and
+  // make its remove button work. Removing the day's last remaining block
+  // just blanks its two times instead of deleting the row, so a day never
+  // ends up with zero rows and no way to add one back except the day toggle.
+  function wireIntervalRow(el, row) {
+    ['.si-from', '.si-to'].forEach(function (sel) {
+      el.querySelector(sel).addEventListener('input', function () { paintPreview(row); });
+      el.querySelector(sel).addEventListener('change', function () { paintPreview(row); });
+    });
+    el.querySelector('.si-remove').addEventListener('click', function () {
+      var list = row.querySelector('.sched-intervals');
+      if (list.children.length > 1) {
+        el.remove();
+      } else {
+        el.querySelector('.si-from').value = '';
+        el.querySelector('.si-to').value = '';
+      }
+      paintPreview(row);
+    });
+  }
+
   function wireSchedule() {
     document.querySelectorAll('.sched-day').forEach(function (row) {
       row.querySelector('.s-on').addEventListener('change', function (e) {
         row.classList.toggle('off', !e.target.checked);
       });
-      // Every field repaints the preview, so the result of a change is visible
-      // the moment it is made rather than after a save.
-      ['.s-from', '.s-to', '.s-len', '.s-cap'].forEach(function (sel) {
+      // Each call length and daily limit repaint the preview too, so the
+      // result of a change is visible the moment it is made rather than
+      // after a save.
+      ['.s-len', '.s-cap'].forEach(function (sel) {
         row.querySelector(sel).addEventListener('input', function () { paintPreview(row); });
         row.querySelector(sel).addEventListener('change', function () { paintPreview(row); });
       });
+      Array.prototype.forEach.call(row.querySelectorAll('.sched-interval'), function (el) {
+        wireIntervalRow(el, row);
+      });
+
+      // "+ Add another time" appends one more block to this day, starting
+      // where the day's last block currently ends, so a second evening slot
+      // after a morning one doesn't mean retyping a start time from scratch.
+      row.querySelector('[data-add]').addEventListener('click', function () {
+        var intervals = readIntervals(row);
+        var last = intervals[intervals.length - 1];
+        var wrap = document.createElement('div');
+        wrap.innerHTML = intervalRow({ start_time: (last && last.end_time) || '', end_time: '' });
+        var el = wrap.firstChild;
+        row.querySelector('.sched-intervals').appendChild(el);
+        wireIntervalRow(el, row);
+        paintPreview(row);
+      });
     });
 
-    // Copy one day's settings onto every day that is switched on. This is the
-    // difference between setting up a week in four clicks and in twenty-eight.
+    // Copy one day's settings, every time block included, onto every day
+    // that is switched on. This is the difference between setting up a week
+    // in four clicks and in twenty-eight.
     document.querySelectorAll('[data-copy]').forEach(function (button) {
       button.addEventListener('click', function () {
         var source = rowOf(Number(button.getAttribute('data-copy')));
-        var values = ['.s-from', '.s-to', '.s-len', '.s-gap', '.s-cap'].map(function (sel) {
-          return source.querySelector(sel).value;
-        });
+        var intervals = readIntervals(source);
+        var length = source.querySelector('.s-len').value;
+        var gap = source.querySelector('.s-gap').value;
+        var cap = source.querySelector('.s-cap').value;
         var copied = 0;
         document.querySelectorAll('.sched-day').forEach(function (row) {
           if (row === source || !row.querySelector('.s-on').checked) return;
-          ['.s-from', '.s-to', '.s-len', '.s-gap', '.s-cap'].forEach(function (sel, i) {
-            row.querySelector(sel).value = values[i];
+          var list = row.querySelector('.sched-intervals');
+          list.innerHTML = intervals.map(intervalRow).join('');
+          Array.prototype.forEach.call(list.querySelectorAll('.sched-interval'), function (el) {
+            wireIntervalRow(el, row);
           });
+          row.querySelector('.s-len').value = length;
+          row.querySelector('.s-gap').value = gap;
+          row.querySelector('.s-cap').value = cap;
           paintPreview(row);
           copied++;
         });
@@ -1350,8 +1342,12 @@
           row.querySelector('.s-on').checked = on;
           row.classList.toggle('off', !on);
           if (on) {
-            row.querySelector('.s-from').value = preset.from;
-            row.querySelector('.s-to').value = preset.to;
+            // A preset always sets a single fresh block, replacing anything
+            // added by hand - "weekend mornings" means one morning block,
+            // not layering on top of whatever was already there.
+            var list = row.querySelector('.sched-intervals');
+            list.innerHTML = intervalRow({ start_time: preset.from, end_time: preset.to });
+            wireIntervalRow(list.querySelector('.sched-interval'), row);
           }
           paintPreview(row);
         });
@@ -1481,12 +1477,10 @@
         '</div>' +
         (prices ? pricingCard(prices) : '') +
         '<div style="margin-top:14px">' + scheduleCard(sched) + '</div>' +
-        extraWindowsCard(sched) +
         blocksCard(sched) + upcomingCard(sched) + calendarCard(sched);
       view.innerHTML = html;
       wirePricing();
       wireSchedule();
-      wireExtraWindows();
       wireReschedule();
       var tileButton = $('upcomingTile');
       if (tileButton) tileButton.addEventListener('click', function () {

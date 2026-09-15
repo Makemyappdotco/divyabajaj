@@ -65,28 +65,28 @@ function bad(message) {
 const CLOCK = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 /**
- * Validates one weekday's hours. Rejected here rather than in the database so
- * Divya gets a sentence she can act on instead of a Postgres constraint name.
+ * Validates one weekday's hours, now possibly more than one time block a day
+ * (e.g. free 9-11am and separately free 5-8pm on the same Sunday). Rejected
+ * here rather than in the database so Divya gets a sentence she can act on
+ * instead of a Postgres constraint name.
+ *
+ * Each call length, gap and daily limit apply to the whole day, not per
+ * block - Divya doesn't need a 45 minute morning and a 60 minute evening on
+ * the same day, and the daily limit is inherently a whole-day concept (the
+ * engine counts bookings across every block on a day toward the same cap).
+ * Returns an array of one row per time block (empty if the day is off or has
+ * no blocks yet), so PUT /hours can just flatMap this over the whole week.
  */
 function validateDay(day, index) {
   const weekday = Number(day.weekday);
   if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw bad(`Row ${index + 1} has an invalid day.`);
-  if (day.is_active === false) return null;
+  if (day.is_active === false) return [];
 
-  if (!CLOCK.test(String(day.start_time || ''))) throw bad(`${WEEKDAYS[weekday]}: start time must look like 18:30.`);
-  if (!CLOCK.test(String(day.end_time || ''))) throw bad(`${WEEKDAYS[weekday]}: end time must look like 20:30.`);
-
-  const [sh, sm] = day.start_time.split(':').map(Number);
-  const [eh, em] = day.end_time.split(':').map(Number);
-  const open = sh * 60 + sm;
-  const close = eh * 60 + em;
-  if (close <= open) throw bad(`${WEEKDAYS[weekday]}: the end time has to be after the start time.`);
+  const intervals = Array.isArray(day.intervals) ? day.intervals : [];
+  if (!intervals.length) return [];
 
   const length = Number(day.slot_duration_minutes) || 60;
   if (length < 15 || length > 240) throw bad(`${WEEKDAYS[weekday]}: a call has to be between 15 and 240 minutes.`);
-  if (close - open < length) {
-    throw bad(`${WEEKDAYS[weekday]}: ${close - open} minutes is not long enough for a ${length} minute call.`);
-  }
 
   const bufferAfter = Number(day.buffer_after_minutes) || 0;
   const bufferBefore = Number(day.buffer_before_minutes) || 0;
@@ -99,17 +99,41 @@ function validateDay(day, index) {
     throw bad(`${WEEKDAYS[weekday]}: the daily limit has to be a whole number from 1 to 20.`);
   }
 
-  return {
+  const parsed = intervals.map(interval => {
+    if (!CLOCK.test(String(interval.start_time || ''))) throw bad(`${WEEKDAYS[weekday]}: start time must look like 18:30.`);
+    if (!CLOCK.test(String(interval.end_time || ''))) throw bad(`${WEEKDAYS[weekday]}: end time must look like 20:30.`);
+    const [sh, sm] = interval.start_time.split(':').map(Number);
+    const [eh, em] = interval.end_time.split(':').map(Number);
+    const open = sh * 60 + sm;
+    const close = eh * 60 + em;
+    if (close <= open) throw bad(`${WEEKDAYS[weekday]}: the end time has to be after the start time.`);
+    if (close - open < length) {
+      throw bad(`${WEEKDAYS[weekday]}: ${close - open} minutes is not long enough for a ${length} minute call.`);
+    }
+    return { open, close, start_time: interval.start_time, end_time: interval.end_time };
+  });
+
+  // Two blocks that overlap are almost always a mistake, not a real request
+  // for double capacity - catch it here with a sentence instead of letting it
+  // through to generate confusing duplicate-looking slots.
+  const sorted = parsed.slice().sort((a, b) => a.open - b.open);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].open < sorted[i - 1].close) {
+      throw bad(`${WEEKDAYS[weekday]}: ${sorted[i - 1].start_time}-${sorted[i - 1].end_time} and ${sorted[i].start_time}-${sorted[i].end_time} overlap.`);
+    }
+  }
+
+  return parsed.map(interval => ({
     weekday,
-    start_time: day.start_time,
-    end_time: day.end_time,
+    start_time: interval.start_time,
+    end_time: interval.end_time,
     timezone_id: day.timezone_id || 'Asia/Kolkata',
     slot_duration_minutes: length,
     buffer_before_minutes: bufferBefore,
     buffer_after_minutes: bufferAfter,
     max_bookings: cap,
     is_active: true
-  };
+  }));
 }
 
 /**
@@ -215,19 +239,31 @@ router.get('/', handle('read', async (req, res) => {
   const extraRules = rules.data.filter(r => r.kind === 'extra');
 
   // Every weekday is returned, active or not, so the panel can render a full
-  // week without inventing rows client-side.
-  const byWeekday = new Map(gridRules.map(r => [Number(r.weekday), r]));
+  // week without inventing rows client-side. A day can now have more than one
+  // grid row (more than one time block), so they're grouped here rather than
+  // picked one-per-day; call length, gap and daily limit are shared across a
+  // day's blocks (validateDay enforces that on save), so any row supplies them.
+  const byWeekday = new Map();
+  gridRules.forEach(r => {
+    const wd = Number(r.weekday);
+    if (!byWeekday.has(wd)) byWeekday.set(wd, []);
+    byWeekday.get(wd).push(r);
+  });
   const week = WEEKDAYS.map((label, weekday) => {
-    const rule = byWeekday.get(weekday);
+    const rows = (byWeekday.get(weekday) || [])
+      .filter(r => r.is_active)
+      .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')));
+    const first = rows[0];
     return {
       weekday, label,
-      is_active: Boolean(rule && rule.is_active),
-      start_time: (rule && String(rule.start_time || '').slice(0, 5)) || '18:00',
-      end_time: (rule && String(rule.end_time || '').slice(0, 5)) || '20:00',
-      slot_duration_minutes: (rule && rule.slot_duration_minutes) || 60,
-      buffer_before_minutes: (rule && rule.buffer_before_minutes) || 0,
-      buffer_after_minutes: (rule && rule.buffer_after_minutes) || 15,
-      max_bookings: rule ? rule.max_bookings : null
+      is_active: rows.length > 0,
+      slot_duration_minutes: (first && first.slot_duration_minutes) || 60,
+      buffer_before_minutes: (first && first.buffer_before_minutes) || 0,
+      buffer_after_minutes: (first && first.buffer_after_minutes) || 15,
+      max_bookings: first ? first.max_bookings : null,
+      intervals: rows.length
+        ? rows.map(r => ({ start_time: String(r.start_time || '').slice(0, 5), end_time: String(r.end_time || '').slice(0, 5) }))
+        : [{ start_time: '18:00', end_time: '20:00' }]
     };
   });
 
@@ -273,7 +309,10 @@ router.put('/hours', handle('hours', async (req, res) => {
   const days = Array.isArray(req.body && req.body.week) ? req.body.week : null;
   if (!days) throw bad('Nothing to save.');
 
-  const keep = days.map(validateDay).filter(Boolean);
+  // One row per time block now, not one row per weekday - a day with two
+  // blocks contributes two rows here.
+  const keep = days.flatMap((day, index) => validateDay(day, index));
+  const activeDays = new Set(keep.map(row => row.weekday)).size;
 
   // Replace rather than merge: the panel always sends the whole week, so a day
   // Divya switched off must actually disappear rather than linger as a stale
@@ -292,7 +331,7 @@ router.put('/hours', handle('hours', async (req, res) => {
     if (insert.error) throw new Error(insert.error.message);
   }
 
-  return res.json({ success: true, active_days: keep.length, environment });
+  return res.json({ success: true, active_days: activeDays, environment });
 }));
 
 // -------------------------------------------------------------- extra windows

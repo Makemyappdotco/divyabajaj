@@ -8,31 +8,45 @@ const req=(p,m,b)=>fetch(S+p+'?environment=test',{method:m,headers:{'Content-Typ
 const avail=()=>fetch(`${BASE}/api/booking/availability?days=21`).then(r=>r.json());
 let pass=0,fail=0;
 const check=(l,ok,d='')=>{ok?pass++:fail++;console.log(`${ok?'PASS':'FAIL'}  ${l}${ok?'':'  <- '+d}`)};
+// Each day now carries an `intervals` array (one or more time blocks) rather
+// than a single start_time/end_time pair, so Divya can have e.g. a free
+// 9-11am and separately a free 5-8pm on the same day.
 const week=(over={})=>[0,1,2,3,4,5,6].map(w=>Object.assign(
-  {weekday:w,is_active:false,start_time:'18:00',end_time:'20:00',slot_duration_minutes:60,buffer_after_minutes:15,buffer_before_minutes:0,max_bookings:null}, over[w]||{}));
+  {weekday:w,is_active:false,intervals:[{start_time:'18:00',end_time:'20:00'}],slot_duration_minutes:60,buffer_after_minutes:15,buffer_before_minutes:0,max_bookings:null}, over[w]||{}));
 
 (async()=>{
   await fetch(`${BASE}/__reset`,{method:'POST'});
   console.log('--- validation rejects nonsense with a readable sentence ---');
-  let r = await req('/hours','PUT',{week:week({1:{is_active:true,start_time:'20:00',end_time:'18:00'}})});
+  let r = await req('/hours','PUT',{week:week({1:{is_active:true,intervals:[{start_time:'20:00',end_time:'18:00'}]}})});
   check('end before start rejected', r.status===400 && /after the start/.test(r.body.error), JSON.stringify(r.body));
-  r = await req('/hours','PUT',{week:week({2:{is_active:true,start_time:'18:00',end_time:'18:30',slot_duration_minutes:60}})});
+  r = await req('/hours','PUT',{week:week({2:{is_active:true,intervals:[{start_time:'18:00',end_time:'18:30'}],slot_duration_minutes:60}})});
   check('window shorter than one call rejected', r.status===400 && /not long enough/.test(r.body.error), JSON.stringify(r.body));
-  r = await req('/hours','PUT',{week:week({3:{is_active:true,start_time:'evening',end_time:'20:00'}})});
+  r = await req('/hours','PUT',{week:week({3:{is_active:true,intervals:[{start_time:'evening',end_time:'20:00'}]}})});
   check('garbage time rejected', r.status===400 && /18:30/.test(r.body.error), JSON.stringify(r.body));
   r = await req('/hours','PUT',{week:week({4:{is_active:true,max_bookings:99}})});
   check('silly daily cap rejected', r.status===400 && /1 to 20/.test(r.body.error), JSON.stringify(r.body));
+  r = await req('/hours','PUT',{week:week({5:{is_active:true,intervals:[{start_time:'09:00',end_time:'12:00'},{start_time:'11:00',end_time:'14:00'}]}})});
+  check('overlapping blocks on the same day rejected', r.status===400 && /overlap/.test(r.body.error), JSON.stringify(r.body));
   const before = await avail();
   check('a rejected save changes nothing', before.days.length > 0, 'availability went empty');
 
   console.log('\n--- saving real hours ---');
-  r = await req('/hours','PUT',{week:week({1:{is_active:true,start_time:'10:00',end_time:'13:00',slot_duration_minutes:45,buffer_after_minutes:15}})});
+  r = await req('/hours','PUT',{week:week({1:{is_active:true,intervals:[{start_time:'10:00',end_time:'13:00'}],slot_duration_minutes:45,buffer_after_minutes:15}})});
   check('valid week saves', r.status===200 && r.body.active_days===1, JSON.stringify(r.body));
   const after = await avail();
   const days = after.days.map(d=>new Date(d.slots[0].starts_at).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata',weekday:'short'}));
   check('only Monday is offered now', days.every(d=>d==='Mon') && days.length>0, JSON.stringify(days.slice(0,4)));
   const first = after.days[0].slots;
   check('45 minute slots, 4 in a 3 hour morning', first.length===4 && first[0].duration_minutes===45, JSON.stringify(first.map(s=>s.duration_minutes)));
+
+  console.log('\n--- two time blocks on the same day (the Calendly-style "+ Add another time" case) ---');
+  r = await req('/hours','PUT',{week:week({1:{is_active:true,intervals:[{start_time:'09:00',end_time:'11:00'},{start_time:'17:00',end_time:'20:00'}]}})});
+  check('two-block day saves', r.status===200 && r.body.active_days===1, JSON.stringify(r.body));
+  const panel = await fetch(B).then(r=>r.json());
+  check('the panel reads back both blocks, in order', JSON.stringify(panel.week[1].intervals)===JSON.stringify([{start_time:'09:00',end_time:'11:00'},{start_time:'17:00',end_time:'20:00'}]), JSON.stringify(panel.week[1].intervals));
+  const twoBlock = await avail();
+  const mondaySlots = twoBlock.days.find(d=>new Date(d.slots[0].starts_at).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata',weekday:'short'})==='Mon').slots;
+  check('slots come from both blocks, not just one', mondaySlots.length===5, JSON.stringify(mondaySlots.map(s=>s.starts_at)));
 
   console.log('\n--- switching every day off ---');
   r = await req('/hours','PUT',{week:week()});
@@ -41,7 +55,7 @@ const week=(over={})=>[0,1,2,3,4,5,6].map(w=>Object.assign(
   check('booking page reports not configured', none.configured===false && none.days.length===0, JSON.stringify({c:none.configured,d:none.days.length}));
 
   console.log('\n--- time off ---');
-  await req('/hours','PUT',{week:week({1:{is_active:true,start_time:'10:00',end_time:'13:00'},3:{is_active:true,start_time:'18:30',end_time:'20:30'}})});
+  await req('/hours','PUT',{week:week({1:{is_active:true,intervals:[{start_time:'10:00',end_time:'13:00'}]},3:{is_active:true,intervals:[{start_time:'18:30',end_time:'20:30'}]}})});
   const withBoth = await avail();
   const mondays = withBoth.days.filter(d=>new Date(d.slots[0].starts_at).toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata',weekday:'short'})==='Mon');
   check('Mondays present before blocking', mondays.length>0);

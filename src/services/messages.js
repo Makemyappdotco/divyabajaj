@@ -278,12 +278,21 @@ ${lines.map(line => `<p style="margin:0 0 8px">${escapeHtml(line)}</p>`).join(''
  * and waiting for approval, which is exactly why these are kept short.
  */
 function reportReadyWhatsapp({ name, reportToken }) {
-  return {
-    // blueprint_ready:  "Hi {{1}}, your Full Blueprint is ready..."
-    body: [firstName(name)],
-    // The button is a dynamic URL: base https://divyabajaj.com/r/ plus this.
-    buttonUrlSuffix: reportToken || ''
-  };
+  // blueprint_ready:  "Hi {{1}}, your Full Blueprint is ready..."
+  //   header: None - despite the body text saying "Your blueprint is
+  //   attached", this template has no document-header component at all.
+  //   button: View Blueprint -> https://divyabajaj.com/r/{{1}}
+  //
+  // Confirmed 2026-09-15 by reading the template's own setup in Uomox
+  // (Template Header: None; button URL https://divyabajaj.com/r/{{1}}).
+  // This is the exact same shape as free_report_ready_new: no document
+  // header, and a dynamic button whose {{1}} is filled from the second
+  // value in the flat array Uomox sends, not a separate button field. This
+  // template was still sending the old guessed shape (a document header
+  // plus a separate buttonUrlSuffix), which is what was causing the
+  // intermittent (#131008) Required parameter is missing failures seen in
+  // production against paid customers.
+  return { body: [firstName(name), reportToken || ''] };
 }
 
 function consultationConfirmedWhatsapp({ name, startsAt }) {

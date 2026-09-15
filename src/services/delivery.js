@@ -115,22 +115,18 @@ async function deliverReport({ environment, jobId, reportId, name, email: to, ph
 
   if (whatsappConfigured()) {
     const vars = messages.reportReadyWhatsapp({ name, reportToken: linkToken });
-    // The SAME /r/<token> link used for the button, also used as the document
-    // header. Used to be a separate raw Supabase storage URL, which meant the
-    // header could point somewhere different from the button on the very same
-    // message - the opposite of what the comment above this function promises
-    // ("one link, both channels, minted once so they cannot disagree"). /r/
-    // was already built for exactly this: it serves the stored PDF bytes
-    // directly in one hop, no redirect, which is what Meta's fetcher needs.
+    // No document header here - blueprint_ready has none (confirmed by
+    // reading the template's own setup in Uomox), whatever its body text
+    // says. The button link travels as the second body value; see the long
+    // comment on reportReadyWhatsapp() in messages.js for why. The SAME /r/
+    // link used for the button is also what the email points at, minted
+    // once above so the two channels cannot disagree.
     result.whatsapp = await attempt({
       environment, jobId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('report_ready'),
-        bodyParams: vars.body,
-        buttonUrlSuffix: vars.buttonUrlSuffix,
-        documentUrl: link || null,
-        documentName: 'Divya-Bajaj-Full-Blueprint.pdf'
+        bodyParams: vars.body
       })
     });
   }

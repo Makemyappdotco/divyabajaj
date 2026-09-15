@@ -108,10 +108,23 @@ test('a name with HTML in it cannot break the email', () => {
   assert.ok(!mail.html.includes('<script>'), 'unescaped HTML reached the message');
 });
 
-test('the WhatsApp template gets numbered blanks, not a sentence', () => {
+test('the paid report WhatsApp template sends the greeting then the real report link, with no separate button field', () => {
+  // Confirmed 2026-09-15 by reading blueprint_ready's own setup in Uomox:
+  // Template Header is None (no document component, whatever the body text
+  // says), and the button is https://divyabajaj.com/r/{{1}}. Same shape as
+  // free_report_ready_new - the token has to be the second body value, not
+  // a separate button field, or the button opens a placeholder link. This
+  // was still on the old guessed shape (document header + button field),
+  // which is what caused real, intermittent (#131008) failures in
+  // production against paying customers.
   const vars = messages.reportReadyWhatsapp({ name: 'Ananya Rao', reportToken: 'abc123' });
-  assert.deepStrictEqual(vars.body, ['Ananya']);
-  assert.strictEqual(vars.buttonUrlSuffix, 'abc123');
+  assert.deepStrictEqual(vars.body, ['Ananya', 'abc123']);
+  assert.strictEqual(vars.buttonUrlSuffix, undefined, 'this provider has no separate button field - the token travels inside body');
+});
+
+test('a missing report token does not crash the paid report WhatsApp send', () => {
+  const vars = messages.reportReadyWhatsapp({ name: 'Ananya Rao' });
+  assert.deepStrictEqual(vars.body, ['Ananya', '']);
 });
 
 test('the free report WhatsApp template sends the greeting then the real report link, with no separate button field', () => {
@@ -418,6 +431,21 @@ test('deliverFreeReport does not send a document header or a separate button fie
 
   assert.ok(!fn.includes('buttonUrlSuffix'), 'deliverFreeReport should not send button data for free_report_ready');
   assert.ok(!fn.includes('documentUrl'), 'deliverFreeReport should not send a document header for free_report_ready');
+});
+
+test('deliverReport (the paid blueprint) does not send a document header or a separate button field either', () => {
+  // Same bug, same template family: blueprint_ready has no document header
+  // (Template Header: None in Uomox) and its button is filled from the
+  // flat array, not a separate field. This was left on the old guessed
+  // shape after the free report fix, on purpose, until it could be
+  // confirmed - it is now confirmed, and this is the regression guard.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const fn = source.slice(source.indexOf('async function deliverReport'), source.indexOf('async function deliverFreeReport'));
+
+  assert.ok(!fn.includes('buttonUrlSuffix'), 'deliverReport should not send button data for report_ready/blueprint_ready');
+  assert.ok(!fn.includes('documentUrl'), 'deliverReport should not send a document header for report_ready/blueprint_ready');
 });
 
 // -------------------------------------------------- failure diagnostics

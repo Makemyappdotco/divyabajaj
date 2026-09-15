@@ -97,7 +97,7 @@ function authHeaders() {
 }
 
 /** Meta Cloud API body: components, numbered parameters, optional URL button. */
-function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
+function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName, imageUrl }) {
   if (text) {
     return { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } };
   }
@@ -116,6 +116,17 @@ function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUr
         type: 'document',
         document: { link: documentUrl, filename: documentName || 'report.pdf' }
       }]
+    });
+  }
+  // A static image header, same idea but for a template whose approved
+  // header is a picture rather than the PDF itself (the "Your Free Reading
+  // Is Ready" style banners) - Meta fetches this URL fresh on every single
+  // send, it is never stored against the template, so this has to be sent
+  // with every message or the send is rejected for a missing header.
+  if (imageUrl && !documentUrl) {
+    components.push({
+      type: 'header',
+      parameters: [{ type: 'image', image: { link: imageUrl } }]
     });
   }
   if (bodyParams && bodyParams.length) {
@@ -140,7 +151,7 @@ function cloudBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUr
 }
 
 /** The flatter shape most non-Meta-shaped BSPs use. */
-function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
+function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName, imageUrl }) {
   if (text) return { from: sender(), to, type: 'text', message: text };
   return {
     from: sender(),
@@ -151,7 +162,8 @@ function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentU
     params: (bodyParams || []).map(String),
     button_params: buttonUrlSuffix ? [String(buttonUrlSuffix)] : undefined,
     header_document_url: documentUrl || undefined,
-    header_document_name: documentUrl ? (documentName || 'report.pdf') : undefined
+    header_document_name: documentUrl ? (documentName || 'report.pdf') : undefined,
+    header_image_url: !documentUrl && imageUrl ? imageUrl : undefined
   };
 }
 
@@ -171,7 +183,7 @@ function simpleBody({ to, template, bodyParams, buttonUrlSuffix, text, documentU
  * and does not actually show a button). Both are flagged below - test these
  * two specifically once a template using them is approved.
  */
-function uomoxBody({ to, template, bodyParams, buttonUrlSuffix, documentUrl, documentName }) {
+function uomoxBody({ to, template, bodyParams, buttonUrlSuffix, documentUrl, documentName, imageUrl }) {
   const body = {
     destination: to,
     templateName: template,
@@ -184,6 +196,14 @@ function uomoxBody({ to, template, bodyParams, buttonUrlSuffix, documentUrl, doc
     // guess here, but this specific line needs a live test once
     // blueprint_ready (the template with a document header) is approved.
     body.media = { url: documentUrl, type: 'document', filename: documentName || 'report.pdf' };
+  } else if (imageUrl) {
+    // This one IS confirmed - Uomox's own Postman example for a media header
+    // uses exactly this shape with type "image". Divya's team uploaded a
+    // static banner image as the header when these templates were approved,
+    // so it has to be resent with every message the same way the PDF is -
+    // WhatsApp never stores it against the template for reuse, whatever the
+    // Uomox dashboard preview makes it look like.
+    body.media = { url: imageUrl, type: 'image' };
   }
   if (buttonUrlSuffix) {
     // NOT CONFIRMED: see the function comment above - Uomox's own example for
@@ -200,7 +220,7 @@ function uomoxBody({ to, template, bodyParams, buttonUrlSuffix, documentUrl, doc
  * often enough that trusting the status code is how "it says it sent" and "the
  * customer got nothing" coexist for a week.
  */
-async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName }) {
+async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName, imageUrl }) {
   if (!isConfigured()) return { sent: false, reason: 'not_configured' };
 
   const number = normalise(to);
@@ -215,7 +235,7 @@ async function send({ to, template, bodyParams, buttonUrlSuffix, text, documentU
   }
 
   const build = style() === 'simple' ? simpleBody : style() === 'uomox' ? uomoxBody : cloudBody;
-  const payload = build({ to: number, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName });
+  const payload = build({ to: number, template, bodyParams, buttonUrlSuffix, text, documentUrl, documentName, imageUrl });
 
   // Meta's own URL carries the sender in the path; most wrappers do not.
   const url = baseUrl().includes('{sender}')

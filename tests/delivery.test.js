@@ -321,6 +321,65 @@ test('a document header for Uomox carries the report PDF link', async () => {
   assert.strictEqual(seen.media.filename, 'Divya-Bajaj-Full-Blueprint.pdf');
 });
 
+test('an image header for Uomox carries the header image, in the confirmed type "image" shape', async () => {
+  // Divya's team uploaded a static banner as the header when free_report_ready_new
+  // was approved, so WhatsApp expects that same image resent with every message -
+  // this is the fix for the real "Media upload error" customers saw.
+  let seen = null;
+  const { server, url } = await fakeProvider((req, res, body) => {
+    seen = body;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'success', metaResponse: { messages: [{ id: 'wamid.IMG' }] } }));
+  });
+
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'k', UOMOX_API_STYLE: 'uomox' });
+  await wa.send({
+    to: '9812345678', template: 'free_report_ready_new', bodyParams: ['Ananya', 'tok_abc'],
+    imageUrl: 'https://divyabajaj.com/whatsapp/free-report-ready.png'
+  });
+  server.close();
+
+  assert.strictEqual(seen.media.url, 'https://divyabajaj.com/whatsapp/free-report-ready.png');
+  assert.strictEqual(seen.media.type, 'image');
+  assert.ok(!seen.media.filename, 'an image header has no filename, that is a document-header-only field');
+});
+
+test('a document header wins over an image header if a caller somehow sends both', async () => {
+  // Never happens today (no caller passes both), but the PDF is the one that
+  // has to win if it ever does - it is the actual deliverable.
+  let seen = null;
+  const { server, url } = await fakeProvider((req, res, body) => {
+    seen = body;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'success' }));
+  });
+
+  const wa = loadWhatsapp({ UOMOX_API_URL: url, UOMOX_API_KEY: 'k', UOMOX_API_STYLE: 'uomox' });
+  await wa.send({
+    to: '9812345678', template: 'blueprint_ready', bodyParams: ['Ananya'],
+    documentUrl: 'https://example.com/report.pdf', imageUrl: 'https://example.com/banner.png'
+  });
+  server.close();
+
+  assert.strictEqual(seen.media.type, 'document');
+  assert.strictEqual(seen.media.url, 'https://example.com/report.pdf');
+});
+
+test('deliverFreeReport sends the free-reading header image, from SITE_URL', () => {
+  // Not sending this at all is exactly what was producing the "Media upload
+  // error" - see the long comment on the imageUrl line in deliverFreeReport.
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'delivery.js'), 'utf8');
+  const fn = source.slice(source.indexOf('async function deliverFreeReport'), source.indexOf('async function notifyPaymentReceived'));
+
+  assert.ok(/imageUrl:\s*`\$\{reportLinks\.siteUrl\(\)\}\/whatsapp\/free-report-ready\.png`/.test(fn),
+    'deliverFreeReport should send imageUrl built from reportLinks.siteUrl(), not a hardcoded domain');
+
+  const imagePath = path.join(__dirname, '..', 'public', 'whatsapp', 'free-report-ready.png');
+  assert.ok(fs.existsSync(imagePath), 'the image the code points at should actually exist in public/whatsapp/');
+});
+
 test('a 200 that carries an error is NOT called a success', async () => {
   const { server, url } = await fakeProvider((req, res) => {
     // Exactly what several providers do, and the reason status codes alone

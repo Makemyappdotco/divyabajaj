@@ -174,15 +174,21 @@ async function deliverFreeReport({ environment, reportId, name, email: to, phone
 
   if (whatsappConfigured()) {
     const vars = messages.freeReportWhatsapp({ name, reportToken: linkToken });
-    // No document header here - this template does not have one. The
-    // button link travels as the second body value; see the long comment
-    // on freeReportWhatsapp() in messages.js for why.
+    // No document header here - this template does not carry the PDF
+    // itself. It DOES carry a static image header though (the "Your Free
+    // Reading Is Ready" banner Divya's team uploaded when the template was
+    // approved), which is why every send has to resend that same image -
+    // WhatsApp never stores it against the template for reuse, so leaving
+    // this out is what was producing the "Media upload error" customers saw.
+    // The button link travels as the second body value; see the long
+    // comment on freeReportWhatsapp() in messages.js for why.
     result.whatsapp = await attempt({
       environment, jobId: reportId, channel: 'whatsapp', to: phone,
       run: () => whatsapp.send({
         to: phone,
         template: whatsapp.templateName('free_report_ready'),
-        bodyParams: vars.body
+        bodyParams: vars.body,
+        imageUrl: `${reportLinks.siteUrl()}/whatsapp/free-report-ready.png`
       })
     });
   }

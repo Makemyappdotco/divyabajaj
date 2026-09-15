@@ -150,7 +150,7 @@ For future guidance, discuss themes and decision windows rather than guaranteed 
 Write Divya Bajaj's real contact details as plain text only, never as a markdown link (do not write things like [text](url), just write the bare address or number on its own):
 Website: ${brand.website}
 WhatsApp: ${brand.whatsapp}
-Email: ${brand.email}`
+Email: hello@divyabajaj.com`
   ];
 }
 

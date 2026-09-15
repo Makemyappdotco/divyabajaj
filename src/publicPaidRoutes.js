@@ -84,7 +84,6 @@ function numbersFromV2(result = {}) {
     ruling_number: deterministic.birth_number || deterministic.psychic_number || indian.radical_number || indian.radical_num || '',
     destiny_number: deterministic.destiny_number || indian.destiny_number || western.lifepath_number || '',
     name_number: deterministic.name_number || indian.name_number || western.expression_number || '',
-    personal_year: deterministic.personal_year || '',
     lifepath_number: western.lifepath_number || '',
     personality_number: western.personality_number || '',
     soul_urge_number: western.soul_urge_number || ''

@@ -151,10 +151,9 @@ function drawCover(doc, { lead, numbers, paid }) {
   const items = [
     ['Ruling', numbers.ruling_number],
     ['Destiny', numbers.destiny_number],
-    ['Name', numbers.name_number],
-    ['Personal Year', numbers.personal_year]
+    ['Name', numbers.name_number]
   ];
-  const itemW = (totalWidth - 40) / 4;
+  const itemW = (totalWidth - 40) / items.length;
   items.forEach((item, index) => {
     const x = 82 + index * itemW;
     if (index) {
@@ -233,13 +232,12 @@ function drawIntroPage(doc, { lead, numbers, reportText, paid }) {
   doc.moveDown(1.25);
   const usable = doc.page.width - PAGE.left - PAGE.right;
   const gap = 12;
-  const w = (usable - gap) / 2;
+  const w = (usable - gap * 2) / 3;
   const y = doc.y;
   drawCoreCard(doc, 'Ruling Number', numbers.ruling_number, PAGE.left, y, w);
   drawCoreCard(doc, 'Destiny Number', numbers.destiny_number, PAGE.left + w + gap, y, w);
-  drawCoreCard(doc, 'Name Number', numbers.name_number, PAGE.left, y + 92, w);
-  drawCoreCard(doc, 'Personal Year', numbers.personal_year, PAGE.left + w + gap, y + 92, w);
-  doc.y = y + 190;
+  drawCoreCard(doc, 'Name Number', numbers.name_number, PAGE.left + (w + gap) * 2, y, w);
+  doc.y = y + 98;
 
   const missing = numbers.lo_shu_grid?.missing || [];
   const repeated = numbers.lo_shu_grid?.repeated || [];

@@ -89,6 +89,52 @@ router.get('/activity', handle('activity', req =>
   analytics.getActivity({ limit: req.query.limit })
 ));
 
+// A CSV cell that contains a comma, a quote or a line break has to be quoted,
+// and any quote inside it doubled - the one escaping rule every spreadsheet
+// app agrees on. Anything else round-trips as plain text.
+function csvCell(value) {
+  const text = value === null || value === undefined ? '' : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+const CUSTOMER_EXPORT_COLUMNS = [
+  ['name', 'Name'], ['email', 'Email'], ['phone', 'Phone'], ['dob', 'Date of birth'],
+  ['tob', 'Time of birth'], ['pob', 'Place of birth'], ['status', 'Status'], ['tier', 'Tier'],
+  ['source', 'Source'], ['marketing_consent', 'Marketing consent'], ['total_spent', 'Total spent (INR)'],
+  ['created_at', 'Joined'], ['last_activity_at', 'Last activity']
+];
+
+/**
+ * Every customer as a CSV download, for Divya to open in Excel or Sheets.
+ *
+ * Not wrapped in handle() like the routes above: this sends a file, not JSON,
+ * so it needs its own Content-Type and Content-Disposition.
+ */
+router.get('/customers/export', async (req, res) => {
+  try {
+    if (!db.usingSupabase()) {
+      return res.status(503).json({ error: 'Customer data needs Supabase; this environment is on local fallback storage.' });
+    }
+    const rows = await analytics.listAllCustomersForExport({ environment: scope(req) });
+    const header = CUSTOMER_EXPORT_COLUMNS.map(([, label]) => csvCell(label)).join(',');
+    const body = (rows || [])
+      .map(row => CUSTOMER_EXPORT_COLUMNS.map(([key]) => csvCell(row[key])).join(','))
+      .join('\r\n');
+    const csv = `${header}\r\n${body}\r\n`;
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="divya-bajaj-customers-${stamp}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    // A leading BOM so Excel on Windows reads the file as UTF-8 instead of
+    // guessing a local codepage and mangling any non-ASCII name.
+    return res.send('﻿' + csv);
+  } catch (error) {
+    console.error('[admin:customers/export]', error);
+    return res.status(error.status || 500).json({ error: error.message || 'Export failed' });
+  }
+});
+
 /**
  * A fresh, short-lived download link for any report.
  *

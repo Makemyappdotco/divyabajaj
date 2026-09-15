@@ -783,8 +783,10 @@
   }
 
   function renderCustomers() {
-    var head = '<div class="controls" style="margin-bottom:14px">' +
+    var head = '<div class="controls" style="margin-bottom:14px;display:flex;gap:10px;align-items:center">' +
       '<input class="search" id="custSearch" placeholder="Search name, email or phone" value="' + esc(state.customerSearch) + '">' +
+      '<a class="dl" style="text-decoration:none;white-space:nowrap" ' +
+        'href="/api/admin/customers/export?environment=' + encodeURIComponent(state.environment) + '">Download all as CSV</a>' +
       '</div>';
     view.innerHTML = head + loading(1);
 

@@ -267,6 +267,35 @@ async function listCustomers({ environment = 'production', search = '', page = 1
   };
 }
 
+/**
+ * Every customer, unpaginated, for the "download all customer data" button.
+ *
+ * Supabase caps a single response around 1,000 rows regardless of what is
+ * asked for, so this pages through in batches until a batch comes back short,
+ * rather than trusting one big .range() to return everything at once.
+ */
+async function listAllCustomersForExport({ environment = 'production' } = {}) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  const BATCH = 1000;
+  const rows = [];
+  for (let from = 0; ; from += BATCH) {
+    const { data } = await unwrap(
+      applyEnvironment(
+        supabase.from('leads').select(
+          'name, email, phone, dob, tob, pob, status, tier, source, marketing_consent, total_spent, created_at, last_activity_at'
+        ),
+        environment
+      ).order('created_at', { ascending: false }).range(from, from + BATCH - 1),
+      'export customers'
+    );
+    rows.push(...data);
+    if (data.length < BATCH) break;
+  }
+  return rows;
+}
+
 /** Everything known about one customer, for the detail view. */
 async function getCustomer(leadId) {
   const supabase = getSupabaseClient();
@@ -410,6 +439,6 @@ async function getActivity({ limit = 60 } = {}) {
 }
 
 module.exports = {
-  getOverview, listReports, listCustomers, getCustomer,
+  getOverview, listReports, listCustomers, listAllCustomersForExport, getCustomer,
   getConsultations, getHealth, getActivity, summariseDurations
 };

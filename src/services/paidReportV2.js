@@ -25,8 +25,7 @@ const REQUIRED_ASTROLOGY_GLANCE_ROWS = [
 const REQUIRED_NUMEROLOGY_GLANCE_ROWS = [
   'birth number',
   'destiny number',
-  'name number',
-  'personal year'
+  'name number'
 ];
 
 const CUSTOMER_FACING_FORBIDDEN_TERMS = [
@@ -34,7 +33,13 @@ const CUSTOMER_FACING_FORBIDDEN_TERMS = [
   { pattern: /Chaldean/i, label: 'Chaldean' },
   { pattern: /Pythagorean/i, label: 'Pythagorean' },
   { pattern: /AstrologyAPI/i, label: 'AstrologyAPI' },
-  { pattern: /separate\s+Nadi\s+calculation/i, label: 'separate Nadi calculation' }
+  { pattern: /separate\s+Nadi\s+calculation/i, label: 'separate Nadi calculation' },
+  // Client decision, 2026-09-15: the word "Personal Year" (and the bare 1-9
+  // cycle number that goes with it) must never reach the customer, in the
+  // glance grid or the Timing Map. The underlying calculation still drives the
+  // Timing Map's guidance - see the TIMING MAP CONTRACT prompt below - this
+  // only blocks the label and figure from showing up in the finished report.
+  { pattern: /Personal\s+Year/i, label: 'Personal Year' }
 ];
 
 function getPaidModel() {
@@ -186,12 +191,11 @@ Astrological layer, exactly seven rows in this order:
 7. Next major shift
 If a row cannot be supported from verified data, keep the row and say that the available source does not support a stronger conclusion. Never invent it.
 
-Numerological layer, exactly four rows in this order:
+Numerological layer, exactly three rows in this order:
 1. Birth Number
 2. Destiny Number
 3. Name Number
-4. Personal Year ${reportYear}
-Use deterministic_numerology as the primary internal number source. Present the customer-facing numerology system as Vedic Numerology. Show the derivation briefly and accurately without exposing internal calculation labels.
+Do not add a fourth row for the current numerology cycle, and never use the words "Personal Year" or show its bare 1-9 figure anywhere in the report. Use deterministic_numerology as the primary internal number source. Present the customer-facing numerology system as Vedic Numerology. Show the derivation briefly and accurately without exposing internal calculation labels.
 End this section with one headline finding that names the strongest genuine cross-system confirmation. If there is no strong convergence, say that plainly instead of manufacturing one.
 
 THE SEVEN LIFE AREAS
@@ -233,7 +237,9 @@ ONE PAGE SUMMARY CONTRACT
 
 TIMING MAP CONTRACT
 - Produce exactly five core timing rows, one for each deterministic personal_years entry, in chronological order.
-- For each row compare the verified astrological chapter with that Personal Year.
+- For each row, use that entry's year to compare against the verified astrological chapter for that year. Never call the year a "Personal Year" and never print its bare 1-9 cycle figure anywhere in the row.
+- The period field is the plain calendar year only, for example "2026", nothing else.
+- The numerology field is a short plain-language description of that year's numerology theme (for example "a completion and clearing cycle"), written in words, never as a number or as "Personal Year".
 - If astrology is silent for a year, say so.
 - Add an optional major_shift object only when the verified Dasha source clearly contains a meaningful major-period change outside those five rows.
 - Do not create dates or events that the verified source does not support.
@@ -315,8 +321,7 @@ Return ONLY valid JSON with exactly this shape:
     "numerology": [
       {"label":"Birth Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
       {"label":"Destiny Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
-      {"label":"Name Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""},
-      {"label":"Personal Year ${reportYear}", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""}
+      {"label":"Name Number", "value":"", "ruling_planet":"", "derived_from":"", "plain_meaning":""}
     ],
     "headline_finding": ""
   },
@@ -375,7 +380,7 @@ RULES
 - Do not add any unsupported factual claim.
 - Make all required sections complete.
 - Keep exactly seven fixed life areas.
-- Keep exactly seven fixed astrology glance rows and four fixed numerology glance rows.
+- Keep exactly seven fixed astrology glance rows and three fixed numerology glance rows. Never add a Personal Year row, and never use the words "Personal Year" or its bare 1-9 figure anywhere in the report.
 - Keep exactly five core timing rows corresponding to deterministic personal_years.
 - Keep exactly five closing summary points and at least four scope limitations.
 - Present the customer-facing systems only as Nadi Astrology and Vedic Numerology.
@@ -561,7 +566,7 @@ function validateReport(report) {
 
   const numerologyRows = Array.isArray(report.glance?.numerology) ? report.glance.numerology : [];
   const numerologyLabels = numerologyRows.map(item => normalizedLabel(item?.label));
-  if (numerologyRows.length !== 4) issues.push('Numerology glance must contain exactly four rows.');
+  if (numerologyRows.length !== 3) issues.push('Numerology glance must contain exactly three rows.');
   REQUIRED_NUMEROLOGY_GLANCE_ROWS.forEach(label => {
     if (!numerologyLabels.includes(label)) issues.push(`Numerology glance row missing: ${label}.`);
   });

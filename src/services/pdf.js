@@ -40,6 +40,11 @@ function cleanMarkdown(text) {
     .replace(/__/g, '')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
+    // A markdown link like [https://divyabajaj.com](https://divyabajaj.com) was
+    // printing as raw bracket-and-parenthesis text in the finished PDF, because
+    // nothing here ever stripped that syntax - only bold/italic/headings were
+    // handled. This keeps just the address the link points to.
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$2')
     .replace(/\t/g, ' ');
 }
 

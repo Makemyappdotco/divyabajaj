@@ -1,4 +1,5 @@
 const { calcAllNumbers } = require('./numerology');
+const brand = require('../config/divyaBrand');
 
 function getPaidModel() {
   return process.env.OPENAI_PAID_MODEL || 'gpt-5.5';
@@ -146,11 +147,10 @@ Use exactly these numbered headings:
 
 For future guidance, discuss themes and decision windows rather than guaranteed events. Give a clear 30-day action plan. End with a graceful invitation to consult Divya for exact chart-level guidance.
 
-Current placeholder contact details:
-Website: https://divyabajaj.com
-Instagram: https://instagram.com/divyabajaj
-WhatsApp: +91 99999 99999
-Email: hello@divyabajaj.com`
+Write Divya Bajaj's real contact details as plain text only, never as a markdown link (do not write things like [text](url), just write the bare address or number on its own):
+Website: ${brand.website}
+WhatsApp: ${brand.whatsapp}
+Email: ${brand.email}`
   ];
 }
 

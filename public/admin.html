@@ -1409,7 +1409,16 @@
         }
         button.disabled = true;
         apiWrite('/appointment/' + button.getAttribute('data-cancel') + '/cancel', 'POST', { reason: 'cancelled from the admin panel' })
-          .then(renderConsultations)
+          .then(function (d) {
+            // The cancel itself already succeeded by the time this runs - this
+            // is only about whether the customer was actually told, so it is a
+            // heads-up, not an error. Silent when it went out fine or when
+            // WhatsApp/email are not configured at all (nothing to compare to).
+            if (d.notified && d.notified.attempted && !d.notified.delivered) {
+              alert('The booking is cancelled, but the customer could not be notified automatically (WhatsApp/email failed). Please tell them yourself.');
+            }
+            renderConsultations();
+          })
           .catch(function (e) { button.disabled = false; alert(e.message); });
       });
     });

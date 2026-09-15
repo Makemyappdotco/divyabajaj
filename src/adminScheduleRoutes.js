@@ -8,6 +8,7 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('./database');
 const store = require('./services/booking/store');
+const delivery = require('./services/delivery');
 
 const router = express.Router();
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -410,6 +411,31 @@ router.delete('/block/:id', handle('unblock', async (req, res) => {
 
 // ------------------------------------------------------- manage a booking
 
+/**
+ * Best-effort customer notification for a cancel/reschedule that has already
+ * committed to the database. Mirrors the comment on the payment confirmation
+ * send in paymentRoutes.js: the booking change itself must never fail, or
+ * appear to have failed, because a WhatsApp/email attempt hit trouble - so
+ * this is always fire-and-swallow, logged and returned for the panel to show
+ * as a note, never thrown back into handle()'s 500 path.
+ */
+async function notifyBookingChange(appointment, deliverFn) {
+  try {
+    const lead = appointment.lead_id ? await db.getLead(appointment.lead_id) : null;
+    return await deliverFn({
+      environment: appointment.environment,
+      appointmentId: appointment.id,
+      name: (lead && lead.name) || '',
+      email: (lead && lead.email) || '',
+      phone: (lead && lead.phone) || '',
+      startsAt: appointment.starts_at
+    });
+  } catch (error) {
+    console.error('[schedule:notify]', error);
+    return { attempted: false, delivered: false, reason: error.message };
+  }
+}
+
 router.post('/appointment/:id/cancel', handle('cancel', async (req, res) => {
   const appointment = await store.getAppointment(String(req.params.id));
   if (!appointment) return res.status(404).json({ error: 'That booking no longer exists.' });
@@ -418,9 +444,10 @@ router.post('/appointment/:id/cancel', handle('cancel', async (req, res) => {
     reason: String((req.body && req.body.reason) || '').trim().slice(0, 300) || 'cancelled by Divya',
     changedBy: 'admin'
   });
+  const notified = await notifyBookingChange(updated, delivery.deliverConsultationCancelled);
   // Cancelling drops the row out of active_appointment_slot_unique, so the time
   // becomes bookable again on the very next availability call.
-  return res.json({ success: true, appointment: updated, slot_released: true });
+  return res.json({ success: true, appointment: updated, slot_released: true, notified });
 }));
 
 router.post('/appointment/:id/reschedule', handle('reschedule', async (req, res) => {
@@ -441,7 +468,8 @@ router.post('/appointment/:id/reschedule', handle('reschedule', async (req, res)
       changedBy: 'admin',
       patch: { starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() }
     });
-    return res.json({ success: true, appointment: updated });
+    const notified = await notifyBookingChange(updated, delivery.deliverConsultationMoved);
+    return res.json({ success: true, appointment: updated, notified });
   } catch (error) {
     if (/duplicate key|unique/i.test(error.message)) {
       return res.status(409).json({ error: 'There is already a booking at that time.' });

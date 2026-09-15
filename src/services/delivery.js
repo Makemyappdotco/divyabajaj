@@ -292,6 +292,77 @@ async function deliverBookingConfirmation({ environment, appointmentId, name, em
   return result;
 }
 
+/**
+ * Sent when Divya cancels a booked consultation from the panel.
+ *
+ * The message content (consultationMovedWhatsapp/Email with cancelled: true)
+ * already existed in messages.js, written for this exact template pair, but
+ * nothing ever called it - the admin cancel route only updated the database
+ * row. A cancelled booking with no word to the customer is worse than no
+ * cancel button at all, so this is not optional the way a marketing
+ * follow-up is: it always attempts, like the confirmation does.
+ */
+async function deliverConsultationCancelled({ environment, appointmentId, name, email: to, phone }) {
+  const result = { attempted: false, whatsapp: null, email: null };
+  if (!isConfigured()) return Object.assign(result, { reason: 'not_configured' });
+  result.attempted = true;
+
+  if (whatsappConfigured()) {
+    const vars = messages.consultationMovedWhatsapp({ name, cancelled: true });
+    result.whatsapp = await attempt({
+      environment, jobId: appointmentId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone,
+        template: whatsapp.templateName('consultation_cancelled'),
+        bodyParams: vars.body
+      })
+    });
+  }
+
+  if (emailConfigured()) {
+    const mail = messages.consultationMovedEmail({ name, cancelled: true });
+    result.email = await attempt({
+      environment, jobId: appointmentId, channel: 'email', to,
+      run: () => email.send({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    });
+  }
+
+  result.delivered = Boolean((result.whatsapp && result.whatsapp.sent) || (result.email && result.email.sent));
+  return result;
+}
+
+/** Sent when Divya moves a booked consultation to a new time. Same gap as
+ * deliverConsultationCancelled above - the message content already existed,
+ * nothing ever called it. */
+async function deliverConsultationMoved({ environment, appointmentId, name, email: to, phone, startsAt }) {
+  const result = { attempted: false, whatsapp: null, email: null };
+  if (!isConfigured()) return Object.assign(result, { reason: 'not_configured' });
+  result.attempted = true;
+
+  if (whatsappConfigured()) {
+    const vars = messages.consultationMovedWhatsapp({ name, startsAt, cancelled: false });
+    result.whatsapp = await attempt({
+      environment, jobId: appointmentId, channel: 'whatsapp', to: phone,
+      run: () => whatsapp.send({
+        to: phone,
+        template: whatsapp.templateName('consultation_moved'),
+        bodyParams: vars.body
+      })
+    });
+  }
+
+  if (emailConfigured()) {
+    const mail = messages.consultationMovedEmail({ name, startsAt, cancelled: false });
+    result.email = await attempt({
+      environment, jobId: appointmentId, channel: 'email', to,
+      run: () => email.send({ to, subject: mail.subject, text: mail.text, html: mail.html })
+    });
+  }
+
+  result.delivered = Boolean((result.whatsapp && result.whatsapp.sent) || (result.email && result.email.sent));
+  return result;
+}
+
 // -------------------------------------------------------------- to Divya
 
 /**
@@ -335,6 +406,7 @@ async function notifyOwner({ environment, event, name, phone, email: customerEma
 module.exports = {
   isConfigured, channels, whatsappConfigured, emailConfigured,
   deliverReport, deliverFreeReport, deliverBookingConfirmation,
+  deliverConsultationCancelled, deliverConsultationMoved,
   notifyPaymentReceived, notifyRefunded, notifyOwner,
   ownerPhone, ownerEmail
 };

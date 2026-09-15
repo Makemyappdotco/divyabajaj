@@ -87,6 +87,10 @@ const week=(over={})=>[0,1,2,3,4,5,6].map(w=>Object.assign(
   check('the booking shows in upcoming with the customer name', sched.upcoming.length===1 && sched.upcoming[0].lead.name==='Booked Person', JSON.stringify(sched.upcoming.map(u=>u.lead)));
   r = await req('/appointment/'+sched.upcoming[0].id+'/cancel','POST',{reason:'test'});
   check('cancel succeeds', r.status===200 && r.body.appointment.status==='cancelled', JSON.stringify(r.body).slice(0,120));
+  // Cancelling now also attempts to tell the customer (consultation_cancelled) -
+  // it must report that attempt without ever failing the cancel itself, even
+  // when the harness has no WhatsApp/email credentials configured.
+  check('cancel reports a notify attempt rather than silently skipping it', r.body.notified && r.body.notified.attempted===false, JSON.stringify(r.body.notified));
   const afterCancel = await fetch(B).then(r=>r.json());
   check('it leaves the upcoming list', afterCancel.upcoming.length===0);
 

@@ -224,7 +224,7 @@ function consultationConfirmedEmail({ name, startsAt, mode }) {
       'Your private consultation is confirmed.',
       '',
       `When: ${when}`,
-      'Duration: 60 minutes',
+      'Duration: 45 minutes',
       `Format: ${mode === 'phone_call' ? 'Phone call' : 'Video call'}`,
       '',
       'You will get the joining details before the call.',
@@ -238,7 +238,7 @@ function consultationConfirmedEmail({ name, startsAt, mode }) {
 <p style="margin:0 0 18px">Your private consultation is confirmed.</p>
 <table style="margin:0 0 18px;border-collapse:collapse">
 <tr><td style="padding:4px 18px 4px 0;color:#6b6156">When</td><td style="padding:4px 0;font-weight:600">${escapeHtml(when)}</td></tr>
-<tr><td style="padding:4px 18px 4px 0;color:#6b6156">Duration</td><td style="padding:4px 0">60 minutes</td></tr>
+<tr><td style="padding:4px 18px 4px 0;color:#6b6156">Duration</td><td style="padding:4px 0">45 minutes</td></tr>
 <tr><td style="padding:4px 18px 4px 0;color:#6b6156">Format</td><td style="padding:4px 0">${mode === 'phone_call' ? 'Phone call' : 'Video call'}</td></tr>
 </table>
 <p style="margin:0 0 18px">You will get the joining details before the call. Reply to this email if you need to move it.</p>

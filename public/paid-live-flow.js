@@ -195,7 +195,7 @@
                 <div class="dbp-eyebrow">Need a deeper personal answer?</div>
                 <strong>Book a one-to-one consultation with Divya</strong>
                 <p>Discuss exact timing, compare real choices and apply the report to your present situation.</p>
-                <div class="dbp-meta"><span>₹4,999</span><span>60 minutes</span><span>Phone or video</span></div>
+                <div class="dbp-meta"><span>₹4,999</span><span>45 minutes</span><span>Phone or video</span></div>
                 <a class="dbp-consult" href="/consultation" target="_blank" rel="noopener">Book Personal Consultation</a>
               </div>
             </section>

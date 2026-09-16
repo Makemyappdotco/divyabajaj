@@ -1,6 +1,6 @@
 const CARD_COUNT = 18;
 const CONSULTATION_PRICE = '₹4,999';
-const CONSULTATION_DURATION = '60 minutes';
+const CONSULTATION_DURATION = '45 minutes';
 
 function text(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();

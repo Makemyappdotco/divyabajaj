@@ -50,7 +50,7 @@
         <p>Your report shows the main patterns. A personal session helps apply them to your actual choices, timing and present situation.</p>
         <div class="pb4-conversion-meta">
           <span>₹4,999</span>
-          <span>60 minutes</span>
+          <span>45 minutes</span>
           <span>Phone or video</span>
         </div>
         <a class="pb4-conversion-primary" href="${BOOKING_URL}" target="_blank" rel="noopener">Book One-to-One Consultation</a>

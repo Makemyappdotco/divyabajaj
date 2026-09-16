@@ -62,6 +62,7 @@ run report-delivery-delay.test.js
 run pdf-sections.test.js
 run public-hours.test.js
 run campaigns-readiness.test.js
+run paid-report-notify-once.test.js
 
 # Integration suites: fresh harness each.
 for suite in schedule-api.test.js booking-api.test.js payment-api.test.js pricing-e2e.test.js paid-report.test.js; do

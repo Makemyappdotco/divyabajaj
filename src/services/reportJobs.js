@@ -97,26 +97,48 @@ async function attachOrder(jobId, { orderId, gatewayOrderId }) {
 /**
  * Money has arrived. Moves the job into the queue.
  *
- * Idempotent, because the browser and the webhook both call it: a job already
- * past this point is returned unchanged rather than being dragged backwards
- * into the queue and generated a second time.
+ * The browser's /verify and Razorpay's webhook both call this, often within
+ * milliseconds of each other. Returns the updated row ONLY when THIS call is
+ * the one that actually performed the awaiting_payment -> queued move, and
+ * null on every other outcome (already past this point, or lost the race to
+ * the other caller) - same atomic-update-with-a-WHERE pattern as claim()
+ * below, and for the same reason: a plain read-then-write, checked in JS
+ * instead of in the SQL WHERE clause, lets both callers read
+ * "awaiting_payment" before either has written "queued", so both believe
+ * they were first. That is what was sending the payment received message
+ * out twice - notifyFirstPaid() trusts this return value to know who won.
  */
 async function markPaid(jobId, { paymentId } = {}) {
+  const supabase = client();
   const job = await get(jobId);
   if (!job) return null;
+
   if (job.status !== 'awaiting_payment') {
-    // Already queued, generating, generated or refunded. Record the payment id
-    // if this is the first caller to know it, but do not touch the status.
+    // Already queued, generating, generated or refunded by the other
+    // caller. Record the payment id if this is the first caller to know it,
+    // but this call did not perform the transition, so it is not the winner.
     if (paymentId && !job.gateway_payment_id) {
-      return update(jobId, { gateway_payment_id: paymentId });
+      await update(jobId, { gateway_payment_id: paymentId });
     }
-    return job;
+    return null;
   }
-  return update(jobId, {
-    status: 'queued',
-    paid_at: now(),
-    gateway_payment_id: paymentId || job.gateway_payment_id || ''
-  });
+
+  const { data, error } = await supabase.from('report_jobs')
+    .update({
+      status: 'queued',
+      paid_at: now(),
+      gateway_payment_id: paymentId || job.gateway_payment_id || '',
+      updated_at: now()
+    })
+    .eq('id', jobId)
+    // The race guard. Without this the check above is only advisory.
+    .eq('status', 'awaiting_payment')
+    .select();
+
+  if (error) throw new Error(error.message);
+  // Empty means the other caller's update committed between our read above
+  // and this write - they are the winner, not us.
+  return (data && data[0]) || null;
 }
 
 /**

@@ -322,12 +322,11 @@ router.post('/webhook', async (req, res) => {
             await supabase.from('orders').update({ status: 'paid', updated_at: now() }).eq('id', orderRow.data.id);
             const job = await reportJobs.getByGatewayOrder(gatewayOrderId);
             if (job) {
-              // job.status here is BEFORE markPaid, same as /verify captures
-              // it - notifyFirstPaid() uses that to tell whether the webhook
-              // or the browser is the one that actually wins the race.
-              const previousStatus = job.status;
+              // markPaid() itself decides whether the webhook or the browser
+              // actually won the race - see its docstring - so there is
+              // nothing to capture here beforehand any more.
               const queued = await reportJobs.markPaid(job.id, { paymentId });
-              paidReportRoutes.notifyFirstPaid({ job, previousStatus, queued })
+              paidReportRoutes.notifyFirstPaid({ job, queued })
                 .catch(error => console.error('[payment:webhook] notify failed', error.message));
             }
           } else {

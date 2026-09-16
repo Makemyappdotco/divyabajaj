@@ -321,7 +321,7 @@ body.light .toggle-icon.moon{opacity:0}body.light .toggle-icon.sun{opacity:1}
 .avail-body{max-width:640px;margin:0 auto}
 .avail-slots{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:28px}
 @media(min-width:520px){.avail-slots{grid-template-columns:repeat(4,1fr)}}
-.avail-slot{padding:20px 12px;text-align:center;border:1px solid rgba(201,169,110,.06);transition:all .4s}
+.avail-slot{padding:20px 12px;text-align:center;border:1px solid rgba(201,169,110,.06);transition:all .4s;display:block;text-decoration:none;color:inherit;cursor:pointer}
 .avail-slot:hover{border-color:var(--gold);background:rgba(201,169,110,.03);transform:translateY(-3px)}
 .avail-slot .aday{font-family:var(--serif);font-size:14px;font-weight:500;color:var(--ivory);margin-bottom:5px}
 .avail-slot .atime{font-size:11px;font-weight:300;color:var(--text-m);line-height:1.5}
@@ -540,6 +540,10 @@ body.light .free-form input,body.light .free-form select{background:rgba(176,141
 .wa-float svg{width:28px;height:28px;fill:white}
 @media(min-width:768px){.wa-float{bottom:24px;right:24px;width:56px;height:56px}}
 .wa-btn{display:inline-flex;align-items:center;gap:10px;padding:14px 32px;background:#25D366;color:white;font-size:13px;font-weight:600;letter-spacing:1px;transition:all .3s;border-radius:0}
+.avail-cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.book-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:transparent;border:1px solid rgba(201,169,110,.35);color:var(--gold);font-size:13px;font-weight:600;letter-spacing:1px;transition:all .3s;border-radius:0;text-decoration:none}
+.book-btn:hover{background:rgba(201,169,110,.08);border-color:var(--gold)}
+body.light .book-btn{border-color:rgba(176,141,74,.4);color:var(--gold-d)}
 .wa-btn:hover{background:#20BD5A;transform:translateY(-2px);box-shadow:0 6px 24px rgba(37,211,102,.25)}
 .wa-btn svg{width:20px;height:20px;fill:white}
 
@@ -699,6 +703,11 @@ background:linear-gradient(135deg,rgba(201,169,110,.08) 0%,transparent 50%)}
 .pcard-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:20px}
 .pcard-tag{padding:4px 10px;font-size:10px;font-weight:400;color:var(--text-m);border:1px solid rgba(201,169,110,.08);background:rgba(201,169,110,.02)}
 .pcard.popular .pcard-tag{border-color:rgba(201,169,110,.15);background:rgba(201,169,110,.05)}
+.pcard-tag-star{color:var(--gold);margin-left:2px}
+.pcard-info-ic{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:rgba(201,169,110,.2);color:var(--gold);font-size:9px;font-style:normal;font-weight:700;font-family:var(--sans);margin-left:5px;cursor:pointer;vertical-align:middle}
+.pcard-note{font-size:11px;line-height:1.55;color:var(--text-s);margin:-14px 0 16px;padding-left:1px;display:none}
+.pcard-note.show{display:block}
+body.light .pcard-info-ic{background:rgba(156,111,47,.18)}
 .pcard-btn{display:block;width:100%;padding:14px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;transition:all .4s;text-align:center;font-family:var(--sans);border:none;cursor:pointer;margin-top:auto}
 .pcard.popular .pcard-btn{background:var(--gold);color:var(--bg);box-shadow:0 4px 16px rgba(201,169,110,.15)}
 .pcard.popular .pcard-btn:hover{box-shadow:0 8px 28px rgba(201,169,110,.3);transform:translateY(-2px)}
@@ -2256,7 +2265,8 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <div class="pcard-price-row"><span class="pcard-price">&#8377;999</span><span class="pcard-og-price">&#8377;4,999</span></div>
 <div class="pcard-save">Save 80%</div>
 <div class="pcard-desc">A complete astrology and numerology reading. Nadi Astrology combined with numerology, name correction guidance, mobile and house number analysis, gemstone protocol, and 30 days of priority WhatsApp access to Divya directly.</div>
-<div class="pcard-tags"><span class="pcard-tag">Astro + Numero</span><span class="pcard-tag">Name Correction</span><span class="pcard-tag">Mobile/House Analysis</span><span class="pcard-tag">Gemstone Rx</span><span class="pcard-tag">30-Day Access</span></div>
+<div class="pcard-tags"><span class="pcard-tag">Astro + Numero</span><span class="pcard-tag">Name Correction</span><span class="pcard-tag">Gemstone Rx</span><span class="pcard-tag">30-Day Access<span class="pcard-tag-star">*</span><span class="pcard-info-ic" title="Can only be used for one follow-up question" onclick="event.stopPropagation();toggleBlueprintNote()" role="button" tabindex="0" aria-label="What does 30-Day Access mean">i</span></span></div>
+<p class="pcard-note" id="blueprintNote">* 30-Day Access means priority WhatsApp access to Divya, for one follow-up question during that period.</p>
 <a href="#booking" class="pcard-btn">Get Blueprint</a>
 </div>
 
@@ -2333,15 +2343,18 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 
 <div class="avail-body">
 <div class="avail-slots reveal" id="availSlots">
-<div class="avail-slot"><div class="aday">Wed</div><div class="atime">6:30 PM<br>8:00 PM</div></div>
-<div class="avail-slot"><div class="aday">Fri</div><div class="atime">6:30 PM<br>8:00 PM</div></div>
-<div class="avail-slot"><div class="aday">Sat</div><div class="atime">11:30 AM<br>2:00 PM</div></div>
-<div class="avail-slot"><div class="aday">Sun</div><div class="atime">11:30 AM<br>2:00 PM</div></div>
+<a href="/book-consultation?day=Wed" class="avail-slot"><div class="aday">Wed</div><div class="atime">6:30 PM<br>8:00 PM</div></a>
+<a href="/book-consultation?day=Fri" class="avail-slot"><div class="aday">Fri</div><div class="atime">6:30 PM<br>8:00 PM</div></a>
+<a href="/book-consultation?day=Sat" class="avail-slot"><div class="aday">Sat</div><div class="atime">11:30 AM<br>2:00 PM</div></a>
+<a href="/book-consultation?day=Sun" class="avail-slot"><div class="aday">Sun</div><div class="atime">11:30 AM<br>2:00 PM</div></a>
 </div>
 <div class="avail-modes reveal reveal-d1"><span class="avail-mode">Phone Call</span><span class="avail-mode">Video Call</span></div>
 <div class="avail-note reveal reveal-d2">Divya does not rush. Each session is focused entirely on your questions. Cancellations must be made at least 6 hours in advance.</div>
 <div style="text-align:center;margin-top:24px" class="reveal reveal-d3">
+<div class="avail-cta-row">
 <a href="https://wa.me/91XXXXXXXXXX?text=Hi%20Divya%2C%20I%20want%20to%20book%20a%20consultation%20slot" target="_blank" class="wa-btn"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>Book on WhatsApp</a>
+<a href="/book-consultation" class="book-btn">Book a Session<span style="font-size:15px">&#8250;</span></a>
+</div>
 </div>
 </div>
 </div>
@@ -2412,7 +2425,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <p class="svc-popup-intro" id="svcPopIntro"></p>
 <div class="svc-popup-list" id="svcPopList"></div>
 <div class="svc-popup-actions">
-<a href="#" id="svcPopWa" target="_blank" rel="noopener" class="svc-pop-btn svc-pop-btn-primary"><svg viewBox="0 0 24 24" style="fill:#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/></svg>I want Guidance</a>
+<a href="javascript:void(0)" id="svcPopWa" target="_blank" rel="noopener" class="svc-pop-btn svc-pop-btn-primary"><svg viewBox="0 0 24 24" style="fill:#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/></svg>I want Guidance</a>
 <button type="button" id="svcPopReport" class="svc-pop-btn svc-pop-btn-ghost" onclick="serviceToFreeReport()">Generate Free Report</button>
 </div>
 <p class="svc-popup-foot">Personal guidance from Divya. Real answers, not template replies.</p>
@@ -2937,6 +2950,7 @@ function openServicePopup(key){
   var body=p.querySelector('.popup-body'); if(body) body.scrollTop=0;
 }
 function closeServicePopup(){ var p=document.getElementById('servicePopup'); if(!p) return; p.classList.remove('active'); document.body.style.overflow=''; }
+function toggleBlueprintNote(){ var n=document.getElementById('blueprintNote'); if(n) n.classList.toggle('show'); }
 function serviceToFreeReport(){ closeServicePopup(); setTimeout(function(){ if(typeof openFreeReportPopup==='function') openFreeReportPopup(); }, 240); }
 (function(){
   var p=document.getElementById('servicePopup');
@@ -2968,7 +2982,11 @@ function serviceToFreeReport(){ closeServicePopup(); setTimeout(function(){ if(t
     var times = (day.intervals||[]).map(function(iv){
       return fmtTime(iv.start_time) + ' - ' + fmtTime(iv.end_time);
     }).join('<br>');
-    return '<div class="avail-slot"><div class="aday">'+shortDay(day.label)+'</div><div class="atime">'+times+'</div></div>';
+    var wd = shortDay(day.label);
+    // Sends the customer straight to that weekday on the real booking page -
+    // see the ?day= handling added to consultation.html - instead of a tile
+    // that just displays hours and goes nowhere.
+    return '<a href="/book-consultation?day='+encodeURIComponent(wd)+'" class="avail-slot"><div class="aday">'+wd+'</div><div class="atime">'+times+'</div></a>';
   }
   function fallbackHtml(){
     return '<div class="avail-slot" style="grid-column:1/-1;padding:20px 12px"><div class="atime">New slots are being scheduled. Message Divya on WhatsApp for the next available time.</div></div>';

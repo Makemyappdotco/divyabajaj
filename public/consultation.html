@@ -134,7 +134,7 @@
   <div class="rule"></div>
 
   <div id="flow">
-    <div class="card">
+    <div class="card" id="bookingForm">
       <div class="step-label">Step 1</div>
       <div class="step-title">Pick a day and time</div>
       <div class="step-note">All times shown in India Standard Time (IST).</div>
@@ -275,10 +275,26 @@
         'Every slot in the next three weeks is taken. Message us on WhatsApp and we will find you one.</div>';
       return;
     }
+
+    // The landing page's weekly schedule tiles link here with ?day=Wed and so
+    // on - a weekday, not a specific date, since that widget only shows
+    // Divya's recurring hours. Jump to the first upcoming date that falls on
+    // that weekday, so the click actually saves the customer the hunting,
+    // rather than always landing on whichever date happens to be soonest.
+    var preferredDay = '';
+    try { preferredDay = (new URLSearchParams(location.search).get('day') || '').trim().toLowerCase(); } catch (e) {}
+    var startIndex = 0;
+    if (preferredDay) {
+      var match = state.days.findIndex(function (day) {
+        return fmt(day.slots[0].starts_at, { weekday: 'short' }).toLowerCase() === preferredDay;
+      });
+      if (match >= 0) startIndex = match;
+    }
+
     var html = '<div class="days" id="days">';
     state.days.forEach(function (day, i) {
       var first = day.slots[0].starts_at;
-      html += '<button type="button" class="day" data-date="' + esc(day.date) + '" aria-pressed="' + (i === 0) + '">' +
+      html += '<button type="button" class="day" data-date="' + esc(day.date) + '" aria-pressed="' + (i === startIndex) + '">' +
         '<div class="day-wd">' + esc(fmt(first, { weekday: 'short' })) + '</div>' +
         '<div class="day-n">' + esc(fmt(first, { day: 'numeric' })) + '</div>' +
         '<div class="day-mo">' + esc(fmt(first, { month: 'short' })) + '</div>' +
@@ -297,7 +313,11 @@
       renderSlots(button.getAttribute('data-date'));
     });
 
-    renderSlots(state.days[0].date);
+    if (startIndex > 0) {
+      var selectedButton = $('days').children[startIndex];
+      if (selectedButton) selectedButton.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+    }
+    renderSlots(state.days[startIndex].date);
   }
 
   function renderSlots(date) {

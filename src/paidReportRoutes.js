@@ -178,13 +178,14 @@ router.post('/checkout', handle('checkout', async (req, res) => {
  * Two different callers can be the one that first moves a job out of
  * awaiting_payment: the browser's /verify below, or the Razorpay webhook in
  * paymentRoutes.js (a customer who pays and closes the tab before /verify
- * ever runs is exactly the case the webhook exists for). Both call this with
- * the job's status from BEFORE they called markPaid, so only whichever one
- * actually won that race sends anything - one receipt, one ping to Divya,
- * never zero and never two.
+ * ever runs is exactly the case the webhook exists for). markPaid() itself
+ * is the one place that can tell who actually won that race - it returns
+ * the job only to the caller whose update performed the transition, and
+ * null to the other one - so trusting that return value here is what keeps
+ * this to one receipt and one ping to Divya, never zero and never two.
  */
-async function notifyFirstPaid({ job, previousStatus, queued }) {
-  if (!(queued && queued.status === 'queued' && previousStatus === 'awaiting_payment')) return;
+async function notifyFirstPaid({ job, queued }) {
+  if (!queued) return;
 
   const price = await pricing.priceOf(PRODUCT, job.environment).catch(() => null);
   delivery.notifyPaymentReceived({
@@ -254,7 +255,7 @@ router.post('/verify', handle('verify', async (req, res) => {
   // The webhook can land first instead - see notifyFirstPaid() below, shared
   // with src/paymentRoutes.js, so whichever one actually wins the race is
   // the only one that sends the receipt and Divya's sale alert.
-  notifyFirstPaid({ job, previousStatus: job.status, queued });
+  notifyFirstPaid({ job, queued });
 
   return res.json({
     success: true,

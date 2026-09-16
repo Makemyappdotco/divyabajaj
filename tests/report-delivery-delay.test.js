@@ -102,10 +102,10 @@ console.log('\nreport delivery delay\n');
 
   check('notifyFirstPaid() is the one place that sends the receipt and the owner alert',
     /delivery\.notifyOwner/.test(notifyFirstPaid) && /delivery\.notifyPaymentReceived/.test(notifyFirstPaid));
-  check('notifyFirstPaid() only fires on the transition out of awaiting_payment, never on a duplicate call',
-    /previousStatus === 'awaiting_payment'/.test(notifyFirstPaid) && /queued\.status === 'queued'/.test(notifyFirstPaid));
+  check('notifyFirstPaid() only fires when markPaid() says THIS call won the race, never on a duplicate call',
+    /if \(!queued\) return/.test(notifyFirstPaid));
   check('/verify calls notifyFirstPaid() instead of notifying inline',
-    /notifyFirstPaid\(\{\s*job,\s*previousStatus:\s*job\.status,\s*queued\s*\}\)/.test(verify));
+    /notifyFirstPaid\(\{\s*job,\s*queued\s*\}\)/.test(verify));
   check('runJob() no longer notifies the owner (moved to notifyFirstPaid)',
     !/notifyOwner/.test(runJob));
   check('notifyFirstPaid is exported so the webhook path can share it',
@@ -124,10 +124,8 @@ console.log('\nreport delivery delay\n');
     /require\(['"]\.\/paidReportRoutes['"]\)/.test(source));
 
   const webhook = source.slice(source.indexOf("router.post('/webhook'"));
-  check('the webhook captures the job status BEFORE calling markPaid',
-    /previousStatus\s*=\s*job\.status/.test(webhook));
   check('the webhook calls notifyFirstPaid so a webhook-only payment still gets a receipt and an owner alert',
-    /paidReportRoutes\.notifyFirstPaid\(\{\s*job,\s*previousStatus,\s*queued\s*\}\)/.test(webhook));
+    /paidReportRoutes\.notifyFirstPaid\(\{\s*job,\s*queued\s*\}\)/.test(webhook));
 })();
 
 // ------------------------------------------------------------- the sweep

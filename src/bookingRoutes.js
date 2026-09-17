@@ -13,7 +13,7 @@ const pricing = require('./services/pricing');
 const router = express.Router();
 
 const CONSULTATION_MINUTES = Number(process.env.CONSULTATION_MINUTES) || 60;
-const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '917042091555';
 
 /**
  * Until email and WhatsApp notifications are wired up, nothing tells Divya a

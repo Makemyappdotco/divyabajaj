@@ -27,7 +27,7 @@ const router = express.Router();
 const CURRENCY = 'INR';
 const PRODUCT = 'paid_blueprint';
 // Same number the consultation flow and the landing page already use.
-const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '917042091555';
 
 function id(prefix) { return `${prefix}_${crypto.randomBytes(8).toString('hex')}`; }
 function now() { return new Date().toISOString(); }

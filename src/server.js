@@ -61,7 +61,7 @@ function validateBrowserScriptsSafely() {
 const browserScriptsValid = validateBrowserScriptsSafely();
 
 // Divya's real WhatsApp number, as already used by public/consultation.html.
-const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '919545136766';
+const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '917042091555';
 
 async function sendLandingWithPatches(res) {
   const landingPath = path.join(publicDir, 'landing.html');

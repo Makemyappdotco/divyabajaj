@@ -3,7 +3,7 @@
   window.__divyaPaidV2ConversionSafe = true;
 
   var BOOKING_URL = '/consultation';
-  var WHATSAPP_URL = 'https://wa.me/919545136766?text=' + encodeURIComponent(
+  var WHATSAPP_URL = 'https://wa.me/917042091555?text=' + encodeURIComponent(
     'Hello Divya, I have checked my Full Blueprint and want to book a one-to-one consultation.'
   );
 

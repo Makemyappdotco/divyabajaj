@@ -169,6 +169,11 @@ body.light .toggle-icon.moon{opacity:0}body.light .toggle-icon.sun{opacity:1}
 .hero-free-btn{display:block;width:100%;padding:14px;background:var(--gold);color:#08070A;font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;text-align:center;border:none;cursor:pointer;transition:all .4s;position:relative;overflow:hidden;font-family:var(--sans)}
 .hero-free-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);animation:shimmer 3s linear infinite}
 .hero-free-btn:hover{box-shadow:0 8px 32px rgba(201,169,110,.35);transform:translateY(-2px)}
+.hero-alt-link{font-size:12px;color:var(--text-s);text-align:center;max-width:440px;margin:0 auto;animation:fadeUp .8s 1s both}
+.hero-alt-link a{color:var(--gold);text-decoration:underline;text-underline-offset:3px;font-weight:500}
+.hero-alt-link a:hover{color:var(--gold-l)}
+@media(min-width:768px){.hero-alt-link{text-align:left;margin-left:0;margin-right:0}}
+body.light .hero-alt-link{color:rgba(42,37,32,.55)}
 .hero-or{display:flex;align-items:center;gap:12px;margin-bottom:16px;animation:fadeUp .8s .95s both;max-width:440px;margin-left:auto;margin-right:auto}
 @media(min-width:768px){.hero-or{margin-left:0;margin-right:0}}
 .hero-or-line{flex:1;height:1px;background:rgba(201,169,110,.1)}
@@ -357,11 +362,14 @@ body.light .toggle-icon.moon{opacity:0}body.light .toggle-icon.sun{opacity:1}
 .footer-copy{font-size:10px;color:var(--text-s)}
 
 /* Sticky */
-.sticky{position:fixed;bottom:0;left:0;right:0;z-index:99;padding:10px 14px;background:rgba(8,7,10,.93);backdrop-filter:blur(20px);border-top:1px solid rgba(201,169,110,.08);display:flex;gap:8px;transform:translateY(100%);transition:transform .5s cubic-bezier(.22,1,.36,1)}
+.sticky{position:fixed;bottom:0;left:0;right:0;z-index:99;padding:10px 14px;background:rgba(8,7,10,.93);backdrop-filter:blur(20px);border-top:1px solid rgba(201,169,110,.08);transform:translateY(100%);transition:transform .5s cubic-bezier(.22,1,.36,1)}
 .sticky.show{transform:none}
-.sticky a{flex:1;text-align:center;padding:13px 6px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
+.sticky-row{display:flex;gap:8px}
+.sticky-row a{flex:1;text-align:center;padding:13px 6px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase}
 .sticky .st-free{background:var(--gold);color:var(--bg)}
 .sticky .st-book{border:1px solid rgba(201,169,110,.25);color:var(--gold)}
+.sticky-upsell{display:flex;align-items:center;justify-content:center;gap:6px;text-align:center;padding:8px 6px;margin-bottom:8px;font-size:10.5px;font-weight:500;letter-spacing:.4px;color:var(--gold);background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);border-radius:8px}
+.sticky-upsell span{transition:transform .3s}
 @media(min-width:768px){.sticky{display:none}}
 /* ===== UNIQUE SECTION BACKGROUNDS ===== */
 .cosmos{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
@@ -1611,6 +1619,22 @@ body.light .db-method-card{
 }
 body.light .db-method-card::after{color:rgba(243,231,215,.14)!important}
 
+.db-upsell-strip{position:relative;overflow:hidden;background:radial-gradient(circle at 18% 15%,rgba(201,169,110,.16),transparent 26%),radial-gradient(circle at 82% 18%,rgba(74,106,170,.16),transparent 28%),linear-gradient(160deg,#16131f 0%,#1c1830 48%,#13111d 100%)}
+.db-upsell-head{position:relative;z-index:2;text-align:center;margin-bottom:36px}
+.db-upsell-head .sec-title{color:#F3E7D7}
+.db-upsell-grid{position:relative;z-index:2;display:grid;grid-template-columns:1fr;gap:16px;max-width:900px;margin:0 auto}
+@media(min-width:700px){.db-upsell-grid{grid-template-columns:1fr 1fr;gap:20px}}
+.db-upsell-card{padding:26px;border:1px solid rgba(201,169,110,.18);background:rgba(255,255,255,.06);border-radius:22px;box-shadow:0 12px 34px rgba(0,0,0,.12);transition:transform .3s,border-color .3s}
+.db-upsell-card:hover{transform:translateY(-3px);border-color:rgba(201,169,110,.34)}
+.db-upsell-card .label{color:var(--gold);margin-bottom:10px}
+.db-upsell-card h3{font-family:var(--serif);font-size:19px;font-weight:500;color:#F3E7D7;margin-bottom:9px}
+.db-upsell-card p{font-size:13px;line-height:1.65;color:#F3E7D7;opacity:.85;margin-bottom:18px}
+.db-upsell-card p strong{color:var(--gold);opacity:1;font-weight:600}
+.db-upsell-btn{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);text-decoration:none;padding:11px 20px;border:1px solid rgba(201,169,110,.4);border-radius:999px;transition:all .3s}
+.db-upsell-btn:hover{background:rgba(201,169,110,.12);border-color:var(--gold)}
+.db-upsell-btn span{transition:transform .3s}
+.db-upsell-btn:hover span{transform:translateX(3px)}
+
 
 
 /* Cleaner book with Divya directly image tile in dark mode */
@@ -1919,6 +1943,8 @@ body.light .mobile-nav-logo{background:radial-gradient(circle at 30% 30%,rgba(17
 .svc-pop-btn-ghost{background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.32);color:var(--gold)}
 .svc-pop-btn-ghost:hover{background:rgba(201,169,110,.18)}
 .svc-popup-foot{text-align:center;font-size:11px;color:var(--text-s);margin-top:13px;line-height:1.4}
+.svc-popup-blueprint{display:block;text-align:center;font-size:12px;color:var(--gold);text-decoration:underline;text-underline-offset:3px;font-weight:500;margin-top:12px}
+.svc-popup-blueprint:hover{color:var(--gold-l)}
 @media(min-width:500px){.svc-popup-actions{flex-direction:row}}
 
 /* Service popup: light-mode text fixes (added) */
@@ -2039,6 +2065,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <div class="hero-free-title">See what your numbers reveal about you</div>
 <button class="hero-free-btn pulse-cta" type="button" onclick="openFreeReportPopup()">Read My Numbers. Free &rarr;</button>
 </div>
+<p class="hero-alt-link">Already sure what you need? <a href="#pricing">See the Full Blueprint &amp; VIP Consultation</a></p>
 
 </div>
 </div>
@@ -2211,6 +2238,29 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 </div>
 </section>
 
+<!-- GO DEEPER UPSELL BAND -->
+<section class="sp db-upsell-strip">
+<div class="wrap">
+<div class="db-upsell-head reveal">
+<div class="label label-c">Go Deeper</div>
+<h2 class="sec-title">Want more than the free reading?</h2>
+</div>
+<div class="db-upsell-grid stagger">
+<div class="db-upsell-card reveal">
+<div class="label">Advanced</div>
+<h3>The Full Blueprint</h3>
+<p>A complete astrology and numerology reading, name correction guidance, gemstone protocol and 30 days of priority WhatsApp access to Divya. <strong>&#8377;999</strong></p>
+<a href="#pricing" class="db-upsell-btn">See What&rsquo;s Inside <span>&rarr;</span></a>
+</div>
+<div class="db-upsell-card reveal reveal-d1">
+<div class="label">VIP</div>
+<h3>Private Consultation</h3>
+<p>A full 45-minute live session with Divya, every question about your situation answered directly, on a call. <strong>&#8377;4,999</strong></p>
+<a href="#pricing" class="db-upsell-btn">See What&rsquo;s Inside <span>&rarr;</span></a>
+</div>
+</div>
+</div>
+</section>
 
 <section class="sp db-method-strip">
 <div class="wrap">
@@ -2394,8 +2444,11 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 </footer>
 
 <div class="sticky" id="sticky">
+<a href="#pricing" class="sticky-upsell">&#10022; See the Full Blueprint Report <span>&rarr;</span></a>
+<div class="sticky-row">
 <a href="javascript:void(0)" onclick="openFreeReportPopup()" class="st-free">Read My Numbers Free</a>
 <a href="https://wa.me/91XXXXXXXXXX" target="_blank" class="st-book">WhatsApp</a>
+</div>
 </div>
 <!-- Live Activity Notifications -->
 <div class="activity-toast" id="activityToast">
@@ -2429,6 +2482,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <button type="button" id="svcPopReport" class="svc-pop-btn svc-pop-btn-ghost" onclick="serviceToFreeReport()">Generate Free Report</button>
 </div>
 <p class="svc-popup-foot">Personal guidance from Divya. Real answers, not template replies.</p>
+<a href="#pricing" onclick="closeServicePopup()" class="svc-popup-blueprint">Want the complete picture instead? See the Full Blueprint report &rarr;</a>
 </div>
 </div>
 </div>

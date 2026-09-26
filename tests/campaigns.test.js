@@ -197,6 +197,42 @@ test('consent is only ever granted by the lead writers, never revoked', () => {
   });
 });
 
+// ---------------------------------------------------- free report exception
+//
+// The free report form deliberately has no checkbox, decided Sept 2026, to
+// keep that form frictionless. Instead the popup discloses the WhatsApp/email
+// follow-up in plain words right next to the button that submits it, and
+// tapping that button is itself the consenting act. These two tests exist so
+// that exception stays a documented, visible decision, not a silent one: if
+// either the on-page notice or the route's own comment disappears, this
+// becomes indistinguishable from the bug c6360c7 already fixed once.
+
+test('the free report popup discloses WhatsApp consent right by its submit button', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'landing.html'), 'utf8');
+  const marker = 'id="popupSubmitBtn"';
+  const at = source.indexOf(marker);
+  assert.ok(at > -1, 'free report submit button not found');
+  const nearby = source.slice(at, at + 600);
+  assert.ok(/popup-consent/.test(nearby), 'no consent notice right after the free report submit button');
+  assert.ok(/WhatsApp/.test(nearby), 'the notice does not mention WhatsApp');
+  assert.ok(/STOP/.test(nearby), 'the notice does not say how to stop');
+});
+
+test('the free report route documents why it grants consent unconditionally', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes.js'), 'utf8');
+  const at = source.indexOf("router.post('/reports/free'");
+  assert.ok(at > -1, "/reports/free route not found");
+  const routeBody = source.slice(at, source.indexOf("router.", at + 20));
+  assert.ok(/marketingConsent\s*=\s*true/.test(routeBody),
+    'the free report route no longer grants marketing consent at all');
+  assert.ok(/no consent checkbox|popup-consent|consent is instead the act of submitting/i.test(routeBody),
+    'consent is granted here with no comment explaining why - looks like the old bug, not the documented exception');
+});
+
 (async () => {
   for (const run of queue) await run();
   console.log(`\n${passed} passed, ${failed} failed\n`);

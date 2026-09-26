@@ -139,9 +139,19 @@ router.post('/reports/free', async (req, res) => {
   let report = null;
   try {
     const { name, phone, dob, email, question, source } = req.body;
-    const marketingConsent = req.body.marketing_consent === true;
     const missing = requiredFields(req.body);
     if (missing.length) return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
+
+    // Unlike the booking and paid blueprint forms, the free report popup has no
+    // consent checkbox - decided Sept 2026, so the free report keeps zero
+    // friction. Consent is instead the act of submitting itself: the popup
+    // shows the WhatsApp/email disclosure in plain words right by the submit
+    // button (see public/landing.html, .popup-consent), and the same wording
+    // lives in /privacy-policy.html. Every request that reaches this route
+    // already came from a customer who saw that notice and pressed Generate,
+    // so it is granted unconditionally here, the same way the ticked-box forms
+    // grant it only when the customer actually agreed.
+    const marketingConsent = true;
 
     lead = await findOrCreateLead({
       name, phone, dob, email, question,

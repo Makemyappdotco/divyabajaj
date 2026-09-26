@@ -360,6 +360,8 @@ body.light .hero-alt-link{color:rgba(42,37,32,.55)}
 .footer-btn.fs:hover{border-color:var(--gold);color:var(--gold)}
 .footer-line{width:100%;height:1px;background:var(--sl)}
 .footer-copy{font-size:10px;color:var(--text-s)}
+.footer-legal-link{color:var(--text-s);text-decoration:underline;text-underline-offset:2px}
+.footer-legal-link:hover{color:var(--gold)}
 
 /* Sticky */
 .sticky{position:fixed;bottom:0;left:0;right:0;z-index:99;padding:10px 14px;background:rgba(8,7,10,.93);backdrop-filter:blur(20px);border-top:1px solid rgba(201,169,110,.08);transform:translateY(100%);transition:transform .5s cubic-bezier(.22,1,.36,1)}
@@ -1238,6 +1240,11 @@ position:relative;overflow:hidden;margin-top:4px}
 background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
 animation:shimmer 3s linear infinite}
 .popup-submit:hover{box-shadow:0 8px 28px rgba(201,169,110,.3);transform:translateY(-2px)}
+
+/* Free report consent notice, added Sept 2026: no checkbox, the act of
+   tapping Generate is the consenting action, disclosed in plain words here. */
+.popup-consent{font-size:10.5px;line-height:1.55;color:var(--text-s);text-align:center;margin-top:10px}
+.popup-consent a{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
 
 /* Social proof line */
 .popup-proof{display:flex;align-items:center;justify-content:center;gap:8px;
@@ -2439,7 +2446,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <a href="#booking" class="footer-btn fs">Book a Session</a>
 </div>
 <div class="footer-line"></div>
-<div class="footer-copy">&copy; 2026 Divya Bajaj. All rights reserved.</div>
+<div class="footer-copy">&copy; 2026 Divya Bajaj. All rights reserved. &nbsp;<a href="/privacy-policy.html" class="footer-legal-link">Privacy Policy &amp; Terms</a></div>
 </div>
 </footer>
 
@@ -2516,6 +2523,7 @@ body.light .svc-popup-foot{color:rgba(32,24,19,.5)}
 <div class="field-group"><label class="field-label">Date of Birth</label><input type="date" id="popDob" name="dob" max="2025-12-31" min="1920-01-01" required></div>
 <div style="display:flex;gap:8px;align-items:stretch"><select id="popCountryCode" style="width:90px;padding:13px 8px;background:rgba(201,169,110,.04);border:1.5px solid rgba(201,169,110,.18);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:300;outline:none"><option value="+91">+91 IN</option><option value="+1">+1 US</option><option value="+44">+44 UK</option><option value="+971">+971 UAE</option><option value="+65">+65 SG</option><option value="+61">+61 AU</option><option value="+49">+49 DE</option><option value="+33">+33 FR</option><option value="+81">+81 JP</option><option value="+86">+86 CN</option><option value="+82">+82 KR</option><option value="+966">+966 SA</option><option value="+974">+974 QA</option><option value="+60">+60 MY</option><option value="+977">+977 NP</option><option value="+94">+94 LK</option><option value="+880">+880 BD</option></select><input type="tel" placeholder="WhatsApp Number" id="popPhone" name="phone" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required style="flex:1"></div>
 <button class="popup-submit" type="button" id="popupSubmitBtn" onclick="submitPopup()">Generate My Free Report</button>
+<p class="popup-consent">By tapping Generate, you agree to receive WhatsApp and email updates about Divya Bajaj’s paid services. Reply STOP on WhatsApp anytime to opt out. See our <a href="/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
 <button type="button" onclick="clearPopupForm()" style="display:block;width:100%;padding:12px;margin-top:6px;background:transparent;border:1px solid rgba(201,169,110,.15);color:var(--text-s);font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;font-family:var(--sans);transition:all .3s">Clear All Fields</button>
 <p style="text-align:center;font-size:11px;color:var(--text-s);margin-top:8px;line-height:1.4">Your report appears here instantly, and a copy is sent to your email and WhatsApp.</p>
 </div>

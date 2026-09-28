@@ -9,6 +9,7 @@ const express = require('express');
 const store = require('./services/booking/store');
 const db = require('./database');
 const pricing = require('./services/pricing');
+const googleCalendar = require('./services/googleCalendar');
 
 const router = express.Router();
 
@@ -90,10 +91,15 @@ router.get('/availability', handle('availability', async (req, res) => {
   if (!db.usingSupabase()) return fail(res, 503, 'Booking is temporarily unavailable.');
 
   const days = Math.min(Math.max(Number(req.query.days) || 21, 1), store.MAX_DAYS_AHEAD);
-  // Google Calendar busy times are added here once the calendar is connected.
-  // Passing an empty list means availability falls back to Divya's own rules
-  // rather than the whole page failing when Google is unreachable.
-  const result = await store.listAvailability({ days, busy: [] });
+  // getBusyTimes never throws and returns [] when Google isn't connected or
+  // unreachable, so availability always falls back to Divya's own rules
+  // rather than the whole page failing when Google is down.
+  const busyFrom = new Date();
+  const busyTo = new Date(busyFrom.getTime() + days * 86400000);
+  const busy = await googleCalendar.getBusyTimes({
+    environment: store.runtimeEnvironment(), from: busyFrom, to: busyTo
+  });
+  const result = await store.listAvailability({ days, busy });
   // Same source as the charge, so the page can never advertise one price and
   // take another.
   const price = await pricing.priceOf('consultation');
@@ -172,8 +178,13 @@ router.post('/hold', handle('hold', async (req, res) => {
   // falls on.
   // `from` narrows the window; the clock stays real, so the minimum notice
   // period still applies exactly as it does on the availability list.
+  const holdFrom = new Date(start.getTime() - 36 * 3600000);
+  const holdTo = new Date(holdFrom.getTime() + 3 * 86400000);
+  const holdBusy = await googleCalendar.getBusyTimes({
+    environment: store.runtimeEnvironment(), from: holdFrom, to: holdTo
+  });
   const available = await store.listAvailability({
-    days: 3, busy: [], from: new Date(start.getTime() - 36 * 3600000)
+    days: 3, busy: holdBusy, from: holdFrom
   });
   const match = available.slots.find(slot => slot.slot_key === slotKey);
   if (!match) return fail(res, 409, 'That slot is no longer available. Please pick another.');

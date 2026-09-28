@@ -18,6 +18,7 @@ const pricing = require('./services/pricing');
 const reportJobs = require('./services/reportJobs');
 const delivery = require('./services/delivery');
 const paidReportRoutes = require('./paidReportRoutes');
+const googleCalendar = require('./services/googleCalendar');
 
 const router = express.Router();
 
@@ -191,10 +192,36 @@ async function confirmPaid({ appointment, gatewayOrderId, paymentId, source }) {
 
   if (!claimed) return;
 
+  const lead = appointment.lead_id ? await db.getLead(appointment.lead_id) : null;
+
+  // Same "never undo a confirmed, paid booking" rule as the messaging below:
+  // a Calendar failure (not connected, token revoked, Google down) is logged
+  // and swallowed, never surfaced to the customer or the webhook caller.
+  try {
+    const event = await googleCalendar.createEventForAppointment({
+      environment: appointment.environment,
+      appointment: claimed,
+      lead
+    });
+    if (event) {
+      await store.setAppointmentStatus(appointment.id, 'confirmed', {
+        reason: 'google calendar event created',
+        changedBy: 'system',
+        patch: {
+          calendar_provider: 'google',
+          calendar_id: event.calendarId,
+          calendar_event_id: event.eventId,
+          meeting_url: event.meetingUrl
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[payment:confirm] booking confirmed but calendar sync failed', error.message);
+  }
+
   // Messaging never fails a confirmed, paid booking. The slot is theirs
   // whether or not the message lands.
   try {
-    const lead = appointment.lead_id ? await db.getLead(appointment.lead_id) : null;
     await delivery.deliverBookingConfirmation({
       environment: appointment.environment,
       appointmentId: appointment.id,

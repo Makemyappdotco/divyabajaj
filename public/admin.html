@@ -360,7 +360,8 @@
     days: 30,
     reportPage: 1, reportCategory: 'all', reportStatus: 'all',
     customerPage: 1, customerSearch: '',
-    failedCount: 0
+    failedCount: 0,
+    gcalNotice: null
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -1158,7 +1159,9 @@
         '<td>' + esc(lead.name || '—') +
           (lead.phone ? '<div class="dim" style="font-size:11.5px">' + esc(lead.phone) + '</div>' : '') +
           (lead.email ? '<div class="dim" style="font-size:11.5px">' + esc(lead.email) + '</div>' : '') + '</td>' +
-        '<td class="nowrap">' + esc(exactWhen(a.starts_at, true)) + '</td>' +
+        '<td class="nowrap">' + esc(exactWhen(a.starts_at, true)) +
+          (a.meeting_url ? '<div style="font-size:11.5px;margin-top:3px">' +
+            '<a href="' + esc(a.meeting_url) + '" target="_blank" rel="noopener" class="dl">Meet link</a></div>' : '') + '</td>' +
         '<td>' + productTag('consultation') +
           '<div class="dim" style="font-size:11px;margin-top:3px">' + esc(a.status.replace(/_/g, ' ')) + '</div></td>' +
         '<td style="font-size:12px">' + esc((a.customer_question || '').slice(0, 90)) + '</td>' +
@@ -1236,13 +1239,58 @@
   }
 
   function calendarCard(sched) {
-    return '<div class="card" style="margin-top:14px">' +
+    var notice = state.gcalNotice;
+    var noticeHtml = notice
+      ? '<div class="save-note ' + (notice.kind === 'bad' ? 'bad' : 'ok') + '" style="margin-bottom:12px;font-size:13px">' + esc(notice.text) + '</div>'
+      : '';
+
+    var body;
+    if (sched.calendar_connected) {
+      body = '<div class="dim" style="font-size:13px;line-height:1.6">Connected' +
+        (sched.calendar_account_email ? ' as ' + esc(sched.calendar_account_email) : '') + '. ' +
+        'Every new booking lands in Divya\'s calendar with a Google Meet link, and anything already on her calendar blocks that time automatically.</div>' +
+        '<div class="btn-row"><button class="btn quiet" id="gcalDisconnect">Disconnect</button>' +
+        '<span class="save-note" id="gcalNote"></span></div>';
+    } else {
+      body = '<div class="dim" style="font-size:13px;line-height:1.6">' + esc(sched.calendar_note) +
+        ' Once it is, every booking lands in Divya\'s calendar with a Google Meet link, and anything already in her calendar blocks that time automatically.</div>' +
+        '<div class="btn-row"><a class="btn" style="text-decoration:none;display:inline-block" href="/api/admin/google-calendar/connect">Connect Google Calendar</a>' +
+        '<span class="save-note" id="gcalNote"></span></div>';
+    }
+
+    return '<div class="card" id="calendarCard" style="margin-top:14px">' +
       '<div class="section-head"><div class="section-title">Google Calendar</div>' +
       '<div class="section-note">' + (sched.calendar_connected ? 'connected' : 'not connected') + '</div></div>' +
-      '<div class="dim" style="font-size:13px;line-height:1.6">' + esc(sched.calendar_note) +
-      ' Once it is, every booking lands in Divya\'s calendar with a Google Meet link, and anything already in her calendar blocks that time automatically.</div>' +
-      '<div class="btn-row"><button class="btn" disabled>Connect Google Calendar</button>' +
-      '<span class="save-note">Needs the Google project set up first.</span></div></div>';
+      noticeHtml + body + '</div>';
+  }
+
+  function wireCalendarCard() {
+    // Shown once, right after the OAuth redirect lands back here - not worth
+    // persisting past this render, so it is cleared as soon as it is read.
+    state.gcalNotice = null;
+
+    var disconnect = $('gcalDisconnect');
+    if (!disconnect) return;
+    disconnect.addEventListener('click', function () {
+      if (!confirm('Disconnect Google Calendar? New bookings will stop syncing until it is connected again.')) return;
+      disconnect.disabled = true;
+      disconnect.textContent = 'Disconnecting…';
+      fetch('/api/admin/google-calendar/disconnect', { method: 'POST', headers: { Accept: 'application/json' } })
+        .then(function (response) {
+          return response.text().then(function (raw) {
+            var parsed;
+            try { parsed = raw ? JSON.parse(raw) : {}; } catch (e) { parsed = { error: raw }; }
+            if (!response.ok) throw new Error(parsed.error || ('Request failed (' + response.status + ')'));
+            return parsed;
+          });
+        })
+        .then(renderConsultations)
+        .catch(function (e) {
+          disconnect.disabled = false;
+          disconnect.textContent = 'Disconnect';
+          note('gcalNote', 'bad', e.message);
+        });
+    });
   }
 
   function note(id, kind, text) {
@@ -1491,6 +1539,7 @@
       wirePricing();
       wireSchedule();
       wireReschedule();
+      wireCalendarCard();
       var tileButton = $('upcomingTile');
       if (tileButton) tileButton.addEventListener('click', function () {
         var card = $('upcomingCard');
@@ -1789,6 +1838,27 @@
   $('drawerClose').addEventListener('click', function () { $('drawer').classList.remove('on'); });
   $('drawer').addEventListener('click', function (e) { if (e.target === $('drawer')) $('drawer').classList.remove('on'); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') $('drawer').classList.remove('on'); });
+
+  // Google redirects back here as a full page load (?gcal_connected=1 or
+  // ?gcal_error=...), not a fetch, so the result has to be picked up from the
+  // URL once at startup - then the URL is cleaned so refreshing the page
+  // never re-shows a stale notice or re-submits anything.
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var connected = params.get('gcal_connected');
+    var gcalError = params.get('gcal_error');
+    if (!connected && !gcalError) return;
+
+    state.gcalNotice = gcalError
+      ? { kind: 'bad', text: gcalError }
+      : { kind: 'ok', text: 'Google Calendar connected.' };
+    state.section = 'consultations';
+
+    params.delete('gcal_connected');
+    params.delete('gcal_error');
+    var qs = params.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  })();
 
   var initial = location.hash.replace('#', '');
   if (SECTIONS.some(function (s) { return s.id === initial; })) state.section = initial;

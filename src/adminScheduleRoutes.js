@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const db = require('./database');
 const store = require('./services/booking/store');
 const delivery = require('./services/delivery');
+const googleCalendar = require('./services/googleCalendar');
 
 const router = express.Router();
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -209,14 +210,15 @@ router.get('/', handle('read', async (req, res) => {
   const environment = scope();
   const supabase = client();
 
-  const [rules, blocked, upcoming] = await Promise.all([
+  const [rules, blocked, upcoming, calendarStatus] = await Promise.all([
     supabase.from('availability_rules').select('*').eq('environment', environment).order('weekday'),
     supabase.from('blocked_dates').select('*').eq('environment', environment)
       .gte('ends_at', now()).order('starts_at'),
     supabase.from('appointments')
       .select('id, starts_at, ends_at, status, mode, lead_id, customer_question, meeting_url')
       .eq('environment', environment).in('status', store.LIVE_APPOINTMENT_STATUSES)
-      .gte('starts_at', now()).order('starts_at')
+      .gte('starts_at', now()).order('starts_at'),
+    googleCalendar.getStatus(environment)
   ]);
 
   for (const result of [rules, blocked, upcoming]) {
@@ -298,8 +300,9 @@ router.get('/', handle('read', async (req, res) => {
     upcoming: upcoming.data.map(a => Object.assign({}, a, { lead: names[a.lead_id] || null })),
     hold_minutes: store.HOLD_MINUTES,
     min_notice_minutes: store.MIN_NOTICE_MINUTES,
-    calendar_connected: false,
-    calendar_note: 'Google Calendar is not connected yet.'
+    calendar_connected: calendarStatus.connected,
+    calendar_account_email: calendarStatus.account_email || null,
+    calendar_note: calendarStatus.note
   });
 }));
 
@@ -444,6 +447,9 @@ router.post('/appointment/:id/cancel', handle('cancel', async (req, res) => {
     reason: String((req.body && req.body.reason) || '').trim().slice(0, 300) || 'cancelled by Divya',
     changedBy: 'admin'
   });
+  // Best-effort, same as everywhere else Calendar is touched: a booking is
+  // cancelled in the app either way, whether or not Google could be reached.
+  await googleCalendar.cancelEventForAppointment({ environment: appointment.environment, appointment });
   const notified = await notifyBookingChange(updated, delivery.deliverConsultationCancelled);
   // Cancelling drops the row out of active_appointment_slot_unique, so the time
   // becomes bookable again on the very next availability call.

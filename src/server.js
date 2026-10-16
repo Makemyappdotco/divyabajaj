@@ -312,7 +312,20 @@ function serveLanding(req, res) {
 
 app.get('/', serveLanding);
 app.get('/landing.html', serveLanding);
-app.get(['/full-blueprint', '/paid-report'], serveLanding);
+app.get('/paid-report', serveLanding);
+
+// Standalone, directly-shareable pages for the two lead-magnet products -
+// mirrors how /consultation already works as its own page, so each product
+// has one direct link that can be shared on its own instead of only living
+// inside the homepage's popups.
+app.get('/full-blueprint', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.sendFile(path.join(publicDir, 'full-blueprint.html'));
+});
+app.get('/free-report', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.sendFile(path.join(publicDir, 'free-report.html'));
+});
 
 // paid-live-flow.js builds the report modal from a template literal with the
 // blueprint and consultation prices written into it, so it is served through a

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-4V2BKEPSV2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-4V2BKEPSV2');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Full Blueprint | Divya Bajaj</title>
+<meta name="description" content="The Full Blueprint: a complete astrology and numerology reading, name correction guidance, gemstone protocol and 30 days of priority WhatsApp access to Divya Bajaj.">
+<link rel="icon" href="/divya-bajaj-monogram.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Same tokens as landing.html, consultation.html and free-report.html. */
+  :root{
+    --serif:'Fraunces',Georgia,serif;
+    --sans:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
+    --bg:#F6F3EC; --surface:#FDFBF7; --surface-2:#EDE8DF;
+    --line:#E2D9C8; --line-soft:#EFE8DA;
+    --ink:#1A1714; --ink-2:#5C544A; --ink-3:#8A8073;
+    --gold:#B08D4A; --gold-l:#C9A96E; --gold-d:#8A6F3A;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(26,23,20,.05), 0 8px 24px rgba(26,23,20,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+
+  .wrap{max-width:720px;margin:0 auto;padding:26px 20px 80px}
+  @media (max-width:560px){.wrap{padding:18px 14px 60px}}
+
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:26px}
+  .top img{width:44px;height:auto;flex:none}
+  .top-name{font-family:var(--serif);font-size:18px;font-weight:600;line-height:1.15}
+  .top-sub{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);margin-top:2px}
+
+  .label{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-d);font-weight:600}
+  h1{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:-.015em;line-height:1.15;margin-top:10px}
+  @media (max-width:560px){h1{font-size:26px}}
+  .lede{color:var(--ink-2);margin-top:10px;max-width:58ch}
+  .rule{height:1px;background:linear-gradient(90deg,var(--gold-l),transparent);opacity:.6;margin:24px 0}
+
+  .price-row{display:flex;align-items:baseline;gap:10px;margin-top:4px}
+  .price-now{font-family:var(--serif);font-size:30px;font-weight:600;color:var(--gold-d)}
+  .price-was{font-size:15px;color:var(--ink-3);text-decoration:line-through}
+  .price-save{font-size:12px;color:var(--gold-d);background:var(--surface-2);border-radius:20px;padding:3px 10px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+        padding:22px;box-shadow:var(--shadow);margin-top:22px}
+  .card h2{font-family:var(--serif);font-size:19px;font-weight:600}
+  .includes{list-style:none;margin-top:14px;display:grid;gap:11px}
+  .includes li{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink-2)}
+  .includes li::before{content:'\2713';flex:none;width:20px;height:20px;border-radius:50%;
+    background:var(--surface-2);color:var(--gold-d);font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;margin-top:1px}
+
+  .cta{background:var(--ink);color:var(--surface);border-radius:10px;padding:15px 22px;
+       font-size:15px;font-weight:600;width:100%;margin-top:22px;transition:opacity .13s}
+  .cta:hover{opacity:.88}
+
+  .trust{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .fact{font-size:12.5px;color:var(--gold-d);border:1px solid var(--line);background:var(--surface);
+        border-radius:20px;padding:4px 12px;white-space:nowrap}
+
+  .foot{text-align:center;font-size:12.5px;color:var(--ink-3);margin-top:28px}
+  .foot a{color:var(--gold-d)}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <img src="/divya-bajaj-monogram.svg" alt="">
+    <div>
+      <div class="top-name">Divya Bajaj</div>
+      <div class="top-sub">Astro-Numerologist</div>
+    </div>
+  </div>
+
+  <div class="label">Advanced &middot; Go Deeper</div>
+  <h1>The Full Blueprint</h1>
+  <p class="lede">A complete astrology and numerology reading, name correction guidance, a gemstone protocol, and 30 days of priority WhatsApp access to Divya &mdash; built around your exact birth details.</p>
+
+  <div class="price-row" id="priceRow" hidden>
+    <span class="price-now" id="priceNow"></span>
+    <span class="price-was" id="priceWas" hidden></span>
+    <span class="price-save" id="priceSave" hidden></span>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="card">
+    <h2>What&rsquo;s inside</h2>
+    <ul class="includes">
+      <li>Complete astrology &amp; numerology reading built from your birth chart and numbers together</li>
+      <li>Name correction guidance, based on your numerology</li>
+      <li>A personal gemstone protocol</li>
+      <li>30 days of priority WhatsApp access to Divya for follow-up questions</li>
+      <li>A clear, written PDF report you keep</li>
+    </ul>
+    <button class="cta" type="button" id="getBlueprintBtn">Get My Full Blueprint</button>
+    <div class="trust">
+      <div class="fact">Instant, secure checkout</div>
+      <div class="fact">Delivered to email &amp; WhatsApp</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    Have a question first? Message us on
+    <a href="https://wa.me/917042091555" rel="noopener">WhatsApp</a>.
+  </div>
+</div>
+
+<!-- The real, live checkout flow - same script the homepage uses. It builds
+     its own modal and talks to the real Razorpay-backed blueprint API, so
+     this page does not reimplement any payment logic. -->
+<script src="/paid-live-flow.js?v=paid-live-ui-2"></script>
+<script>
+(function () {
+  function openBlueprint() {
+    if (window.openPaidBlueprint) window.openPaidBlueprint();
+  }
+  var btn = document.getElementById('getBlueprintBtn');
+  if (btn) btn.addEventListener('click', openBlueprint);
+
+  // Visitors land here from a direct link specifically to buy this, so open
+  // the checkout right away - the sales copy above stays underneath for
+  // anyone who closes it first to read more.
+  window.addEventListener('load', function () {
+    setTimeout(openBlueprint, 400);
+  });
+
+  // Fill in the live price so the page never advertises a stale number.
+  fetch('/api/pricing').then(function (r) { return r.json(); }).then(function (d) {
+    var rows = (d && d.products) || [];
+    var row = rows.filter(function (r) { return r.product_code === 'paid_blueprint'; })[0];
+    if (!row) return;
+    var now = document.getElementById('priceNow');
+    var was = document.getElementById('priceWas');
+    var save = document.getElementById('priceSave');
+    var row_ = document.getElementById('priceRow');
+    now.textContent = row.formatted;
+    row_.hidden = false;
+    if (row.compare_at_formatted) { was.textContent = row.compare_at_formatted; was.hidden = false; }
+    if (row.saving_percent) { save.textContent = row.saving_percent + '% off'; save.hidden = false; }
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

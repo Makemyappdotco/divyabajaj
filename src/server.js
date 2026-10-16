@@ -64,7 +64,7 @@ const browserScriptsValid = validateBrowserScriptsSafely();
 // Divya's real WhatsApp number, as already used by public/consultation.html.
 const CONTACT_WHATSAPP = process.env.CONTACT_WHATSAPP || '917042091555';
 
-async function sendLandingWithPatches(res) {
+async function sendLandingWithPatches(res, autoOpen) {
   const landingPath = path.join(publicDir, 'landing.html');
   if (!fs.existsSync(landingPath)) return res.status(404).send('Landing page not found');
 
@@ -105,6 +105,16 @@ async function sendLandingWithPatches(res) {
   html = pricingPatch.patchLandingPrices(html, await pricing.getPrices());
 
   html = html.replace('</body>', `${paidScript}\n${directPaidScript}\n${polishScript}\n${whyBalanceScript}\n${modalFixScript}\n${profileRepairScript}\n${freeDownloadFixScript}\n${revealFailsafeScript}\n${bookingModalScript}\n</body>`);
+
+  // A direct link to one specific product (e.g. /free-report, /full-blueprint)
+  // opens the exact same homepage and its exact same existing popup/modal -
+  // nothing about the popup itself is rebuilt here, just auto-triggered, so
+  // it can never drift from what the homepage actually shows.
+  if (autoOpen === 'free') {
+    html = html.replace('</body>', `<script>window.addEventListener('load', function () { setTimeout(function () { if (window.openFreeReportPopup) window.openFreeReportPopup(); }, 300); });</script>\n</body>`);
+  } else if (autoOpen === 'blueprint') {
+    html = html.replace('</body>', `<script>window.addEventListener('load', function () { setTimeout(function () { if (window.openPaidBlueprint) window.openPaidBlueprint(); }, 300); });</script>\n</body>`);
+  }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -314,17 +324,20 @@ app.get('/', serveLanding);
 app.get('/landing.html', serveLanding);
 app.get('/paid-report', serveLanding);
 
-// Standalone, directly-shareable pages for the two lead-magnet products -
-// mirrors how /consultation already works as its own page, so each product
-// has one direct link that can be shared on its own instead of only living
-// inside the homepage's popups.
+// Direct links to one specific product - the exact same homepage, exact same
+// existing popup/modal, just auto-opened on arrival so each product has a
+// link that can be shared on its own without reimplementing any UI.
 app.get('/full-blueprint', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  res.sendFile(path.join(publicDir, 'full-blueprint.html'));
+  return sendLandingWithPatches(res, 'blueprint').catch(error => {
+    console.error('[landing]', error);
+    if (!res.headersSent) res.status(500).send('Landing page unavailable');
+  });
 });
 app.get('/free-report', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  res.sendFile(path.join(publicDir, 'free-report.html'));
+  return sendLandingWithPatches(res, 'free').catch(error => {
+    console.error('[landing]', error);
+    if (!res.headersSent) res.status(500).send('Landing page unavailable');
+  });
 });
 
 // paid-live-flow.js builds the report modal from a template literal with the
